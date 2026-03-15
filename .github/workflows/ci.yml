@@ -136,19 +136,60 @@ jobs:
         shell: bash
         run: cmake --build "${{ matrix.build_dir }}" --config ${{ env.BUILD_TYPE }} --parallel
 
-      - name: Collect build output (Linux/macOS)
-        if: runner.os != 'Windows'
+      - name: Package app (macOS)
+        if: runner.os == 'macOS'
         shell: bash
         run: |
           mkdir -p "${{ matrix.package_dir }}"
-          cp -R "${{ matrix.build_dir }}/." "${{ matrix.package_dir }}/"
 
-      - name: Collect build output (Windows)
+          APP_BUNDLE=$(find "${{ matrix.build_dir }}" -maxdepth 3 -name "appFileExplorer.app" | head -n 1)
+          if [ -z "$APP_BUNDLE" ]; then
+            echo "appFileExplorer.app not found"
+            exit 1
+          fi
+
+          cp -R "$APP_BUNDLE" "${{ matrix.package_dir }}/"
+
+          MACDEPLOYQT=$(find "$QT_ROOT_DIR" -name macdeployqt | head -n 1)
+          if [ -z "$MACDEPLOYQT" ]; then
+            echo "macdeployqt not found"
+            exit 1
+          fi
+
+          "$MACDEPLOYQT" "${{ matrix.package_dir }}/appFileExplorer.app" -qmldir="$GITHUB_WORKSPACE"
+
+      - name: Package app (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
+          $ErrorActionPreference = "Stop"
+
           New-Item -ItemType Directory -Force -Path "${{ matrix.package_dir }}" | Out-Null
-          Copy-Item -Recurse -Force "${{ matrix.build_dir }}\*" "${{ matrix.package_dir }}\"
+
+          $exe = Get-ChildItem -Path "${{ matrix.build_dir }}" -Recurse -Filter "appFileExplorer.exe" |
+            Select-Object -First 1
+
+          if (-not $exe) {
+            throw "appFileExplorer.exe not found"
+          }
+
+          Copy-Item $exe.FullName "${{ matrix.package_dir }}\" -Force
+
+          $deployTool = Get-ChildItem -Path $env:QT_ROOT_DIR -Recurse -Filter "windeployqt.exe" |
+            Select-Object -First 1
+
+          if (-not $deployTool) {
+            throw "windeployqt.exe not found under QT_ROOT_DIR=$env:QT_ROOT_DIR"
+          }
+
+          & $deployTool.FullName `
+            --release `
+            --qmldir "$PWD" `
+            --dir "${{ matrix.package_dir }}" `
+            "${{ matrix.package_dir }}\appFileExplorer.exe"
+
+          Write-Host "Packaged files:"
+          Get-ChildItem -Recurse "${{ matrix.package_dir }}"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
