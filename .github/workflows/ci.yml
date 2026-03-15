@@ -154,6 +154,48 @@ jobs:
           echo "Packaged files:"
           find "${{ matrix.package_dir }}" -maxdepth 3 -type f
 
+      - name: Smoke test packaged app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          WORKDIR="$(realpath "${{ matrix.package_dir }}")"
+          EXE="$(find "$WORKDIR" -maxdepth 3 -type f -name appFileExplorer | head -n 1)"
+
+          if [ -z "$EXE" ]; then
+            echo "=== packaged files ==="
+            find "$WORKDIR" -maxdepth 6 -print || true
+            exit 1
+          fi
+
+          STDOUT_LOG="$WORKDIR/startup-stdout.txt"
+          STDERR_LOG="$WORKDIR/startup-stderr.txt"
+          rm -f "$STDOUT_LOG" "$STDERR_LOG"
+
+          export QT_DEBUG_PLUGINS=1
+          export QML_IMPORT_TRACE=1
+          export QT_QPA_PLATFORM=offscreen
+
+          "$EXE" >"$STDOUT_LOG" 2>"$STDERR_LOG" &
+          PID=$!
+
+          sleep 8
+
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "=== startup-stdout.txt ==="
+            cat "$STDOUT_LOG" || true
+            echo "=== startup-stderr.txt ==="
+            cat "$STDERR_LOG" || true
+            echo "=== packaged files ==="
+            find "$WORKDIR" -maxdepth 6 -print || true
+            wait "$PID" || true
+            exit 1
+          fi
+
+          kill "$PID" || true
+          wait "$PID" || true
+
       - name: Package app (macOS)
         if: runner.os == 'macOS'
         shell: bash
@@ -193,6 +235,56 @@ jobs:
 
           echo "Packaged files:"
           find . -maxdepth 4
+
+      - name: Smoke test packaged app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          WORKDIR="$(realpath "${{ matrix.package_dir }}")"
+          APP_BUNDLE="$WORKDIR/appFileExplorer.app"
+
+          if [ ! -d "$APP_BUNDLE" ]; then
+            echo "=== packaged files ==="
+            find "$WORKDIR" -maxdepth 6 -print || true
+            exit 1
+          fi
+
+          EXE="$APP_BUNDLE/Contents/MacOS/appFileExplorer"
+          if [ ! -x "$EXE" ]; then
+            echo "Executable not found: $EXE"
+            find "$APP_BUNDLE" -maxdepth 6 -print || true
+            exit 1
+          fi
+
+          STDOUT_LOG="$WORKDIR/startup-stdout.txt"
+          STDERR_LOG="$WORKDIR/startup-stderr.txt"
+          rm -f "$STDOUT_LOG" "$STDERR_LOG"
+
+          export QT_DEBUG_PLUGINS=1
+          export QML_IMPORT_TRACE=1
+
+          "$EXE" >"$STDOUT_LOG" 2>"$STDERR_LOG" &
+          PID=$!
+
+          sleep 8
+
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "=== startup-stdout.txt ==="
+            cat "$STDOUT_LOG" || true
+            echo "=== startup-stderr.txt ==="
+            cat "$STDERR_LOG" || true
+            echo "=== otool app binary ==="
+            otool -L "$EXE" || true
+            echo "=== packaged files ==="
+            find "$APP_BUNDLE" -maxdepth 6 -print || true
+            wait "$PID" || true
+            exit 1
+          fi
+
+          kill "$PID" || true
+          wait "$PID" || true
 
       - name: Package app (Windows)
         if: runner.os == 'Windows'
