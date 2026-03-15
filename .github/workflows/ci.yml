@@ -136,10 +136,29 @@ jobs:
         shell: bash
         run: cmake --build "${{ matrix.build_dir }}" --config ${{ env.BUILD_TYPE }} --parallel
 
+      - name: Package app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -e
+          mkdir -p "${{ matrix.package_dir }}"
+
+          EXE=$(find "${{ matrix.build_dir }}" -maxdepth 3 -type f -name "appFileExplorer" | head -n 1)
+          if [ -z "$EXE" ]; then
+            echo "appFileExplorer not found"
+            exit 1
+          fi
+
+          cp "$EXE" "${{ matrix.package_dir }}/"
+
+          echo "Packaged files:"
+          find "${{ matrix.package_dir }}" -maxdepth 3 -type f
+
       - name: Package app (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
+          set -e
           mkdir -p "${{ matrix.package_dir }}"
 
           APP_BUNDLE=$(find "${{ matrix.build_dir }}" -maxdepth 3 -name "appFileExplorer.app" | head -n 1)
@@ -157,6 +176,9 @@ jobs:
           fi
 
           "$MACDEPLOYQT" "${{ matrix.package_dir }}/appFileExplorer.app" -qmldir="$GITHUB_WORKSPACE"
+
+          echo "Packaged files:"
+          find "${{ matrix.package_dir }}" -maxdepth 4
 
       - name: Package app (Windows)
         if: runner.os == 'Windows'
@@ -185,7 +207,7 @@ jobs:
           & $deployTool.FullName `
             --release `
             --compiler-runtime `
-            --qmldir "$PWD" `
+            --qmldir "$env:GITHUB_WORKSPACE" `
             --dir "${{ matrix.package_dir }}" `
             "${{ matrix.package_dir }}\appFileExplorer.exe"
 
