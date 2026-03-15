@@ -194,14 +194,82 @@ jobs:
           echo "Packaged files:"
           find . -maxdepth 4
 
+      - name: Package app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          New-Item -ItemType Directory -Force -Path "${{ matrix.package_dir }}" | Out-Null
+
+          $exe = Get-ChildItem -Path "${{ matrix.build_dir }}" -Recurse -Filter "appFileExplorer.exe" |
+            Select-Object -First 1
+
+          if (-not $exe) {
+            Write-Host "=== build contents ==="
+            Get-ChildItem -Recurse "${{ matrix.build_dir }}" |
+              Select-Object FullName |
+              Format-Table -AutoSize |
+              Out-String -Width 4096 |
+              Write-Host
+
+            throw "appFileExplorer.exe not found in build output"
+          }
+
+          Copy-Item $exe.FullName "${{ matrix.package_dir }}\" -Force
+
+          if (-not (Test-Path "${{ matrix.package_dir }}\appFileExplorer.exe")) {
+            throw "Copy to dist failed"
+          }
+
+          $deployTool = Get-ChildItem -Path $env:QT_ROOT_DIR -Recurse -Filter "windeployqt.exe" |
+            Select-Object -First 1
+
+          if (-not $deployTool) {
+            throw "windeployqt.exe not found under QT_ROOT_DIR=$env:QT_ROOT_DIR"
+          }
+
+          & $deployTool.FullName `
+            --release `
+            --compiler-runtime `
+            --qmldir "$env:GITHUB_WORKSPACE" `
+            --dir "${{ matrix.package_dir }}" `
+            "${{ matrix.package_dir }}\appFileExplorer.exe"
+
+          if (-not (Test-Path "${{ matrix.package_dir }}\platforms\qwindows.dll")) {
+            throw "qwindows.dll was not deployed"
+          }
+
+          Write-Host "=== dist contents after windeployqt ==="
+          Get-ChildItem -Recurse "${{ matrix.package_dir }}" |
+            Select-Object FullName |
+            Format-Table -AutoSize |
+            Out-String -Width 4096 |
+            Write-Host
+
       - name: Smoke test packaged app (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $ErrorActionPreference = "Stop"
 
-          $exePath = (Resolve-Path "${{ matrix.package_dir }}\appFileExplorer.exe").Path
           $workDir = (Resolve-Path "${{ matrix.package_dir }}").Path
+
+          $exe = Get-ChildItem -Path $workDir -Recurse -Filter "appFileExplorer.exe" |
+            Select-Object -First 1
+
+          if (-not $exe) {
+            Write-Host "=== dist contents ==="
+            Get-ChildItem -Recurse $workDir |
+              Select-Object FullName |
+              Format-Table -AutoSize |
+              Out-String -Width 4096 |
+              Write-Host
+
+            throw "appFileExplorer.exe not found under $workDir"
+          }
+
+          $exePath = $exe.FullName
           $stdoutLog = Join-Path $workDir "startup-stdout.txt"
           $stderrLog = Join-Path $workDir "startup-stderr.txt"
 
@@ -241,66 +309,6 @@ jobs:
               Format-Table -AutoSize |
               Out-String -Width 4096 |
               Write-Host
-
-            Write-Host "=== Qt platform plugins ==="
-            Get-ChildItem "$workDir\platforms" -ErrorAction SilentlyContinue |
-              Select-Object Name, Length |
-              Format-Table -AutoSize |
-              Out-String -Width 4096 |
-              Write-Host
-
-            Write-Host "=== Qt qml directory ==="
-            Get-ChildItem "$workDir\qml" -Recurse -ErrorAction SilentlyContinue |
-              Select-Object FullName |
-              Format-Table -AutoSize |
-              Out-String -Width 4096 |
-              Write-Host
-
-            throw "appFileExplorer.exe exited immediately with code $($proc.ExitCode)"
-          }
-
-          Stop-Process -Id $proc.Id -Force
-
-      - name: Smoke test packaged app (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = "Stop"
-
-          $exePath = (Resolve-Path "${{ matrix.package_dir }}\appFileExplorer.exe").Path
-          $workDir = (Resolve-Path "${{ matrix.package_dir }}").Path
-          $logPath = Join-Path $workDir "startup-log.txt"
-
-          Remove-Item $logPath -ErrorAction SilentlyContinue
-
-          $env:QT_DEBUG_PLUGINS = "1"
-          $env:QML_IMPORT_TRACE = "1"
-
-          $proc = Start-Process `
-            -FilePath $exePath `
-            -WorkingDirectory $workDir `
-            -RedirectStandardOutput $logPath `
-            -RedirectStandardError $logPath `
-            -PassThru
-
-          Start-Sleep -Seconds 8
-
-          if ($proc.HasExited) {
-            Write-Host "=== startup-log.txt ==="
-            if (Test-Path $logPath) {
-              Get-Content $logPath -Raw | Write-Host
-            } else {
-              Write-Host "No startup log was produced."
-            }
-
-            Write-Host "=== packaged files ==="
-            Get-ChildItem -Recurse $workDir | Select-Object FullName | Format-Table -AutoSize | Out-String -Width 4096 | Write-Host
-
-            Write-Host "=== Qt platform plugins ==="
-            Get-ChildItem "$workDir\platforms" -ErrorAction SilentlyContinue | Select-Object Name, Length | Format-Table -AutoSize | Out-String -Width 4096 | Write-Host
-
-            Write-Host "=== Qt qml directory ==="
-            Get-ChildItem "$workDir\qml" -Recurse -ErrorAction SilentlyContinue | Select-Object FullName | Format-Table -AutoSize | Out-String -Width 4096 | Write-Host
 
             throw "appFileExplorer.exe exited immediately with code $($proc.ExitCode)"
           }
