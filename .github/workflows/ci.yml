@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            qt_host: linux
+            qt_target: desktop
+            qt_arch: gcc_64
+            cmake_generator: Ninja
+            artifact_name: app-linux
+            build_dir: build
+            package_dir: dist
+
+          - os: windows-latest
+            qt_host: windows
+            qt_target: desktop
+            qt_arch: win64_msvc2022_64
+            cmake_generator: Ninja
+            artifact_name: app-windows
+            build_dir: build
+            package_dir: dist
+
+          - os: macos-latest
+            qt_host: mac
+            qt_target: desktop
+            qt_arch: clang_64
+            cmake_generator: Ninja
+            artifact_name: app-macos
+            build_dir: build
+            package_dir: dist
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Install Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.2"
+          host: ${{ matrix.qt_host }}
+          target: ${{ matrix.qt_target }}
+          arch: ${{ matrix.qt_arch }}
+          cache: true
+
+      - name: Configure (CMake)
+        run: >
+          cmake -S . -B ${{ matrix.build_dir }}
+          -G "${{ matrix.cmake_generator }}"
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
+        shell: bash
+
+      - name: Build
+        run: cmake --build ${{ matrix.build_dir }} --config Release --parallel
+        shell: bash
+
+      - name: Collect build output (Linux/macOS)
+        if: runner.os != 'Windows'
+        run: |
+          mkdir -p "${{ matrix.package_dir }}"
+          cp -R "${{ matrix.build_dir }}/." "${{ matrix.package_dir }}/"
+        shell: bash
+
+      - name: Collect build output (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          New-Item -ItemType Directory -Force -Path "${{ matrix.package_dir }}" | Out-Null
+          Copy-Item -Recurse -Force "${{ matrix.build_dir }}\*" "${{ matrix.package_dir }}\"
+        shell: pwsh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.package_dir }}
+          if-no-files-found: error
