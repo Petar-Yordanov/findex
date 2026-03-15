@@ -1,0 +1,44 @@
+<RCC>
+    <qresource prefix="/">
+        <file>Main.qml</file>
+        <file>AppIcon.qml</file>
+        <file>assets/icons/add.svg</file>
+        <file>assets/icons/arrow-back.svg</file>
+        <file>assets/icons/arrow-forward.svg</file>
+        <file>assets/icons/arrow-upward.svg</file>
+        <file>assets/icons/check-box-outline-blank.svg</file>
+        <file>assets/icons/chevron-right.svg</file>
+        <file>assets/icons/close.svg</file>
+        <file>assets/icons/computer.svg</file>
+        <file>assets/icons/content-copy.svg</file>
+        <file>assets/icons/content-cut.svg</file>
+        <file>assets/icons/dark-mode.svg</file>
+        <file>assets/icons/description.svg</file>
+        <file>assets/icons/desktop-windows.svg</file>
+        <file>assets/icons/more-horiz.svg</file>
+        <file>assets/icons/expand-more.svg</file>
+        <file>assets/icons/insert-drive-file.svg</file>
+        <file>assets/icons/devices.svg</file>
+        <file>assets/icons/download.svg</file>
+        <file>assets/icons/filter-none.svg</file>
+        <file>assets/icons/folder.svg</file>
+        <file>assets/icons/grid-view.svg</file>
+        <file>assets/icons/hard-drive.svg</file>
+        <file>assets/icons/history.svg</file>
+        <file>assets/icons/home.svg</file>
+        <file>assets/icons/image.svg</file>
+        <file>assets/icons/light-mode.svg</file>
+        <file>assets/icons/movie.svg</file>
+        <file>assets/icons/music-note.svg</file>
+        <file>assets/icons/refresh.svg</file>
+        <file>assets/icons/minimize.svg</file>
+        <file>assets/icons/save.svg</file>
+        <file>assets/icons/search.svg</file>
+        <file>assets/icons/sort.svg</file>
+        <file>assets/icons/storage.svg</file>
+        <file>assets/icons/undo.svg</file>
+        <file>assets/icons/usb.svg</file>
+        <file>assets/icons/view-list.svg</file>
+        <file>assets/icons/view-list-alt.svg</file>
+    </qresource>
+</RCC>
