@@ -156,7 +156,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          WORKDIR="$(realpath "${{ matrix.package_dir }}")"
+          WORKDIR="$(realpath -m "${{ github.workspace }}/${{ matrix.package_dir }}")"
           EXE="$(find "$WORKDIR" -maxdepth 6 -type f -name appFileExplorer | head -n 1)"
 
           if [ -z "$EXE" ]; then
@@ -164,6 +164,9 @@ jobs:
             find "$WORKDIR" -maxdepth 8 -print || true
             exit 1
           fi
+
+          echo "=== ldd ==="
+          ldd "$EXE" || true
 
           STDOUT_LOG="$WORKDIR/startup-stdout.txt"
           STDERR_LOG="$WORKDIR/startup-stderr.txt"
@@ -397,6 +400,14 @@ jobs:
 
           Stop-Process -Id $proc.Id -Force
 
+      - name: Zip app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ matrix.package_dir }}"
+          tar -czf "../${{ matrix.artifact_name }}.tar.gz" .
+
       - name: Zip app (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -424,7 +435,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.package_dir }}
+          path: ${{ matrix.artifact_name }}.tar.gz
           if-no-files-found: error
 
       - name: Upload artifact (macOS)
