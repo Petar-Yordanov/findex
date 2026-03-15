@@ -5,7 +5,11 @@ project(FileExplorer VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Core)
+find_package(Qt6 REQUIRED COMPONENTS
+    Core
+    Quick
+    Core5Compat
+)
 
 if(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
@@ -46,15 +50,21 @@ qt_add_qml_module(appFileExplorer
         assets/icons/arrow-upward.svg
         assets/icons/check-box-outline-blank.svg
         assets/icons/chevron-right.svg
+        assets/icons/chevron-left.svg
         assets/icons/close.svg
         assets/icons/computer.svg
         assets/icons/content-copy.svg
         assets/icons/content-cut.svg
+        assets/icons/content-paste.svg
         assets/icons/dark-mode.svg
+        assets/icons/delete.svg
         assets/icons/description.svg
         assets/icons/desktop-windows.svg
         assets/icons/devices.svg
+        assets/icons/detailed-view.svg
         assets/icons/download.svg
+        assets/icons/edit.svg
+        assets/icons/error.svg
         assets/icons/expand-more.svg
         assets/icons/filter-none.svg
         assets/icons/folder.svg
@@ -63,33 +73,38 @@ qt_add_qml_module(appFileExplorer
         assets/icons/history.svg
         assets/icons/home.svg
         assets/icons/image.svg
+        assets/icons/info.svg
         assets/icons/insert-drive-file.svg
+        assets/icons/keyboard-arrow-down.svg
+        assets/icons/keyboard-arrow-up.svg
+        assets/icons/launch.svg
         assets/icons/light-mode.svg
+        assets/icons/list-view.svg
+        assets/icons/lock.svg
         assets/icons/minimize.svg
+        assets/icons/moon.svg
         assets/icons/more-horiz.svg
         assets/icons/movie.svg
         assets/icons/music-note.svg
+        assets/icons/notifications.svg
+        assets/icons/picture-as-pdf.svg
         assets/icons/refresh.svg
         assets/icons/save.svg
         assets/icons/search.svg
         assets/icons/sort.svg
         assets/icons/storage.svg
+        assets/icons/sun.svg
+        assets/icons/sync.svg
+        assets/icons/terminal.svg
+        assets/icons/tile-view.svg
         assets/icons/undo.svg
         assets/icons/usb.svg
         assets/icons/view-list.svg
         assets/icons/view-list-alt.svg
-        assets/icons/content-paste.svg
-        assets/icons/edit.svg
-        assets/icons/delete.svg
-        RESOURCES assets/icons/keyboard-arrow-down.svg assets/icons/keyboard-arrow-up.svg
-        RESOURCES assets/icons/detailed-view.svg assets/icons/tile-view.svg assets/icons/list-view.svg
-        RESOURCES assets/icons/moon.svg assets/icons/sun.svg
-        RESOURCES assets/icons/visibility.svg assets/icons/notifications.svg
-        RESOURCES assets/icons/check.svg
-        RESOURCES assets/icons/error.svg assets/icons/sync.svg assets/icons/info.svg
-        RESOURCES assets/icons/lock.svg assets/icons/launch.svg assets/icons/code.svg assets/icons/terminal.svg assets/icons/zip.svg assets/icons/picture-as-pdf.svg
-        RESOURCES assets/icons/code.svg
-        RESOURCES assets/icons/chevron-left.svg
+        assets/icons/visibility.svg
+        assets/icons/zip.svg
+        assets/icons/check.svg
+        assets/icons/code.svg
 )
 
 set_target_properties(appFileExplorer PROPERTIES
@@ -103,6 +118,7 @@ target_link_libraries(appFileExplorer
     PRIVATE
         Qt6::Quick
         Qt6::Core
+        Qt6::Core5Compat
 )
 
 if(WIN32)
