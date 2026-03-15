@@ -1,4 +1,4 @@
-#include "fileassociationservice.h"
+#include "FileAssociationService.h"
 
 #include <QFileInfo>
 #include <QMimeDatabase>
