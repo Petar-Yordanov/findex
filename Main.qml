@@ -1189,28 +1189,13 @@ Window {
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-        background: Item {
+        background: Rectangle {
             implicitWidth: notificationsPopup.width
             implicitHeight: notificationsPopup.height
-
-            DropShadow {
-                anchors.fill: popupBg
-                source: popupBg
-                horizontalOffset: 0
-                verticalOffset: 4
-                radius: 16
-                samples: 25
-                color: root.darkTheme ? "#66000000" : "#22000000"
-            }
-
-            Rectangle {
-                id: popupBg
-                anchors.fill: parent
-                radius: 12
-                color: darkTheme ? "#1b2230" : "#ffffff"
-                border.color: root.border
-                border.width: 1
-            }
+            radius: 12
+            color: darkTheme ? "#1b2230" : "#ffffff"
+            border.color: root.border
+            border.width: 1
         }
 
         Column {
@@ -5261,40 +5246,23 @@ Window {
                                         width: 24
                                         height: 24
                                         radius: 7
-                                        color: "transparent"
-
-                                        DropShadow {
-                                            anchors.fill: bottomViewBg
-                                            source: bottomViewBg
-                                            horizontalOffset: 0
-                                            verticalOffset: 2
-                                            radius: 8
-                                            samples: 17
-                                            color: root.darkTheme ? "#50000000" : "#18000000"
-                                        }
-
-                                        Rectangle {
-                                            id: bottomViewBg
-                                            anchors.fill: parent
-                                            radius: 7
-                                            color: bottomViewMouse.pressed
-                                                   ? root.pressed
-                                                   : bottomViewMouse.containsMouse
-                                                     ? root.hover
-                                                     : (darkTheme ? "#1a1f27" : "#ffffff")
-                                            border.color: bottomViewMouse.containsMouse || bottomViewMouse.pressed
-                                                          ? root.border
-                                                          : root.borderSoft
-                                            border.width: 1
-                                        }
+                                        color: bottomViewMouse.pressed
+                                            ? root.pressed
+                                            : bottomViewMouse.containsMouse
+                                                ? root.hover
+                                                : (darkTheme ? "#1a1f27" : "#ffffff")
+                                        border.color: bottomViewMouse.containsMouse || bottomViewMouse.pressed
+                                                    ? root.border
+                                                    : root.borderSoft
+                                        border.width: 1
 
                                         AppIcon {
                                             anchors.centerIn: parent
                                             source: root.currentViewMode === "Large icons"
                                                     ? "assets/icons/grid-view.svg"
                                                     : root.currentViewMode === "Tiles"
-                                                      ? "assets/icons/tile-view.svg"
-                                                      : root.currentViewMode === "Details"
+                                                    ? "assets/icons/tile-view.svg"
+                                                    : root.currentViewMode === "Details"
                                                         ? "assets/icons/detailed-view.svg"
                                                         : "assets/icons/list-view.svg"
                                             iconSize: 13
@@ -5322,32 +5290,15 @@ Window {
                                         width: 24
                                         height: 24
                                         radius: 7
-                                        color: "transparent"
-
-                                        DropShadow {
-                                            anchors.fill: notificationsBg
-                                            source: notificationsBg
-                                            horizontalOffset: 0
-                                            verticalOffset: 2
-                                            radius: 8
-                                            samples: 17
-                                            color: root.darkTheme ? "#50000000" : "#18000000"
-                                        }
-
-                                        Rectangle {
-                                            id: notificationsBg
-                                            anchors.fill: parent
-                                            radius: 7
-                                            color: notificationsMouse.pressed
-                                                   ? root.pressed
-                                                   : notificationsMouse.containsMouse
-                                                     ? root.hover
-                                                     : (darkTheme ? "#1a1f27" : "#ffffff")
-                                            border.color: notificationsMouse.containsMouse || notificationsMouse.pressed
-                                                          ? root.border
-                                                          : root.borderSoft
-                                            border.width: 1
-                                        }
+                                        color: notificationsMouse.pressed
+                                            ? root.pressed
+                                            : notificationsMouse.containsMouse
+                                                ? root.hover
+                                                : (darkTheme ? "#1a1f27" : "#ffffff")
+                                        border.color: notificationsMouse.containsMouse || notificationsMouse.pressed
+                                                    ? root.border
+                                                    : root.borderSoft
+                                        border.width: 1
 
                                         AppIcon {
                                             anchors.centerIn: parent
