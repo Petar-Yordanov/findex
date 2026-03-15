@@ -4,6 +4,7 @@
 
 #include "FileAssociationService.h"
 
+#include <QFileInfo>
 #include <QHash>
 #include <QList>
 #include <QString>
