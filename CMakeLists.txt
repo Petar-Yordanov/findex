@@ -135,3 +135,16 @@ if(UNIX AND NOT APPLE)
         PkgConfig::GIO
     )
 endif()
+
+include(GNUInstallDirs)
+
+install(TARGETS appFileExplorer
+    BUNDLE DESTINATION .
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+)
+
+qt_generate_deploy_qml_app_script(
+    TARGET appFileExplorer
+    OUTPUT_SCRIPT deploy_script
+)
+install(SCRIPT ${deploy_script})

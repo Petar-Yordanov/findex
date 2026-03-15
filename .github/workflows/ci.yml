@@ -141,18 +141,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p "${{ matrix.package_dir }}"
-
-          EXE=$(find "${{ matrix.build_dir }}" -maxdepth 3 -type f -name "appFileExplorer" | head -n 1)
-          if [ -z "$EXE" ]; then
-            echo "appFileExplorer not found"
-            exit 1
-          fi
-
-          cp "$EXE" "${{ matrix.package_dir }}/"
-
+          cmake --install "${{ matrix.build_dir }}" --prefix "${{ matrix.package_dir }}"
           echo "Packaged files:"
-          find "${{ matrix.package_dir }}" -maxdepth 3 -type f
+          find "${{ matrix.package_dir }}" -maxdepth 6 -print
 
       - name: Smoke test packaged app (Linux)
         if: runner.os == 'Linux'
@@ -161,11 +152,11 @@ jobs:
           set -euo pipefail
 
           WORKDIR="$(realpath "${{ matrix.package_dir }}")"
-          EXE="$(find "$WORKDIR" -maxdepth 3 -type f -name appFileExplorer | head -n 1)"
+          EXE="$(find "$WORKDIR" -maxdepth 6 -type f -name appFileExplorer | head -n 1)"
 
           if [ -z "$EXE" ]; then
             echo "=== packaged files ==="
-            find "$WORKDIR" -maxdepth 6 -print || true
+            find "$WORKDIR" -maxdepth 8 -print || true
             exit 1
           fi
 
@@ -187,8 +178,10 @@ jobs:
             cat "$STDOUT_LOG" || true
             echo "=== startup-stderr.txt ==="
             cat "$STDERR_LOG" || true
+            echo "=== ldd ==="
+            ldd "$EXE" || true
             echo "=== packaged files ==="
-            find "$WORKDIR" -maxdepth 6 -print || true
+            find "$WORKDIR" -maxdepth 8 -print || true
             wait "$PID" || true
             exit 1
           fi
