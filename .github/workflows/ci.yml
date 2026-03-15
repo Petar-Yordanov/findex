@@ -1,8 +1,8 @@
-name: CI
+name: Qt CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [main, master]
   pull_request:
   workflow_dispatch:
 
@@ -19,7 +19,6 @@ jobs:
             qt_host: linux
             qt_target: desktop
             qt_arch: gcc_64
-            cmake_generator: Ninja
             artifact_name: app-linux
             build_dir: build
             package_dir: dist
@@ -28,7 +27,6 @@ jobs:
             qt_host: windows
             qt_target: desktop
             qt_arch: win64_msvc2022_64
-            cmake_generator: Ninja
             artifact_name: app-windows
             build_dir: build
             package_dir: dist
@@ -37,60 +35,68 @@ jobs:
             qt_host: mac
             qt_target: desktop
             qt_arch: clang_64
-            cmake_generator: Ninja
             artifact_name: app-macos
             build_dir: build
             package_dir: dist
+
+    env:
+      QT_VERSION: 6.10.2
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-
-      - name: Set up CMake
+      - name: Setup CMake
         uses: lukka/get-cmake@latest
 
-      - name: Install Ninja
+      - name: Setup Ninja
         uses: seanmiddleditch/gha-setup-ninja@v5
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
         with:
-          version: "6.8.2"
+          version: ${{ env.QT_VERSION }}
           host: ${{ matrix.qt_host }}
           target: ${{ matrix.qt_target }}
           arch: ${{ matrix.qt_arch }}
           cache: true
+          setup-python: true
+          install-deps: ${{ runner.os == 'Linux' }}
+          # Add modules here if your app actually needs them:
+          # modules: 'qt5compat qtshadertools qtsvg'
 
-      - name: Configure (CMake)
+      - name: Show Qt paths
+        shell: bash
+        run: |
+          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+          echo "Qt6 dir candidates:"
+          find "$QT_ROOT_DIR" -maxdepth 4 -type d \( -name Qt6 -o -name cmake \) | head -50 || true
+
+      - name: Configure
+        shell: bash
         run: >
           cmake -S . -B ${{ matrix.build_dir }}
-          -G "${{ matrix.cmake_generator }}"
+          -G Ninja
           -DCMAKE_BUILD_TYPE=Release
-          -DCMAKE_PREFIX_PATH="${{ env.Qt6_DIR }}"
-        shell: bash
+          -DQt6_ROOT="$QT_ROOT_DIR"
 
       - name: Build
-        run: cmake --build ${{ matrix.build_dir }} --config Release --parallel
         shell: bash
+        run: cmake --build ${{ matrix.build_dir }} --config Release --parallel
 
       - name: Collect build output (Linux/macOS)
         if: runner.os != 'Windows'
+        shell: bash
         run: |
           mkdir -p "${{ matrix.package_dir }}"
           cp -R "${{ matrix.build_dir }}/." "${{ matrix.package_dir }}/"
-        shell: bash
 
       - name: Collect build output (Windows)
         if: runner.os == 'Windows'
+        shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "${{ matrix.package_dir }}" | Out-Null
           Copy-Item -Recurse -Force "${{ matrix.build_dir }}\*" "${{ matrix.package_dir }}\"
-        shell: pwsh
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
