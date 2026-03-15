@@ -141,9 +141,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cmake --install "${{ matrix.build_dir }}" --prefix "${{ matrix.package_dir }}"
+
+          PREFIX="$(realpath -m "${{ github.workspace }}/${{ matrix.package_dir }}")"
+          mkdir -p "$PREFIX"
+
+          cmake --install "${{ matrix.build_dir }}" --prefix "$PREFIX"
+
           echo "Packaged files:"
-          find "${{ matrix.package_dir }}" -maxdepth 6 -print
+          find "$PREFIX" -maxdepth 6 -print
 
       - name: Smoke test packaged app (Linux)
         if: runner.os == 'Linux'
