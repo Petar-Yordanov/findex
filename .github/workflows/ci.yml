@@ -221,20 +221,12 @@ jobs:
             -qmldir="$GITHUB_WORKSPACE" \
             -verbose=2
 
-          # Remove SQL drivers if your app does not use Qt SQL.
-          # This avoids broken references like libmimerapi.dylib getting dragged in.
           rm -rf "${{ matrix.package_dir }}/appFileExplorer.app/Contents/PlugIns/sqldrivers" || true
 
-          # Ad-hoc sign to make the bundle structurally launchable in local testing.
-          # This is NOT a substitute for proper Developer ID signing + notarization.
           codesign --force --deep --sign - "${{ matrix.package_dir }}/appFileExplorer.app"
 
-          cd "${{ matrix.package_dir }}"
-          ditto -c -k --sequesterRsrc --keepParent "appFileExplorer.app" "app-macos.zip"
-          rm -rf "appFileExplorer.app"
-
           echo "Packaged files:"
-          find . -maxdepth 4
+          find "${{ matrix.package_dir }}" -maxdepth 6 -print
 
       - name: Smoke test packaged app (macOS)
         if: runner.os == 'macOS'
@@ -412,6 +404,14 @@ jobs:
         shell: pwsh
         run: |
           Compress-Archive -Path "${{ matrix.package_dir }}\*" -DestinationPath "${{ matrix.artifact_name }}.zip" -Force
+
+      - name: Zip app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ matrix.package_dir }}"
+          ditto -c -k --sequesterRsrc --keepParent "appFileExplorer.app" "app-macos.zip"
 
       - name: Upload artifact (Windows)
         if: runner.os == 'Windows'
