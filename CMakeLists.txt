@@ -5,11 +5,7 @@ project(FileExplorer VERSION 0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS
-    Core
-    Quick
-    Core5Compat
-)
+find_package(Qt6 REQUIRED COMPONENTS Quick Core)
 
 if(UNIX AND NOT APPLE)
     find_package(PkgConfig REQUIRED)
@@ -118,7 +114,6 @@ target_link_libraries(appFileExplorer
     PRIVATE
         Qt6::Quick
         Qt6::Core
-        Qt6::Core5Compat
 )
 
 if(WIN32)

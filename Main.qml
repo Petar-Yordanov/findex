@@ -4,7 +4,6 @@ import QtQuick.Layouts
 import QtQuick.Window
 import QtQml.Models
 import Qt.labs.qmlmodels as Labs
-import Qt5Compat.GraphicalEffects
 
 Window {
     id: root
