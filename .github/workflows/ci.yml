@@ -184,6 +184,7 @@ jobs:
 
           & $deployTool.FullName `
             --release `
+            --compiler-runtime `
             --qmldir "$PWD" `
             --dir "${{ matrix.package_dir }}" `
             "${{ matrix.package_dir }}\appFileExplorer.exe"
