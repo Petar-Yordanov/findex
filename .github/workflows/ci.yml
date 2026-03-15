@@ -177,8 +177,12 @@ jobs:
 
           "$MACDEPLOYQT" "${{ matrix.package_dir }}/appFileExplorer.app" -qmldir="$GITHUB_WORKSPACE"
 
+          cd "${{ matrix.package_dir }}"
+          ditto -c -k --sequesterRsrc --keepParent "appFileExplorer.app" "app-macos.zip"
+          rm -rf "appFileExplorer.app"
+
           echo "Packaged files:"
-          find "${{ matrix.package_dir }}" -maxdepth 4
+          find . -maxdepth 4
 
       - name: Package app (Windows)
         if: runner.os == 'Windows'
@@ -214,9 +218,46 @@ jobs:
           Write-Host "Packaged files:"
           Get-ChildItem -Recurse "${{ matrix.package_dir }}"
 
-      - name: Upload artifact
+      - name: Smoke test app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $exePath = Resolve-Path "${{ matrix.package_dir }}\appFileExplorer.exe"
+          $proc = Start-Process -FilePath $exePath -PassThru
+          Start-Sleep -Seconds 5
+
+          if ($proc.HasExited) {
+            throw "appFileExplorer.exe exited immediately with code $($proc.ExitCode)"
+          }
+
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Zip app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "${{ matrix.package_dir }}\*" -DestinationPath "${{ matrix.artifact_name }}.zip" -Force
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.zip
+          if-no-files-found: error
+
+      - name: Upload artifact (Linux)
+        if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}
           path: ${{ matrix.package_dir }}
+          if-no-files-found: error
+
+      - name: Upload artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.package_dir }}/app-macos.zip
           if-no-files-found: error
