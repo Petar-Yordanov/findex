@@ -140,7 +140,7 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p "${{ matrix.package_dir }}"
 
           EXE=$(find "${{ matrix.build_dir }}" -maxdepth 3 -type f -name "appFileExplorer" | head -n 1)
@@ -158,7 +158,7 @@ jobs:
         if: runner.os == 'macOS'
         shell: bash
         run: |
-          set -e
+          set -euo pipefail
           mkdir -p "${{ matrix.package_dir }}"
 
           APP_BUNDLE=$(find "${{ matrix.build_dir }}" -maxdepth 3 -name "appFileExplorer.app" | head -n 1)
@@ -175,7 +175,17 @@ jobs:
             exit 1
           fi
 
-          "$MACDEPLOYQT" "${{ matrix.package_dir }}/appFileExplorer.app" -qmldir="$GITHUB_WORKSPACE" || true
+          "$MACDEPLOYQT" "${{ matrix.package_dir }}/appFileExplorer.app" \
+            -qmldir="$GITHUB_WORKSPACE" \
+            -verbose=2
+
+          # Remove SQL drivers if your app does not use Qt SQL.
+          # This avoids broken references like libmimerapi.dylib getting dragged in.
+          rm -rf "${{ matrix.package_dir }}/appFileExplorer.app/Contents/PlugIns/sqldrivers" || true
+
+          # Ad-hoc sign to make the bundle structurally launchable in local testing.
+          # This is NOT a substitute for proper Developer ID signing + notarization.
+          codesign --force --deep --sign - "${{ matrix.package_dir }}/appFileExplorer.app"
 
           cd "${{ matrix.package_dir }}"
           ditto -c -k --sequesterRsrc --keepParent "appFileExplorer.app" "app-macos.zip"
@@ -217,6 +227,28 @@ jobs:
 
           Write-Host "Packaged files:"
           Get-ChildItem -Recurse "${{ matrix.package_dir }}"
+
+      - name: Smoke test packaged app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $exePath = Resolve-Path "${{ matrix.package_dir }}\appFileExplorer.exe"
+
+          $proc = Start-Process -FilePath $exePath `
+            -WorkingDirectory (Resolve-Path "${{ matrix.package_dir }}") `
+            -PassThru
+
+          Start-Sleep -Seconds 5
+
+          if ($proc.HasExited) {
+            Write-Host "App exited immediately, rerunning with QT_DEBUG_PLUGINS=1"
+            $env:QT_DEBUG_PLUGINS = "1"
+            & $exePath
+            throw "appFileExplorer.exe exited immediately with code $($proc.ExitCode)"
+          }
+
+          Stop-Process -Id $proc.Id -Force
 
       - name: Zip app (Windows)
         if: runner.os == 'Windows'
