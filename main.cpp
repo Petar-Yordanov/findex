@@ -2,6 +2,7 @@
 #include <QQmlApplicationEngine>
 #include <QQmlError>
 #include <QDebug>
+#include <QQuickStyle>
 #include "FileAssociationService.h"
 
 void dumpApps(const QString& filePath)
@@ -23,6 +24,7 @@ void dumpApps(const QString& filePath)
 
 int main(int argc, char *argv[])
 {
+    QQuickStyle::setStyle("Fusion");
     QGuiApplication app(argc, argv);
 
     qInstallMessageHandler([](QtMsgType, const QMessageLogContext&, const QString& msg) {
