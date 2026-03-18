@@ -7,14 +7,20 @@ MenuSeparator {
     property bool darkTheme: false
 
     implicitWidth: 220
-    implicitHeight: 12
+    implicitHeight: 10
+    padding: 0
 
-    contentItem: Rectangle {
-        x: 10
-        y: Math.round((parent.height - height) / 2)
-        width: parent.width - 20
-        height: 1
-        color: control.darkTheme ? "#2b3442" : "#e4e7ec"
+    contentItem: Item {
+        implicitWidth: 220
+        implicitHeight: 10
+
+        Rectangle {
+            anchors.verticalCenter: parent.verticalCenter
+            x: 12
+            width: parent.width - 24
+            height: 1
+            color: control.darkTheme ? "#3a4352" : "#d9dde4"
+        }
     }
 
     background: Item {}

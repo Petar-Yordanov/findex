@@ -6,7 +6,7 @@ Menu {
 
     property bool darkTheme: false
 
-    implicitWidth: Math.max(220, contentItem ? contentItem.implicitWidth + leftPadding + rightPadding : 220)
+    implicitWidth: 220
     leftPadding: 8
     rightPadding: 8
     topPadding: 8
@@ -14,7 +14,7 @@ Menu {
     overlap: 2
 
     background: Rectangle {
-        radius: 12
+        radius: 10
         color: control.darkTheme ? "#1b2230" : "#ffffff"
         border.color: control.darkTheme ? "#252b36" : "#d7dbe1"
         border.width: 1

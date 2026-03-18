@@ -18,6 +18,19 @@ qt_add_executable(appFileExplorer
     main.cpp
     FileAssociationService.cpp
     FileAssociationService.h
+    FileManagerBridge.cpp
+    FileManagerBridge.h
+
+    FileManagerSessionService.cpp
+    FileManagerSessionService.h
+    FileManagerNavigationService.cpp
+    FileManagerNavigationService.h
+    FileManagerFileOpsService.cpp
+    FileManagerFileOpsService.h
+    FileManagerSearchService.cpp
+    FileManagerSearchService.h
+    FileManagerSidebarService.cpp
+    FileManagerSidebarService.h
 )
 
 if(WIN32)
@@ -176,6 +189,12 @@ qt_add_qml_module(appFileExplorer
         assets/icons/dark/view-list-alt.png
         assets/icons/dark/visibility.png
         assets/icons/dark/zip.png
+        SOURCES FileManagerBridge.h FileManagerBridge.cpp
+        SOURCES FileManagerSessionService.h FileManagerSessionService.cpp
+        SOURCES FileManagerNavigationService.h FileManagerNavigationService.cpp
+        SOURCES FileManagerFileOpsService.h FileManagerFileOpsService.cpp
+        SOURCES FileManagerSearchService.h FileManagerSearchService.cpp
+        SOURCES FileManagerSidebarService.h FileManagerSidebarService.cpp
 )
 
 set_target_properties(appFileExplorer PROPERTIES

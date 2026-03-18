@@ -23,6 +23,7 @@ Window {
     property string themeMode: "Light" // Dark | Light | System
     property bool darkTheme: themeMode === "System" ? false : themeMode === "Dark"
 
+    property var backend: fileManagerBridge
     property color bg: darkTheme ? "#0f1115" : "#f3f4f6"
     property color titleBg: darkTheme ? "#14171d" : "#eceef1"
     property color surface: darkTheme ? "#171b22" : "#f7f7f8"
@@ -45,6 +46,7 @@ Window {
     property color scrollbarThumbPressed: darkTheme ? "#b0b8c6" : "#8d98a8"
     property color scrollbarTrack: darkTheme ? "transparent" : "#eef1f5"
     property int notificationOverlayBottomOffset: notificationsPopup.visible ? (notificationsPopup.height + 52) : 40
+    property var tabAutoScrollTimerRef: tabAutoScrollTimer
 
     property bool tabDragActive: false
 
@@ -121,6 +123,137 @@ Window {
 
     property bool windowMoveActive: false
     property bool hoverFxEnabled: !windowMoveActive
+
+    property int editingTabIndex: -1
+    property string editingTabTitleDraft: ""
+
+    function replaceListModel(model, rows) {
+        model.clear()
+        for (var i = 0; i < rows.length; ++i)
+            model.append(rows[i])
+    }
+
+    function updateTabsPreservingOrder(newTabs) {
+        var incoming = toJsArray(newTabs)
+        if (incoming.length === 0) {
+            tabsModel.clear()
+            return
+        }
+
+        var current = []
+        for (var i = 0; i < tabsModel.count; ++i)
+            current.push(tabsModel.get(i))
+
+        function tabKey(tab) {
+            return (tab.title || "") + "|" + (tab.icon || "")
+        }
+
+        var incomingByKey = {}
+        var incomingKeys = {}
+        for (var j = 0; j < incoming.length; ++j) {
+            var k1 = tabKey(incoming[j])
+            incomingByKey[k1] = incoming[j]
+            incomingKeys[k1] = true
+        }
+
+        var merged = []
+
+        // keep current visual order for tabs that still exist
+        for (var a = 0; a < current.length; ++a) {
+            var ck = tabKey(current[a])
+            if (incomingKeys[ck]) {
+                merged.push(incomingByKey[ck])
+                delete incomingKeys[ck]
+            }
+        }
+
+        // append any newly added tabs that were not already in current visual order
+        for (var b = 0; b < incoming.length; ++b) {
+            var ik = tabKey(incoming[b])
+            if (incomingKeys[ik]) {
+                merged.push(incoming[b])
+                delete incomingKeys[ik]
+            }
+        }
+
+        replaceListModel(tabsModel, merged)
+    }
+
+    function applySnapshot(snapshot, options) {
+        if (!snapshot)
+            return
+
+        var preserveTabsOrder = options && options.preserveTabsOrder === true
+
+        if (snapshot.tabs !== undefined) {
+            if (preserveTabsOrder)
+                updateTabsPreservingOrder(snapshot.tabs)
+            else
+                replaceListModel(tabsModel, toJsArray(snapshot.tabs))
+        }
+
+        if (snapshot.path !== undefined)
+            replaceListModel(pathModel, toJsArray(snapshot.path))
+
+        if (snapshot.drives !== undefined)
+            replaceListModel(drivesModel, toJsArray(snapshot.drives))
+
+        //if (snapshot.sidebar !== undefined)
+        //    sidebarModel.rows = toJsArray(snapshot.sidebar)
+
+        if (snapshot.files !== undefined)
+            filesModel.rows = toJsArray(snapshot.files)
+
+        if (snapshot.currentTab !== undefined)
+            currentTab = snapshot.currentTab
+
+        if (snapshot.pathText !== undefined && pathField)
+            pathField.text = snapshot.pathText
+
+        if (snapshot.message)
+            addToastNotification(snapshot.message, snapshot.messageKind || "info")
+    }
+
+    function toJsArray(value) {
+        if (value === undefined || value === null)
+            return []
+
+        if (Array.isArray(value))
+            return value
+
+        var out = []
+        var len = value.length !== undefined ? value.length : 0
+        for (var i = 0; i < len; ++i)
+            out.push(value[i])
+        return out
+    }
+
+    function selectedItemsForBackend() {
+        var rows = selectedFileRowsArray()
+        var out = []
+        for (var i = 0; i < rows.length; ++i) {
+            var row = rows[i]
+            out.push({
+                row: row,
+                name: fileRowValue(row, "name"),
+                type: fileRowValue(row, "type"),
+                icon: fileRowValue(row, "icon")
+            })
+        }
+        return out
+    }
+
+    function singleItemForBackend(row) {
+        if (row < 0)
+            return []
+
+        return [{
+            row: row,
+            name: fileRowValue(row, "name"),
+            type: fileRowValue(row, "type"),
+            icon: fileRowValue(row, "icon")
+        }]
+    }
 
     function beginSystemMove() {
         windowMoveActive = true
@@ -201,12 +334,7 @@ Window {
             return
         }
 
-        var rows = filesModel.rows.slice(0)
-        var entry = Object.assign({}, rows[row])
-        entry.name = trimmed
-        rows[row] = entry
-        filesModel.rows = rows
-
+        applySnapshot(backend.renameItems(singleItemForBackend(row), trimmed))
         editingFileRow = -1
         editingFileNameDraft = ""
     }
@@ -216,30 +344,51 @@ Window {
         editingFileNameDraft = ""
     }
 
+    function beginRenameTab(index) {
+        if (index < 0 || index >= tabsModel.count)
+            return
+
+        editingTabIndex = index
+        editingTabTitleDraft = tabsModel.get(index).title || ""
+        currentTab = index
+    }
+
+    function commitRenameTab(index, newTitle) {
+        if (index < 0 || index >= tabsModel.count) {
+            editingTabIndex = -1
+            editingTabTitleDraft = ""
+            return
+        }
+
+        var trimmed = (newTitle || "").trim()
+        if (trimmed === "") {
+            editingTabIndex = -1
+            editingTabTitleDraft = ""
+            return
+        }
+
+        renameTab(index, trimmed)
+        editingTabIndex = -1
+        editingTabTitleDraft = ""
+    }
+
+    function cancelRenameTab() {
+        editingTabIndex = -1
+        editingTabTitleDraft = ""
+    }
+
     function addNewFolder() {
-        var rows = filesModel.rows.slice(0)
-        rows.unshift({
-            "name": uniqueName("New folder", ""),
-            "dateModified": currentDateTimeString(),
-            "type": "File folder",
-            "size": "",
-            "icon": "folder"
+        applySnapshot(backend.createFolder())
+        Qt.callLater(function() {
+            beginRenameRow(0)
         })
-        filesModel.rows = rows
-        beginRenameRow(0)
     }
 
     function addNewFile() {
-        var rows = filesModel.rows.slice(0)
-        rows.unshift({
-            "name": uniqueName("New file", ".txt"),
-            "dateModified": currentDateTimeString(),
-            "type": "Text Document",
-            "size": "0 KB",
-            "icon": "description"
+        applySnapshot(backend.createFile())
+        Qt.callLater(function() {
+            beginRenameRow(0)
         })
-        filesModel.rows = rows
-        beginRenameRow(0)
     }
 
     function setNavDropHover(label, kind) {
@@ -323,6 +472,12 @@ Window {
 
         if (currentFileRow === row)
             currentFileRow = -1
+    }
+
+    function showTabContextMenu(index) {
+        contextTabIndex = index
+        applySnapshot(backend.openTabContextMenu(index), { preserveTabsOrder: true })
+        tabContextMenu.popup()
     }
 
     function toggleFileRowSelection(row) {
@@ -487,15 +642,7 @@ Window {
         if (draggedFileCount <= 0)
             return
 
-        var label = draggedFileCount === 1
-                ? ("\"" + draggedFileName + "\"")
-                : (draggedFileCount + " items")
-
-        addToastNotification(
-            "Moved " + label + " to " + targetLabel,
-            "success"
-        )
-
+        applySnapshot(backend.moveItems(selectedItemsForBackend(), targetLabel, targetKind))
         clearFileDrag()
     }
 
@@ -672,25 +819,8 @@ Window {
     }
 
     function navigateToPath(parts) {
-        while (pathModel.count > 0)
-            pathModel.remove(pathModel.count - 1)
-
-        for (var i = 0; i < parts.length; ++i) {
-            pathModel.append({
-                label: parts[i].label,
-                icon: parts[i].icon || (i === 0 ? "hard-drive" : "folder")
-            })
-        }
-
-        syncPathField()
+        applySnapshot(backend.navigateToPathParts(parts))
         editingPath = false
-
-        var currentLabel = pathModel.get(pathModel.count - 1).label
-        renameTab(currentTab, currentLabel)
-
-        addToastNotification("Navigated to " + pathField.text, "info")
-
-        // TODO: reload filesModel for this path
     }
 
     function setPathFromIndex(index) {
@@ -726,32 +856,36 @@ Window {
     }
 
     function addTab(titleText) {
-        tabsModel.append({ title: titleText, icon: "folder" })
-        currentTab = tabsModel.count - 1
+        applySnapshot(backend.addTab(titleText), { preserveTabsOrder: true })
         Qt.callLater(function() {
             ensureTabVisible(currentTab)
         })
     }
 
-    function closeTab(index) {
-        if (tabsModel.count <= 1 || index < 0 || index >= tabsModel.count)
+    function activateTabLocal(index) {
+        if (index < 0 || index >= tabsModel.count)
             return
-        tabsModel.remove(index)
-        if (currentTab >= tabsModel.count)
-            currentTab = tabsModel.count - 1
-        if (currentTab < 0)
-            currentTab = 0
+
+        currentTab = index
+
+        if (backend && backend.activateTab)
+            applySnapshot(backend.activateTab(index), { preserveTabsOrder: true })
+    }
+
+    function closeTab(index) {
+        applySnapshot(backend.closeTab(index))
     }
 
     function renameTab(index, newTitle) {
-        if (index >= 0 && index < tabsModel.count)
-            tabsModel.setProperty(index, "title", newTitle)
+        applySnapshot(backend.renameTab(index, newTitle))
     }
 
     function moveTab(from, to) {
         if (from === to || from < 0 || to < 0 || from >= tabsModel.count || to >= tabsModel.count)
             return
+
         tabsModel.move(from, to, 1)
+
         if (currentTab === from)
             currentTab = to
         else if (currentTab > from && currentTab <= to)
@@ -760,37 +894,34 @@ Window {
             currentTab += 1
     }
 
+    function moveTabLocally(from, to) {
+        if (from === to || from < 0 || to < 0 || from >= tabsModel.count || to >= tabsModel.count)
+            return
+
+        tabsModel.move(from, to, 1)
+
+        if (currentTab === from)
+            currentTab = to
+        else if (from < currentTab && to >= currentTab)
+            currentTab -= 1
+        else if (from > currentTab && to <= currentTab)
+            currentTab += 1
+    }
+
     function openLocation(label, iconText, kind) {
-        while (pathModel.count > 0)
-            pathModel.remove(pathModel.count - 1)
-
-        var driveMatch = label.match(/\(([A-Z]:)\)$/)
-        if (kind === "drive" && driveMatch) {
-            pathModel.append({ label: driveMatch[1], icon: iconText })
-        } else if (label === "Home") {
-            pathModel.append({ label: "Home", icon: iconText })
-        } else {
-            pathModel.append({ label: label, icon: iconText })
-        }
-
         selectedSidebarLabel = label
         selectedSidebarKind = kind || ""
-
-        syncPathField()
+        applySnapshot(backend.openSidebarLocation(label, iconText, kind || ""))
         editingPath = false
     }
 
     function enterFolder(folderName) {
-        var parts = []
-        for (var i = 0; i < pathModel.count; ++i) {
-            parts.push({
-                label: pathModel.get(i).label,
-                icon: pathModel.get(i).icon
-            })
+        for (var i = 0; i < filesModel.rows.length; ++i) {
+            if (fileRowValue(i, "name") === folderName && fileRowValue(i, "type") === "File folder") {
+                applySnapshot(backend.openItems(root.singleItemForBackend(i)))
+                return
+            }
         }
-
-        parts.push({ label: folderName, icon: "folder" })
-        navigateToPath(parts)
     }
 
     function fileRowValue(row, key) {
@@ -940,23 +1071,55 @@ Window {
 
         StyledMenu {
             title: "Change view"
+            darkTheme: root.darkTheme
 
-            StyledMenuItem { text: "Details"; onTriggered: root.currentViewMode = "Details" }
-            StyledMenuItem { text: "Tiles"; onTriggered: root.currentViewMode = "Tiles" }
-            StyledMenuItem { text: "Compact"; onTriggered: root.currentViewMode = "Compact" }
-            StyledMenuItem { text: "Large icons"; onTriggered: root.currentViewMode = "Large icons" }
+            StyledMenuItem {
+                text: "Details"
+                darkTheme: root.darkTheme
+                onTriggered: {
+                    root.currentViewMode = "Details"
+                    applySnapshot(backend.setViewMode("Details"))
+                }
+            }
+            StyledMenuItem {
+                text: "Tiles"
+                darkTheme: root.darkTheme
+                onTriggered: {
+                    root.currentViewMode = "Tiles"
+                    applySnapshot(backend.setViewMode("Tiles"))
+                }
+            }
+            StyledMenuItem {
+                text: "Compact"
+                darkTheme: root.darkTheme
+                onTriggered: {
+                    root.currentViewMode = "Compact"
+                    applySnapshot(backend.setViewMode("Compact"))
+                }
+            }
+            StyledMenuItem {
+                text: "Large icons"
+                darkTheme: root.darkTheme
+                onTriggered: {
+                    root.currentViewMode = "Large icons"
+                    applySnapshot(backend.setViewMode("Large icons"))
+                }
+            }
         }
 
         StyledMenu {
             title: "New"
+            darkTheme: root.darkTheme
 
             StyledMenuItem {
                 text: "File"
                 onTriggered: root.addNewFile()
+                darkTheme: root.darkTheme
             }
 
             StyledMenuItem {
                 text: "Folder"
+                darkTheme: root.darkTheme
                 onTriggered: root.addNewFolder()
             }
         }
@@ -967,26 +1130,34 @@ Window {
 
             StyledMenu {
                 title: "Name"
-                StyledMenuItem { text: "Ascending"; onTriggered: root.sortFilesExplicit(0, true) }
-                StyledMenuItem { text: "Descending"; onTriggered: root.sortFilesExplicit(0, false) }
+                darkTheme: root.darkTheme
+
+                StyledMenuItem { darkTheme: root.darkTheme; text: "Ascending"; onTriggered: root.sortFilesExplicit(0, true) }
+                StyledMenuItem { darkTheme: root.darkTheme; text: "Descending"; onTriggered: root.sortFilesExplicit(0, false) }
             }
 
             StyledMenu {
                 title: "Date modified"
-                StyledMenuItem { text: "Ascending"; onTriggered: root.sortFilesExplicit(1, true) }
-                StyledMenuItem { text: "Descending"; onTriggered: root.sortFilesExplicit(1, false) }
+                darkTheme: root.darkTheme
+
+                StyledMenuItem { darkTheme: root.darkTheme; text: "Ascending"; onTriggered: root.sortFilesExplicit(1, true) }
+                StyledMenuItem { darkTheme: root.darkTheme; text: "Descending"; onTriggered: root.sortFilesExplicit(1, false) }
             }
 
             StyledMenu {
                 title: "Type"
-                StyledMenuItem { text: "Ascending"; onTriggered: root.sortFilesExplicit(2, true) }
-                StyledMenuItem { text: "Descending"; onTriggered: root.sortFilesExplicit(2, false) }
+                darkTheme: root.darkTheme
+
+                StyledMenuItem { darkTheme: root.darkTheme; text: "Ascending"; onTriggered: root.sortFilesExplicit(2, true) }
+                StyledMenuItem { darkTheme: root.darkTheme; text: "Descending"; onTriggered: root.sortFilesExplicit(2, false) }
             }
 
             StyledMenu {
                 title: "Size"
-                StyledMenuItem { text: "Ascending"; onTriggered: root.sortFilesExplicit(3, true) }
-                StyledMenuItem { text: "Descending"; onTriggered: root.sortFilesExplicit(3, false) }
+                darkTheme: root.darkTheme
+
+                StyledMenuItem { darkTheme: root.darkTheme; text: "Ascending"; onTriggered: root.sortFilesExplicit(3, true) }
+                StyledMenuItem { darkTheme: root.darkTheme; text: "Descending"; onTriggered: root.sortFilesExplicit(3, false) }
             }
         }
 
@@ -994,22 +1165,24 @@ Window {
 
         StyledMenuItem {
             text: "Select all"
+            darkTheme: root.darkTheme
             onTriggered: root.selectAllFiles()
         }
 
-        StyledMenuItem { text: "Properties" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Properties" }
     }
 
     StyledMenu {
         id: tabContextMenu
         darkTheme: root.darkTheme
 
-        StyledMenuItem { text: "New tab"; onTriggered: root.addTab("New Tab") }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "New tab"; onTriggered: root.addTab("New Tab") }
 
         StyledMenuItem {
             text: "Close tab"
             enabled: root.contextTabIndex >= 0 && tabsModel.count > 1
             onTriggered: root.closeTab(root.contextTabIndex)
+            darkTheme: root.darkTheme
         }
 
         StyledMenuItem {
@@ -1019,6 +1192,7 @@ Window {
                 if (root.contextTabIndex >= 0)
                     root.addTab(tabsModel.get(root.contextTabIndex).title + " Copy")
             }
+            darkTheme: root.darkTheme
         }
 
         StyledMenuSeparator {}
@@ -1028,8 +1202,9 @@ Window {
             enabled: root.contextTabIndex >= 0
             onTriggered: {
                 if (root.contextTabIndex >= 0)
-                    root.renameTab(root.contextTabIndex, tabsModel.get(root.contextTabIndex).title + " Renamed")
+                    root.beginRenameTab(root.contextTabIndex)
             }
+            darkTheme: root.darkTheme
         }
     }
 
@@ -1040,10 +1215,12 @@ Window {
         StyledMenuItem {
             text: "New folder"
             onTriggered: root.addNewFolder()
+            darkTheme: root.darkTheme
         }
 
         StyledMenuItem {
             text: "New file"
+            darkTheme: root.darkTheme
             onTriggered: root.addNewFile()
         }
     }
@@ -1052,33 +1229,35 @@ Window {
         id: moreActionsMenu
         darkTheme: root.darkTheme
 
-        StyledMenuItem { text: "Compress" }
-        StyledMenuItem { text: "Extract here" }
-        StyledMenuItem { text: "Duplicate" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Compress" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Extract here" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Duplicate" }
 
         StyledMenuSeparator {}
 
         StyledMenu {
             title: "Open with..."
+            darkTheme: root.darkTheme
 
-            StyledMenuItem { text: "Notepad" }
-            StyledMenuItem { text: "Visual Studio Code" }
-            StyledMenuItem { text: "Qt Creator" }
-            StyledMenuItem { text: "Windows Media Player" }
+            StyledMenuItem { darkTheme: root.darkTheme; text: "Notepad" }
+            StyledMenuItem { darkTheme: root.darkTheme; text: "Visual Studio Code" }
+            StyledMenuItem { darkTheme: root.darkTheme; text: "Qt Creator" }
+            StyledMenuItem { darkTheme: root.darkTheme; text: "Windows Media Player" }
         }
 
-        StyledMenuItem { text: "Copy path" }
-        StyledMenuItem { text: "Open in terminal" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Copy path" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Open in terminal" }
 
         StyledMenuSeparator {}
 
         StyledMenuItem {
             text: "Select all"
+            darkTheme: root.darkTheme
             onTriggered: root.selectAllFiles()
         }
 
-        StyledMenuItem { text: "Show hidden files" }
-        StyledMenuItem { text: "Properties" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Show hidden files" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Properties" }
     }
 
     Dialog {
@@ -1177,15 +1356,11 @@ Window {
                         hoverEnabled: true
                         onClicked: {
                             if (root.confirmDialogAction === "deleteRow" && root.confirmDialogRow >= 0) {
-                                root.addToastNotification("Deleted successfully", "success")
+                                applySnapshot(backend.deleteItems(root.singleItemForBackend(root.confirmDialogRow)))
+                                root.clearFileSelection()
                             } else if (root.confirmDialogAction === "deleteSelection") {
-                                var count = root.selectedFileCount()
-                                root.addToastNotification(
-                                    count > 1
-                                        ? ("Deleted " + count + " items successfully")
-                                        : "Deleted successfully",
-                                    "success"
-                                )
+                                applySnapshot(backend.deleteItems(root.selectedItemsForBackend()))
+                                root.clearFileSelection()
                             }
                             confirmDialog.close()
                         }
@@ -1388,6 +1563,7 @@ Window {
                     hoverEnabled: true
                     onClicked: {
                         root.searchScope = "folder"
+                        applySnapshot(backend.setSearchScope("folder"))
                         searchScopeMenu.close()
                     }
                 }
@@ -1420,6 +1596,7 @@ Window {
                     hoverEnabled: true
                     onClicked: {
                         root.searchScope = "global"
+                        applySnapshot(backend.setSearchScope("global"))
                         searchScopeMenu.close()
                     }
                 }
@@ -1434,19 +1611,25 @@ Window {
         StyledMenuItem {
             text: "Open"
             enabled: root.contextSidebarLabel !== ""
-            onTriggered: root.openLocation(root.contextSidebarLabel, root.contextSidebarIcon)
+            onTriggered: root.openLocation(
+                root.contextSidebarLabel,
+                root.contextSidebarIcon,
+                root.contextSidebarKind
+            )
+            darkTheme: root.darkTheme
         }
 
         StyledMenuItem {
             text: "Open in new tab"
             enabled: root.contextSidebarLabel !== ""
             onTriggered: root.addTab(root.contextSidebarLabel)
+            darkTheme: root.darkTheme
         }
 
         StyledMenuSeparator {}
 
-        StyledMenuItem { text: "Pin"; enabled: root.contextSidebarKind !== "section" }
-        StyledMenuItem { text: "Properties"; enabled: root.contextSidebarKind !== "section" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Pin"; enabled: root.contextSidebarKind !== "section" }
+        StyledMenuItem { darkTheme: root.darkTheme; text: "Properties"; enabled: root.contextSidebarKind !== "section" }
     }
 
     StyledMenu {
@@ -1456,38 +1639,112 @@ Window {
         StyledMenuItem {
             text: "Open"
             enabled: root.contextFileRow >= 0
+            darkTheme: root.darkTheme
             onTriggered: {
-                if (root.contextFileRow >= 0 && root.fileRowValue(root.contextFileRow, "type") === "File folder")
-                    root.enterFolder(root.fileRowValue(root.contextFileRow, "name"))
+                if (root.contextFileRow >= 0)
+                    applySnapshot(backend.openItems(root.singleItemForBackend(root.contextFileRow)))
             }
         }
 
-        StyledMenuItem { text: "Open in new tab" }
+        StyledMenuItem {
+            text: "Open in new tab"
+            enabled: root.contextFileRow >= 0
+            darkTheme: root.darkTheme
+            onTriggered: {
+                if (root.contextFileRow >= 0)
+                    applySnapshot(backend.openItemsInNewTab(root.singleItemForBackend(root.contextFileRow)))
+            }
+        }
 
         StyledMenu {
             title: "Open with..."
+            darkTheme: root.darkTheme
 
-            StyledMenuItem { text: "Notepad" }
-            StyledMenuItem { text: "Visual Studio Code" }
-            StyledMenuItem { text: "Qt Creator" }
-            StyledMenuItem { text: "Windows Media Player" }
+            StyledMenuItem {
+                text: "Notepad"
+                enabled: root.contextFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: {
+                    if (root.contextFileRow >= 0)
+                        applySnapshot(backend.openItemsWith(root.singleItemForBackend(root.contextFileRow), "Notepad"))
+                }
+            }
+
+            StyledMenuItem {
+                text: "Visual Studio Code"
+                enabled: root.contextFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: {
+                    if (root.contextFileRow >= 0)
+                        applySnapshot(backend.openItemsWith(root.singleItemForBackend(root.contextFileRow), "Visual Studio Code"))
+                }
+            }
+
+            StyledMenuItem {
+                text: "Qt Creator"
+                enabled: root.contextFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: {
+                    if (root.contextFileRow >= 0)
+                        applySnapshot(backend.openItemsWith(root.singleItemForBackend(root.contextFileRow), "Qt Creator"))
+                }
+            }
+
+            StyledMenuItem {
+                text: "Windows Media Player"
+                enabled: root.contextFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: {
+                    if (root.contextFileRow >= 0)
+                        applySnapshot(backend.openItemsWith(root.singleItemForBackend(root.contextFileRow), "Windows Media Player"))
+                }
+            }
+
             StyledMenuSeparator {}
-            StyledMenuItem { text: "Choose another app..." }
+
+            StyledMenuItem {
+                text: "Choose another app..."
+                enabled: root.contextFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: {
+                    if (root.contextFileRow >= 0)
+                        applySnapshot(backend.chooseOpenWithApp(root.singleItemForBackend(root.contextFileRow)))
+                }
+            }
         }
 
         StyledMenuItem {
             text: "Select all"
+            darkTheme: root.darkTheme
             onTriggered: root.selectAllFiles()
         }
 
         StyledMenuSeparator {}
 
-        StyledMenuItem { text: "Cut" }
-        StyledMenuItem { text: "Copy" }
+        StyledMenuItem {
+            text: "Cut"
+            enabled: root.contextFileRow >= 0
+            darkTheme: root.darkTheme
+            onTriggered: {
+                if (root.contextFileRow >= 0)
+                    applySnapshot(backend.cutItems(root.singleItemForBackend(root.contextFileRow)))
+            }
+        }
+
+        StyledMenuItem {
+            text: "Copy"
+            enabled: root.contextFileRow >= 0
+            darkTheme: root.darkTheme
+            onTriggered: {
+                if (root.contextFileRow >= 0)
+                    applySnapshot(backend.copyItems(root.singleItemForBackend(root.contextFileRow)))
+            }
+        }
 
         StyledMenuItem {
             text: "Rename"
             enabled: root.contextFileRow >= 0
+            darkTheme: root.darkTheme
             onTriggered: root.beginRenameRow(root.contextFileRow)
         }
 
@@ -1496,10 +1753,19 @@ Window {
         StyledMenuItem {
             text: "Delete"
             enabled: root.contextFileRow >= 0
+            darkTheme: root.darkTheme
             onTriggered: root.askDeleteRow(root.contextFileRow)
         }
 
-        StyledMenuItem { text: "Properties" }
+        StyledMenuItem {
+            text: "Properties"
+            enabled: root.contextFileRow >= 0
+            darkTheme: root.darkTheme
+            onTriggered: {
+                if (root.contextFileRow >= 0)
+                    applySnapshot(backend.showItemProperties(root.singleItemForBackend(root.contextFileRow)))
+            }
+        }
     }
 
     StyledMenu {
@@ -1509,31 +1775,37 @@ Window {
         StyledMenuItem {
             text: "Open"
             enabled: root.selectedFileCount() > 0
+            darkTheme: root.darkTheme
             onTriggered: {
-                if (root.selectedFileCount() === 1 && root.currentFileRow >= 0
-                        && root.fileRowValue(root.currentFileRow, "type") === "File folder") {
-                    root.enterFolder(root.fileRowValue(root.currentFileRow, "name"))
-                } else {
-                    root.addToastNotification("Opened " + root.selectedFileCount() + " items", "info")
-                }
+                if (root.selectedFileCount() > 0)
+                    applySnapshot(backend.openItems(root.selectedItemsForBackend()))
             }
         }
 
-        StyledMenuItem { text: "Open in new tab"; enabled: root.selectedFileCount() === 1 }
+        StyledMenuItem {
+            text: "Open in new tab"
+            enabled: root.selectedFileCount() === 1
+            darkTheme: root.darkTheme
+            onTriggered: {
+                if (root.selectedFileCount() === 1 && root.currentFileRow >= 0)
+                    applySnapshot(backend.openItemsInNewTab(root.singleItemForBackend(root.currentFileRow)))
+            }
+        }
 
         StyledMenuSeparator {}
 
-        StyledMenuItem { text: "Cut"; enabled: root.selectedFileCount() > 0 }
+        StyledMenuItem {
+            text: "Cut"
+            enabled: root.selectedFileCount() > 0
+            darkTheme: root.darkTheme
+            onTriggered: applySnapshot(backend.cutItems(root.selectedItemsForBackend()))
+        }
 
         StyledMenuItem {
             text: "Copy"
             enabled: root.selectedFileCount() > 0
-            onTriggered: root.addToastNotification(
-                root.selectedFileCount() > 1
-                    ? ("Copied " + root.selectedFileCount() + " items")
-                    : "Copied successfully to clipboard",
-                "success"
-            )
+            darkTheme: root.darkTheme
+            onTriggered: applySnapshot(backend.copyItems(root.selectedItemsForBackend()))
         }
 
         StyledMenuSeparator {}
@@ -1541,12 +1813,14 @@ Window {
         StyledMenuItem {
             text: "Delete"
             enabled: root.selectedFileCount() > 0
+            darkTheme: root.darkTheme
             onTriggered: root.askDeleteSelection()
         }
 
         StyledMenuItem {
             text: "Rename"
             enabled: root.selectedFileCount() === 1 && root.currentFileRow >= 0
+            darkTheme: root.darkTheme
             onTriggered: root.beginRenameRow(root.currentFileRow)
         }
 
@@ -1554,11 +1828,13 @@ Window {
 
         StyledMenuItem {
             text: "Select all"
+            darkTheme: root.darkTheme
             onTriggered: root.selectAllFiles()
         }
 
         StyledMenuItem {
             text: "Clear selection"
+            darkTheme: root.darkTheme
             enabled: root.selectedFileCount() > 0
             onTriggered: root.clearFileSelection()
         }
@@ -1567,7 +1843,9 @@ Window {
 
         StyledMenuItem {
             text: "Properties"
+            darkTheme: root.darkTheme
             enabled: root.selectedFileCount() > 0
+            onTriggered: applySnapshot(backend.showItemProperties(root.selectedItemsForBackend()))
         }
     }
 
@@ -1578,37 +1856,104 @@ Window {
         StyledMenuItem {
             text: "New folder"
             onTriggered: root.addNewFolder()
+            darkTheme: root.darkTheme
         }
 
         StyledMenuItem {
             text: "New file"
             onTriggered: root.addNewFile()
+            darkTheme: root.darkTheme
         }
 
         StyledMenuSeparator {}
-        StyledMenuItem { text: "Paste" }
+
+        StyledMenuItem {
+            text: "Paste"
+            onTriggered: applySnapshot(backend.pasteItems())
+            darkTheme: root.darkTheme
+        }
+
         StyledMenuSeparator {}
-        StyledMenuItem { text: "Refresh" }
-        StyledMenuItem { text: "Properties" }
+
+        StyledMenuItem {
+            text: "Refresh"
+            onTriggered: applySnapshot(backend.refresh())
+            darkTheme: root.darkTheme
+        }
+
+        StyledMenuItem {
+            text: "Properties"
+            onTriggered: applySnapshot(backend.showCurrentLocationProperties())
+            darkTheme: root.darkTheme
+        }
     }
 
     StyledMenu {
         id: viewModeMenu
         darkTheme: root.darkTheme
 
-        StyledMenuItem { text: "Details"; onTriggered: root.currentViewMode = "Details" }
-        StyledMenuItem { text: "Tiles"; onTriggered: root.currentViewMode = "Tiles" }
-        StyledMenuItem { text: "Compact"; onTriggered: root.currentViewMode = "Compact" }
-        StyledMenuItem { text: "Large icons"; onTriggered: root.currentViewMode = "Large icons" }
+        StyledMenuItem {
+            text: "Details"
+            onTriggered: {
+                root.currentViewMode = "Details"
+                applySnapshot(backend.setViewMode("Details"))
+            }
+            darkTheme: root.darkTheme
+        }
+        StyledMenuItem {
+            text: "Tiles"
+            onTriggered: {
+                root.currentViewMode = "Tiles"
+                applySnapshot(backend.setViewMode("Tiles"))
+            }
+            darkTheme: root.darkTheme
+        }
+        StyledMenuItem {
+            text: "Compact"
+            onTriggered: {
+                root.currentViewMode = "Compact"
+                applySnapshot(backend.setViewMode("Compact"))
+            }
+            darkTheme: root.darkTheme
+        }
+        StyledMenuItem {
+            text: "Large icons"
+            onTriggered: {
+                root.currentViewMode = "Large icons"
+                applySnapshot(backend.setViewMode("Large icons"))
+            }
+            darkTheme: root.darkTheme
+        }
     }
 
     StyledMenu {
         id: themeMenu
         darkTheme: root.darkTheme
 
-        StyledMenuItem { text: "Dark"; onTriggered: root.themeMode = "Dark" }
-        StyledMenuItem { text: "Light"; onTriggered: root.themeMode = "Light" }
-        StyledMenuItem { text: "System"; onTriggered: root.themeMode = "System" }
+        StyledMenuItem {
+            text: "Dark"
+            darkTheme: root.darkTheme
+            onTriggered: {
+                root.themeMode = "Dark"
+                applySnapshot(backend.setTheme("Dark"))
+            }
+        }
+        StyledMenuItem {
+            text: "Light"
+            darkTheme: root.darkTheme
+            onTriggered: {
+                root.themeMode = "Light"
+                applySnapshot(backend.setTheme("Light"))
+            }
+        }
+        StyledMenuItem {
+            text: "System"
+            darkTheme: root.darkTheme
+            onTriggered: {
+                root.themeMode = "System"
+                applySnapshot(backend.setTheme("System"))
+            }
+        }
     }
 
     Component {
@@ -1665,8 +2010,8 @@ Window {
                     return root.detailsRowHeight
                 }
 
-                ScrollBar.vertical: ExplorerScrollbarV {}
-                ScrollBar.horizontal: ExplorerScrollbarH {}
+                ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
+                ScrollBar.horizontal: ExplorerScrollbarH { darkTheme: root.darkTheme }
 
                 delegate: Rectangle {
                     id: rowDelegate
@@ -1858,7 +2203,7 @@ Window {
 
                         onDoubleClicked: {
                             if (root.fileRowValue(row, "type") === "File folder")
-                                root.enterFolder(root.fileRowValue(row, "name"))
+                                applySnapshot(backend.openItems(root.singleItemForBackend(row)))
                         }
 
                         Item {
@@ -2020,6 +2365,7 @@ Window {
                 onReleased: function(mouse) {
                     if (pendingEmptyContextMenu && !root.detailsSelectionMoved) {
                         root.contextFileRow = -1
+                        applySnapshot(backend.openEmptyAreaContextMenu())
                         emptyAreaContextMenu.popup()
                     }
 
@@ -2149,7 +2495,7 @@ Window {
                     maximumFlickVelocity: 2200
                     flickDeceleration: 9000
 
-                    ScrollBar.vertical: ExplorerScrollbarV {}
+                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
                     ScrollBar.horizontal: null
 
                     delegate: Item {
@@ -2374,8 +2720,7 @@ Window {
                             }
 
                             onDoubleClicked: {
-                                if (modelData.type === "File folder")
-                                    root.enterFolder(modelData.name)
+                                applySnapshot(backend.openItems(root.singleItemForBackend(index)))
                             }
 
                             Item {
@@ -2494,6 +2839,7 @@ Window {
                         onReleased: function(mouse) {
                             if (pendingEmptyContextMenu && !tilesRoot.selectionMoved) {
                                 root.contextFileRow = -1
+                                applySnapshot(backend.openEmptyAreaContextMenu())
                                 emptyAreaContextMenu.popup()
                             }
 
@@ -2626,7 +2972,7 @@ Window {
                     maximumFlickVelocity: 2200
                     flickDeceleration: 9000
 
-                    ScrollBar.vertical: ExplorerScrollbarV {}
+                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
                     ScrollBar.horizontal: null
 
                     delegate: Item {
@@ -2806,8 +3152,7 @@ Window {
                             }
 
                             onDoubleClicked: {
-                                if (modelData.type === "File folder")
-                                    root.enterFolder(modelData.name)
+                                applySnapshot(backend.openItems(root.singleItemForBackend(index)))
                             }
 
                             Item {
@@ -2926,6 +3271,7 @@ Window {
                         onReleased: function(mouse) {
                             if (pendingEmptyContextMenu && !compactRoot.selectionMoved) {
                                 root.contextFileRow = -1
+                                applySnapshot(backend.openEmptyAreaContextMenu())
                                 emptyAreaContextMenu.popup()
                             }
 
@@ -3064,7 +3410,7 @@ Window {
                 maximumFlickVelocity: 2200
                 flickDeceleration: 9000
 
-                ScrollBar.vertical: ExplorerScrollbarV {}
+                ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
                 ScrollBar.horizontal: null
 
                 MouseArea {
@@ -3146,6 +3492,7 @@ Window {
                     onReleased: function(mouse) {
                         if (pendingEmptyContextMenu && !largeIconsRoot.selectionMoved) {
                             root.contextFileRow = -1
+                            applySnapshot(backend.openEmptyAreaContextMenu())
                             emptyAreaContextMenu.popup()
                         }
 
@@ -3336,8 +3683,7 @@ Window {
                         }
 
                         onDoubleClicked: {
-                            if (modelData.type === "File folder")
-                                root.enterFolder(modelData.name)
+                            applySnapshot(backend.openItems(root.singleItemForBackend(index)))
                         }
 
                         Item {
@@ -3562,6 +3908,7 @@ Window {
 
                                                 delegate: Rectangle {
                                                     id: tabDelegate
+                                                    property var rootWindow: root
                                                     required property int index
                                                     required property var modelData
 
@@ -3598,6 +3945,7 @@ Window {
                                                         anchors.left: parent.left
                                                         anchors.leftMargin: 12
                                                         spacing: 8
+                                                        visible: root.editingTabIndex !== index
 
                                                         AppIcon {
                                                             name: modelData.icon
@@ -3606,7 +3954,7 @@ Window {
                                                         }
 
                                                         Text {
-                                                            text: modelData.title
+                                                            text: modelData.title || ""
                                                             color: root.text
                                                             font.pixelSize: 13
                                                             font.bold: index === root.currentTab
@@ -3615,17 +3963,67 @@ Window {
                                                         }
                                                     }
 
+                                                    TextField {
+                                                        visible: root.editingTabIndex === index
+                                                        anchors.verticalCenter: parent.verticalCenter
+                                                        anchors.left: parent.left
+                                                        anchors.leftMargin: 12
+                                                        anchors.right: closeButton.left
+                                                        anchors.rightMargin: 8
+                                                        height: 24
+
+                                                        text: root.editingTabTitleDraft || ""
+                                                        color: root.text
+                                                        font.pixelSize: 13
+                                                        selectByMouse: true
+                                                        leftPadding: 8
+                                                        rightPadding: 8
+                                                        topPadding: 0
+                                                        bottomPadding: 0
+
+                                                        background: Rectangle {
+                                                            radius: 6
+                                                            color: root.darkTheme ? "#1b2230" : "#ffffff"
+                                                            border.color: root.accent
+                                                            border.width: 1
+                                                        }
+
+                                                        onVisibleChanged: {
+                                                            if (visible) {
+                                                                forceActiveFocus()
+                                                                selectAll()
+                                                            }
+                                                        }
+
+                                                        onTextChanged: {
+                                                            if (visible)
+                                                                root.editingTabTitleDraft = text || ""
+                                                        }
+
+                                                        onAccepted: root.commitRenameTab(index, text || "")
+
+                                                        onActiveFocusChanged: {
+                                                            if (!activeFocus && visible)
+                                                                root.commitRenameTab(index, text || "")
+                                                        }
+
+                                                        Keys.onEscapePressed: root.cancelRenameTab()
+                                                    }
+
                                                     Rectangle {
+                                                        id: closeButton
                                                         anchors.verticalCenter: parent.verticalCenter
                                                         anchors.right: parent.right
-                                                        anchors.rightMargin: 8
+                                                        anchors.rightMargin: 6
                                                         width: 18
                                                         height: 18
                                                         radius: 9
                                                         color: closeMouse.containsMouse ? root.hover : "transparent"
                                                         z: 3
+                                                        visible: root.editingTabIndex !== index
 
                                                         AppIcon {
+                                                            anchors.centerIn: parent
                                                             name: "close"
                                                             darkTheme: root.darkTheme
                                                             iconSize: 12
@@ -3650,6 +4048,7 @@ Window {
                                                         id: dragHandler
                                                         target: null
                                                         acceptedButtons: Qt.LeftButton
+                                                        enabled: root.editingTabIndex !== index
                                                         xAxis.enabled: true
                                                         yAxis.enabled: false
 
@@ -3662,6 +4061,7 @@ Window {
                                                                 root.draggedTabStartIndex = index
                                                                 root.draggedTabOffset = 0
                                                                 tabDelegate.movedEnough = false
+                                                                root.tabAutoScrollDirection = 0
                                                                 tabAutoScrollTimer.start()
                                                             } else {
                                                                 root.tabAutoScrollDirection = 0
@@ -3721,14 +4121,17 @@ Window {
                                                         anchors.top: parent.top
                                                         anchors.bottom: parent.bottom
                                                         anchors.right: parent.right
-                                                        anchors.rightMargin: 30
+                                                        anchors.rightMargin: root.editingTabIndex === index ? 6 : 30
                                                         hoverEnabled: true
                                                         acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                                        enabled: root.editingTabIndex !== index
 
                                                         onPressed: function(mouse) {
+                                                            if (root.editingTabIndex >= 0 && root.editingTabIndex !== index)
+                                                                root.commitRenameTab(root.editingTabIndex, root.editingTabTitleDraft)
+
                                                             if (mouse.button === Qt.RightButton) {
-                                                                root.contextTabIndex = index
-                                                                tabContextMenu.popup()
+                                                                root.showTabContextMenu(index)
                                                                 return
                                                             }
 
@@ -3738,14 +4141,14 @@ Window {
 
                                                         onClicked: function(mouse) {
                                                             if (mouse.button === Qt.LeftButton && !tabDelegate.movedEnough) {
-                                                                root.currentTab = index
-                                                                root.ensureTabVisible(index)
+                                                                tabDelegate.rootWindow.activateTabLocal(tabDelegate.index)
+                                                                tabDelegate.rootWindow.ensureTabVisible(tabDelegate.index)
                                                             }
                                                         }
 
                                                         onDoubleClicked: {
                                                             if (!tabDelegate.movedEnough)
-                                                                root.toggleMaximize()
+                                                                root.beginRenameTab(index)
                                                         }
                                                     }
                                                 }
@@ -3898,36 +4301,28 @@ Window {
                         iconName: "arrow-back"
                         tooltipText: "Back"
                         darkTheme: root.darkTheme
-                        onClicked: {
-                            if (pathModel.count > 1) {
-                                pathModel.remove(pathModel.count - 1)
-                                syncPathField()
-                            }
-                        }
+                        onClicked: applySnapshot(backend.goBack())
                     }
 
                     IconButton {
                         iconName: "arrow-forward"
                         tooltipText: "Forward"
                         darkTheme: root.darkTheme
+                        onClicked: applySnapshot(backend.goForward())
                     }
 
                     IconButton {
                         iconName: "arrow-upward"
                         tooltipText: "Up"
                         darkTheme: root.darkTheme
-                        onClicked: {
-                            if (pathModel.count > 1) {
-                                pathModel.remove(pathModel.count - 1)
-                                syncPathField()
-                            }
-                        }
+                        onClicked: applySnapshot(backend.goUp())
                     }
 
                     IconButton {
                         iconName: "refresh"
                         tooltipText: "Refresh"
                         darkTheme: root.darkTheme
+                        onClicked: applySnapshot(backend.refresh())
                     }
 
                     Rectangle {
@@ -3966,6 +4361,7 @@ Window {
                                             model: pathModel
 
                                             delegate: Row {
+                                                id: breadcrumbDelegate
                                                 required property int index
                                                 required property var modelData
                                                 spacing: 6
@@ -3981,34 +4377,36 @@ Window {
                                                            : crumbMouse.pressed
                                                              ? root.pressed
                                                              : crumbMouse.containsMouse
-                                                               ? (darkTheme ? "#344055" : "#dfe9f8")
+                                                               ? (root.darkTheme ? "#344055" : "#dfe9f8")
                                                                : "transparent"
                                                     border.color: dropHovered ? root.accent : "transparent"
                                                     border.width: dropHovered ? 1 : 0
                                                     width: Math.min(crumbContent.implicitWidth + 16, 190)
                                                     clip: true
+                                                    property var rootWindow: root
 
                                                     DropArea {
                                                         anchors.fill: parent
 
                                                         onEntered: function(drag) {
-                                                            drag.accepted = root.draggedFileCount > 0
+                                                            drag.accepted = crumbPill.rootWindow.draggedFileCount > 0
                                                             if (drag.accepted)
-                                                                root.breadcrumbDropHoverIndex = index
+                                                                crumbPill.rootWindow.breadcrumbDropHoverIndex = breadcrumbDelegate.index
                                                         }
 
                                                         onExited: function(drag) {
-                                                            if (root.breadcrumbDropHoverIndex === index)
-                                                                root.breadcrumbDropHoverIndex = -1
+                                                            if (crumbPill.rootWindow.breadcrumbDropHoverIndex === breadcrumbDelegate.index)
+                                                                crumbPill.rootWindow.breadcrumbDropHoverIndex = -1
                                                         }
 
                                                         onDropped: function(drop) {
-                                                            if (root.draggedFileCount > 0) {
+                                                            if (crumbPill.rootWindow.draggedFileCount > 0) {
                                                                 drop.accepted = true
-                                                                root.handleDroppedItem(modelData.label, "breadcrumb")
+                                                                crumbPill.rootWindow.handleDroppedItem(breadcrumbDelegate.modelData.label, "breadcrumb")
                                                             }
-                                                            if (root.breadcrumbDropHoverIndex === index)
-                                                                root.breadcrumbDropHoverIndex = -1
+
+                                                            if (crumbPill.rootWindow.breadcrumbDropHoverIndex === breadcrumbDelegate.index)
+                                                                crumbPill.rootWindow.breadcrumbDropHoverIndex = -1
                                                         }
                                                     }
 
@@ -4046,9 +4444,7 @@ Window {
                                                         acceptedButtons: Qt.LeftButton
                                                         z: 1
 
-                                                        onClicked: {
-                                                            root.setPathFromIndex(index)
-                                                        }
+                                                        onClicked: root.setPathFromIndex(index)
 
                                                         onDoubleClicked: {
                                                             root.editingPath = true
@@ -4098,7 +4494,10 @@ Window {
                                 bottomPadding: 0
                                 verticalAlignment: TextInput.AlignVCenter
                                 background: Rectangle { color: "transparent" }
-                                onAccepted: root.editingPath = false
+                                onAccepted: {
+                                    root.editingPath = false
+                                    applySnapshot(backend.navigateToPathString(text))
+                                }
                                 onActiveFocusChanged: {
                                     if (!activeFocus)
                                         root.editingPath = false
@@ -4160,6 +4559,7 @@ Window {
                                         var p = searchScopeButton.mapToItem(root.contentItem, 0, searchScopeButton.height + 6)
                                         searchScopeMenu.x = p.x
                                         searchScopeMenu.y = p.y
+                                        applySnapshot(backend.openSearchScopeMenu())
                                         searchScopeMenu.open()
                                     }
                                 }
@@ -4192,6 +4592,7 @@ Window {
                                 background: Rectangle { color: "transparent" }
 
                                 onTextChanged: root.currentSearch = text
+                                onAccepted: applySnapshot(backend.search(text, root.searchScope))
                             }
                         }
                     }
@@ -4216,7 +4617,10 @@ Window {
                         iconName: "add"
                         tooltipText: "Create"
                         darkTheme: root.darkTheme
-                        onClicked: createMenu.popup()
+                        onClicked: {
+                            applySnapshot(backend.openCreateMenu())
+                            createMenu.popup()
+                        }
                     }
 
                     IconButton {
@@ -4277,7 +4681,10 @@ Window {
                         iconName: root.viewModeIcon(root.currentViewMode)
                         tooltipText: "View"
                         darkTheme: root.darkTheme
-                        onClicked: viewModeMenu.popup()
+                        onClicked: {
+                            applySnapshot(backend.openViewModeMenu())
+                            viewModeMenu.popup()
+                        }
                     }
 
                     IconButton {
@@ -4285,7 +4692,10 @@ Window {
                         iconName: "more-horiz"
                         tooltipText: "More"
                         darkTheme: root.darkTheme
-                        onClicked: moreActionsMenu.popup()
+                        onClicked: {
+                            applySnapshot(backend.openMoreActionsMenu())
+                            moreActionsMenu.popup()
+                        }
                     }
 
                     Item {
@@ -4299,6 +4709,7 @@ Window {
 
                             onPressed: function(mouse) {
                                 if (mouse.button === Qt.RightButton) {
+                                    applySnapshot(backend.openMoreActionsMenu())
                                     moreActionsMenu.popup()
                                     mouse.accepted = true
                                 }
@@ -4345,10 +4756,15 @@ Window {
                             anchors.fill: parent
                             hoverEnabled: true
                             acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            onClicked: themeMenu.popup()
+                            onClicked: {
+                                applySnapshot(backend.openThemeMenu())
+                                themeMenu.popup()
+                            }
                             onPressed: function(mouse) {
-                                if (mouse.button === Qt.RightButton)
+                                if (mouse.button === Qt.RightButton) {
+                                    applySnapshot(backend.openThemeMenu())
                                     themeMenu.popup()
+                                }
                             }
                         }
                     }
@@ -4401,7 +4817,7 @@ Window {
                                     flickableDirection: Flickable.VerticalFlick
                                     contentWidth: width
 
-                                    ScrollBar.vertical: ExplorerScrollbarV {}
+                                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
                                     ScrollBar.horizontal: null
 
                                     delegate: Item {
@@ -4465,13 +4881,32 @@ Window {
                                                     width: 12
                                                     height: 12
 
-                                                    AppIcon {
-                                                        anchors.centerIn: parent
+                                                    Item {
+                                                        width: 12
+                                                        height: 12
+
+                                                        AppIcon {
+                                                            anchors.centerIn: parent
+                                                            visible: hasChildren
+                                                            name: expanded ? "keyboard-arrow-down" : "chevron-right"
+                                                            darkTheme: root.darkTheme
+                                                            iconSize: 12
+                                                            iconOpacity: 0.65
+                                                        }
+
+                                                        MouseArea {
+                                                            anchors.fill: parent
+                                                            visible: hasChildren
+                                                            acceptedButtons: Qt.LeftButton
+                                                            onClicked: treeView.toggleExpanded(row)
+                                                        }
+                                                    }
+
+                                                    MouseArea {
+                                                        anchors.fill: parent
                                                         visible: hasChildren
-                                                        name: expanded ? "keyboard-arrow-down" : "chevron-right"
-                                                        darkTheme: root.darkTheme
-                                                        iconSize: 12
-                                                        iconOpacity: 0.65
+                                                        acceptedButtons: Qt.LeftButton
+                                                        onClicked: treeView.toggleExpanded(row)
                                                     }
                                                 }
 
@@ -4502,7 +4937,7 @@ Window {
                                             anchors.fill: parent
 
                                             onEntered: function(drag) {
-                                                var ok = !itemSection
+                                                var ok = !itemSection && !hasChildren
                                                 drag.accepted = ok
                                                 if (ok)
                                                     root.setNavDropHover(itemLabel, itemKind)
@@ -4528,12 +4963,13 @@ Window {
                                             acceptedButtons: Qt.LeftButton | Qt.RightButton
 
                                             onClicked: function(mouse) {
-                                                if (mouse.button === Qt.LeftButton) {
-                                                    if (hasChildren)
-                                                        treeView.toggleExpanded(row)
-                                                    else
-                                                        root.openLocation(itemLabel, itemIcon, itemKind)
-                                                }
+                                                if (mouse.button !== Qt.LeftButton)
+                                                    return
+
+                                                if (hasChildren)
+                                                    treeView.toggleExpanded(row)
+                                                else
+                                                    root.openLocation(itemLabel, itemIcon, itemKind)
                                             }
 
                                             onPressed: function(mouse) {
@@ -4541,6 +4977,7 @@ Window {
                                                     root.contextSidebarLabel = itemLabel
                                                     root.contextSidebarKind = itemKind
                                                     root.contextSidebarIcon = itemIcon
+                                                    applySnapshot(backend.openSidebarContextMenu(itemLabel, itemKind))
                                                     sidebarContextMenu.popup()
                                                 }
                                             }
@@ -4577,6 +5014,7 @@ Window {
 
                                         delegate: Rectangle {
                                             required property var modelData
+                                            property var rootWindow: root
 
                                             Layout.fillWidth: true
                                             width: parent ? parent.width : 240
@@ -4656,17 +5094,16 @@ Window {
 
                                                 onEntered: function(drag) {
                                                     drag.accepted = true
-                                                    root.setNavDropHover(modelData.label, "drive")
+                                                    rootWindow.setNavDropHover(modelData.label, "drive")
                                                 }
 
                                                 onExited: function(drag) {
-                                                    root.clearNavDropHover(modelData.label, "drive")
+                                                    rootWindow.clearNavDropHover(modelData.label, "drive")
                                                 }
 
                                                 onDropped: function(drop) {
                                                     drop.accepted = true
-                                                    root.handleDroppedItem(modelData.label, "drive")
-                                                    root.clearNavDropHover(modelData.label, "drive")
+                                                    rootWindow.handleDroppedItem(modelData.label, "drive")
                                                 }
                                             }
 
@@ -5146,11 +5583,16 @@ Window {
                                             hoverEnabled: true
                                             acceptedButtons: Qt.LeftButton | Qt.RightButton
 
-                                            onClicked: viewModeMenu.popup()
+                                            onClicked: {
+                                                applySnapshot(backend.openViewModeMenu())
+                                                viewModeMenu.popup()
+                                            }
 
                                             onPressed: function(mouse) {
-                                                if (mouse.button === Qt.RightButton)
+                                                if (mouse.button === Qt.RightButton) {
+                                                    applySnapshot(backend.openViewModeMenu())
                                                     viewModeMenu.popup()
+                                                }
                                             }
                                         }
                                     }
@@ -5205,6 +5647,7 @@ Window {
                                                 )
                                                 notificationsPopup.x = p.x
                                                 notificationsPopup.y = p.y
+                                                applySnapshot(backend.openNotifications())
                                                 notificationsPopup.open()
                                             }
                                         }
@@ -5240,12 +5683,17 @@ Window {
                         required property var modelData
                         required property int index
 
+                        darkTheme: root.darkTheme
                         notificationId: modelData.notificationId
                         title: modelData.title
                         kind: modelData.kind
                         progress: modelData.progress
                         autoClose: modelData.autoClose
                         done: modelData.done
+
+                        onCloseRequested: function(notificationId) {
+                            root.removeNotification(notificationId)
+                        }
                     }
                 }
             }
@@ -5403,5 +5851,9 @@ Window {
         }
     }
 
-    Component.onCompleted: syncPathField()
+    Component.onCompleted: {
+        applySnapshot(backend.bootstrap())
+        if (!pathField.text || pathField.text === "")
+            syncPathField()
+    }
 }
