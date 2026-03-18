@@ -7,6 +7,9 @@
 #include "FileManagerSidebarService.h"
 
 #include <QStringList>
+#include <QOperatingSystemVersion>
+#include <QRegularExpression>
+#include <QStringView>
 
 FileManagerBridge::FileManagerBridge(QObject* parent)
     : QObject(parent)
@@ -87,6 +90,97 @@ QString FileManagerBridge::describeItemCount(const QVariantList& items) const
     return QString::number(count) + QStringLiteral(" items");
 }
 
+bool FileManagerBridge::isValidFileName(const QString& name, QString* error) const
+{
+    const QString trimmed = name.trimmed();
+
+    if (trimmed.isEmpty()) {
+        if (error)
+            *error = QStringLiteral("Name cannot be empty");
+        return false;
+    }
+
+    if (trimmed == QStringLiteral(".") || trimmed == QStringLiteral("..")) {
+        if (error)
+            *error = QStringLiteral("Name is not valid");
+        return false;
+    }
+
+    static const QRegularExpression invalidChars(QStringLiteral(R"([<>:"/\\|?*\x00-\x1F])"));
+    if (invalidChars.match(trimmed).hasMatch()) {
+        if (error)
+            *error = QStringLiteral("Name contains invalid filesystem characters");
+        return false;
+    }
+
+    if (trimmed.endsWith(QLatin1Char(' ')) || trimmed.endsWith(QLatin1Char('.'))) {
+        if (error)
+            *error = QStringLiteral("Name cannot end with a space or dot");
+        return false;
+    }
+
+    const QString upper = trimmed.toUpper();
+    static const QStringList reservedNames = {
+        QStringLiteral("CON"), QStringLiteral("PRN"), QStringLiteral("AUX"), QStringLiteral("NUL"),
+        QStringLiteral("COM1"), QStringLiteral("COM2"), QStringLiteral("COM3"), QStringLiteral("COM4"),
+        QStringLiteral("COM5"), QStringLiteral("COM6"), QStringLiteral("COM7"), QStringLiteral("COM8"),
+        QStringLiteral("COM9"),
+        QStringLiteral("LPT1"), QStringLiteral("LPT2"), QStringLiteral("LPT3"), QStringLiteral("LPT4"),
+        QStringLiteral("LPT5"), QStringLiteral("LPT6"), QStringLiteral("LPT7"), QStringLiteral("LPT8"),
+        QStringLiteral("LPT9")
+    };
+
+    const QString basePart = upper.section(QLatin1Char('.'), 0, 0);
+    if (reservedNames.contains(basePart)) {
+        if (error)
+            *error = QStringLiteral("Name is reserved by the filesystem");
+        return false;
+    }
+
+    if (trimmed.size() > 255) {
+        if (error)
+            *error = QStringLiteral("Name is too long");
+        return false;
+    }
+
+    return true;
+}
+
+bool FileManagerBridge::isValidPathText(const QString& pathText, QString* error) const
+{
+    const QString trimmed = pathText.trimmed();
+
+    if (trimmed.isEmpty()) {
+        if (error)
+            *error = QStringLiteral("Path cannot be empty");
+        return false;
+    }
+
+    static const QRegularExpression invalidChars(QStringLiteral(R"([<>\"|?*\x00-\x1F])"));
+    if (invalidChars.match(trimmed).hasMatch()) {
+        if (error)
+            *error = QStringLiteral("Path contains invalid filesystem characters");
+        return false;
+    }
+
+    return true;
+}
+
+QVariantMap FileManagerBridge::validateFileName(const QString& name) const
+{
+    QString error;
+    const bool ok = isValidFileName(name, &error);
+
+    QVariantMap out;
+    out.insert(QStringLiteral("ok"), ok);
+    out.insert(QStringLiteral("message"),
+               ok ? QStringLiteral("[Backend] Name is valid")
+                  : QStringLiteral("[Backend] ") + error);
+    out.insert(QStringLiteral("messageKind"), ok ? QStringLiteral("success")
+                                                 : QStringLiteral("error"));
+    return out;
+}
+
 QVariantMap FileManagerBridge::bootstrap()
 {
     return makeSnapshot(QStringLiteral("[Backend] Bootstrap complete"), QStringLiteral("info"));
@@ -118,7 +212,7 @@ QVariantMap FileManagerBridge::closeTab(int index)
 
 QVariantMap FileManagerBridge::renameTab(int index, const QString& title)
 {
-    m_sessionService->renameTab(index, title);
+    m_sessionService->renameTab(index, title.trimmed());
     return makeSnapshot(QStringLiteral("[Backend] Renamed tab"), QStringLiteral("success"));
 }
 
@@ -238,7 +332,11 @@ QVariantMap FileManagerBridge::renameItems(const QVariantList& items, const QStr
     if (rows.size() != 1)
         return makeSnapshot(QStringLiteral("[Backend] Rename requires exactly 1 item"), QStringLiteral("info"));
 
-    m_fileOpsService->renameRow(rows.first().toInt(), newName);
+    QString error;
+    if (!isValidFileName(newName, &error))
+        return makeSnapshot(QStringLiteral("[Backend] ") + error, QStringLiteral("error"));
+
+    m_fileOpsService->renameRow(rows.first().toInt(), newName.trimmed());
     return makeSnapshot(QStringLiteral("[Backend] Renamed item"), QStringLiteral("success"));
 }
 
@@ -394,64 +492,6 @@ QVariantMap FileManagerBridge::setViewMode(const QString& viewMode)
     return makeSnapshot(QStringLiteral("[Backend] View mode set to ") + viewMode, QStringLiteral("info"));
 }
 
-QVariantMap FileManagerBridge::openNotifications()
-{
-    return makeSnapshot(QStringLiteral("[Backend] Opened notifications"), QStringLiteral("info"));
-}
-
-QVariantMap FileManagerBridge::openCreateMenu()
-{
-    return makeSnapshot(QStringLiteral("[Backend] Opened create menu"), QStringLiteral("info"));
-}
-
-QVariantMap FileManagerBridge::openMoreActionsMenu()
-{
-    return makeSnapshot(QStringLiteral("[Backend] Opened more actions menu"), QStringLiteral("info"));
-}
-
-QVariantMap FileManagerBridge::openViewModeMenu()
-{
-    return makeSnapshot(QStringLiteral("[Backend] Opened view mode menu"), QStringLiteral("info"));
-}
-
-QVariantMap FileManagerBridge::openThemeMenu()
-{
-    return makeSnapshot(QStringLiteral("[Backend] Opened theme menu"), QStringLiteral("info"));
-}
-
-QVariantMap FileManagerBridge::openSearchScopeMenu()
-{
-    return makeSnapshot(QStringLiteral("[Backend] Opened search scope menu"), QStringLiteral("info"));
-}
-
-QVariantMap FileManagerBridge::openTabContextMenu(int index)
-{
-    Q_UNUSED(index);
-    return makeSnapshot(QStringLiteral("[Backend] Opened tab context menu"), QStringLiteral("info"));
-}
-
-QVariantMap FileManagerBridge::openSidebarContextMenu(const QString& label,
-                                                      const QString& kind)
-{
-    Q_UNUSED(label);
-    Q_UNUSED(kind);
-    return makeSnapshot(QStringLiteral("[Backend] Opened sidebar context menu"), QStringLiteral("info"));
-}
-
-QVariantMap FileManagerBridge::openItemContextMenu(const QVariantList& items)
-{
-    if (normalizeItems(items).isEmpty())
-        return makeSnapshot(QStringLiteral("[Backend] Opened empty item context menu"), QStringLiteral("info"));
-
-    return makeSnapshot(QStringLiteral("[Backend] Opened item context menu for ") + describeItemCount(items),
-                        QStringLiteral("info"));
-}
-
-QVariantMap FileManagerBridge::openEmptyAreaContextMenu()
-{
-    return makeSnapshot(QStringLiteral("[Backend] Opened empty area context menu"), QStringLiteral("info"));
-}
-
 QVariantMap FileManagerBridge::openFolderByRow(int row)
 {
     return openItems(singleRowItemList(row));
@@ -477,4 +517,217 @@ QVariantMap FileManagerBridge::moveRows(const QVariantList& rows,
                                         const QString& targetKind)
 {
     return moveItems(rows, targetLabel, targetKind);
+}
+
+QVariantMap FileManagerBridge::commitPathText(const QString& pathText)
+{
+    QString error;
+    if (!isValidPathText(pathText, &error))
+        return makeSnapshot(QStringLiteral("[Backend] ") + error, QStringLiteral("error"));
+
+    m_navigationService->navigateToPathString(pathText);
+    m_fileOpsService->reloadForPath(m_navigationService->pathText());
+    return makeSnapshot(QStringLiteral("[Backend] Navigated to path"), QStringLiteral("info"));
+}
+
+QVariantMap FileManagerBridge::commitSearchText(const QString& query, const QString& scope)
+{
+    m_searchService->search(query, scope);
+    return makeSnapshot(QStringLiteral("[Backend] Search complete"), QStringLiteral("info"));
+}
+
+QVariantMap FileManagerBridge::openItemByRow(int row)
+{
+    return openItems(singleRowItemList(row));
+}
+
+QVariantMap FileManagerBridge::openItemInNewTabByRow(int row)
+{
+    return openItemsInNewTab(singleRowItemList(row));
+}
+
+QVariantMap FileManagerBridge::createFileAndBeginRename()
+{
+    m_fileOpsService->createFile();
+
+    QVariantMap out = makeSnapshot(QStringLiteral("[Backend] Created file"), QStringLiteral("success"));
+    out.insert(QStringLiteral("beginRenameRow"), 0);
+    return out;
+}
+
+QVariantMap FileManagerBridge::createFolderAndBeginRename()
+{
+    m_fileOpsService->createFolder();
+
+    QVariantMap out = makeSnapshot(QStringLiteral("[Backend] Created folder"), QStringLiteral("success"));
+    out.insert(QStringLiteral("beginRenameRow"), 0);
+    return out;
+}
+
+QVariantMap FileManagerBridge::cutSelection(const QVariantList& items)
+{
+    return cutItems(items);
+}
+
+QVariantMap FileManagerBridge::copySelection(const QVariantList& items)
+{
+    return copyItems(items);
+}
+
+QVariantMap FileManagerBridge::deleteSelection(const QVariantList& items)
+{
+    return deleteItems(items);
+}
+
+QString FileManagerBridge::currentPlatform() const
+{
+#if defined(Q_OS_WIN)
+    return QStringLiteral("windows");
+#elif defined(Q_OS_MACOS)
+    return QStringLiteral("macos");
+#elif defined(Q_OS_LINUX)
+    return QStringLiteral("linux");
+#else
+    return QStringLiteral("unknown");
+#endif
+}
+
+QString FileManagerBridge::invalidNameCharacters() const
+{
+#if defined(Q_OS_WIN)
+    // Windows forbids these in file/folder names
+    return QStringLiteral("\\/:*?\"<>|");
+#elif defined(Q_OS_MACOS)
+    // Modern macOS/APFS effectively forbids slash in path component names.
+    // Historically colon mattered in old APIs, but slash is the real one to block for UI naming.
+    return QStringLiteral("/");
+#elif defined(Q_OS_LINUX)
+    // POSIX path component restriction
+    return QStringLiteral("/");
+#else
+    // safest common subset
+    return QStringLiteral("\\/:*?\"<>|");
+#endif
+}
+
+bool FileManagerBridge::isValidFileOrFolderName(const QString& name) const
+{
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty())
+        return false;
+
+    // Common rules across platforms for path COMPONENT names
+    if (trimmed == QStringLiteral(".") || trimmed == QStringLiteral(".."))
+        return false;
+
+    if (trimmed.contains(QChar(u'\0')))
+        return false;
+
+#if defined(Q_OS_WIN)
+    static const QString invalid = QStringLiteral("\\/:*?\"<>|");
+    for (const QChar ch : invalid) {
+        if (trimmed.contains(ch))
+            return false;
+    }
+
+    // Windows disallows trailing space or dot
+    if (trimmed.endsWith(u' ') || trimmed.endsWith(u'.'))
+        return false;
+
+    // Windows reserved device names
+    const QString upper = trimmed.toUpper();
+    static const QStringList reserved = {
+        QStringLiteral("CON"),
+        QStringLiteral("PRN"),
+        QStringLiteral("AUX"),
+        QStringLiteral("NUL"),
+        QStringLiteral("COM1"),
+        QStringLiteral("COM2"),
+        QStringLiteral("COM3"),
+        QStringLiteral("COM4"),
+        QStringLiteral("COM5"),
+        QStringLiteral("COM6"),
+        QStringLiteral("COM7"),
+        QStringLiteral("COM8"),
+        QStringLiteral("COM9"),
+        QStringLiteral("LPT1"),
+        QStringLiteral("LPT2"),
+        QStringLiteral("LPT3"),
+        QStringLiteral("LPT4"),
+        QStringLiteral("LPT5"),
+        QStringLiteral("LPT6"),
+        QStringLiteral("LPT7"),
+        QStringLiteral("LPT8"),
+        QStringLiteral("LPT9")
+    };
+
+    const QString base = upper.section(u'.', 0, 0);
+    if (reserved.contains(base))
+        return false;
+
+#elif defined(Q_OS_MACOS)
+    if (trimmed.contains(u'/'))
+        return false;
+
+#elif defined(Q_OS_LINUX)
+    if (trimmed.contains(u'/'))
+        return false;
+#endif
+
+    return true;
+}
+
+QString FileManagerBridge::sanitizeFileOrFolderName(const QString& name) const
+{
+    QString out = name;
+
+    out.remove(QChar(u'\0'));
+
+#if defined(Q_OS_WIN)
+    static const QString invalid = QStringLiteral("\\/:*?\"<>|");
+    for (const QChar ch : invalid)
+        out.replace(ch, QChar(u'_'));
+
+    while (out.endsWith(u' ') || out.endsWith(u'.'))
+        out.chop(1);
+
+    const QString upperBase = out.trimmed().toUpper().section(u'.', 0, 0);
+    static const QStringList reserved = {
+        QStringLiteral("CON"),
+        QStringLiteral("PRN"),
+        QStringLiteral("AUX"),
+        QStringLiteral("NUL"),
+        QStringLiteral("COM1"),
+        QStringLiteral("COM2"),
+        QStringLiteral("COM3"),
+        QStringLiteral("COM4"),
+        QStringLiteral("COM5"),
+        QStringLiteral("COM6"),
+        QStringLiteral("COM7"),
+        QStringLiteral("COM8"),
+        QStringLiteral("COM9"),
+        QStringLiteral("LPT1"),
+        QStringLiteral("LPT2"),
+        QStringLiteral("LPT3"),
+        QStringLiteral("LPT4"),
+        QStringLiteral("LPT5"),
+        QStringLiteral("LPT6"),
+        QStringLiteral("LPT7"),
+        QStringLiteral("LPT8"),
+        QStringLiteral("LPT9")
+    };
+
+    if (reserved.contains(upperBase))
+        out.prepend(QStringLiteral("_"));
+
+#else
+    out.replace(u'/', u'_');
+#endif
+
+    out = out.trimmed();
+
+    if (out.isEmpty() || out == QStringLiteral(".") || out == QStringLiteral(".."))
+        out = QStringLiteral("untitled");
+
+    return out;
 }

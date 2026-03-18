@@ -7,17 +7,10 @@
 #include "FileManagerBridge.h"
 #include <QQmlContext>
 // TODO:
-// Tab rename is broken
-// Drop files selected to a tab should make it active
-// Fix handlers (some have no backend handling, some have it even though they shouldnt)
-// We need to split up into reusable files (Start with views and context menus)
-// Validate text fields? In particularly filepaths if they exist and name/folders
-// to ensure that characters that are invalid cant be used for names/renames
-// Make minimium height/width friendlier for window tiling systems
+// Split up into reusable files (Start with views and context menus)
 // Clicking away from filepath bar should turn it back into pills
-// Hover over for context menus is a bit too soft/rounded
-// Hover over color in dark mode for context menu is too aggressive (text disappears)
-// Why does opening context menu outside item boundaries makes it change the order of the items?
+// Opening context menu outside item boundaries makes it change the order of the items - fix that
+// Fix tabs reorder
 
 void dumpApps(const QString& filePath)
 {

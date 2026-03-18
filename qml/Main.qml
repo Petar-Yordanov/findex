@@ -17,8 +17,8 @@ Window {
          | Qt.FramelessWindowHint
          | Qt.WindowMinMaxButtonsHint
          | Qt.WindowCloseButtonHint
-    minimumWidth: 980
-    minimumHeight: 640
+    minimumWidth: 640
+    minimumHeight: 480
 
     property string themeMode: "Light" // Dark | Light | System
     property bool darkTheme: themeMode === "System" ? false : themeMode === "Dark"
@@ -192,6 +192,12 @@ Window {
                 replaceListModel(tabsModel, toJsArray(snapshot.tabs))
         }
 
+        if (snapshot.beginRenameRow !== undefined) {
+            Qt.callLater(function() {
+                beginRenameRow(snapshot.beginRenameRow)
+            })
+        }
+
         if (snapshot.path !== undefined)
             replaceListModel(pathModel, toJsArray(snapshot.path))
 
@@ -353,6 +359,27 @@ Window {
         currentTab = index
     }
 
+    function filterInvalidNameCharacters(value) {
+        var s = value || ""
+
+        if (backend && backend.currentPlatform) {
+            var platform = backend.currentPlatform()
+
+            // remove null everywhere
+            s = s.replace(/\u0000/g, "")
+
+            if (platform === "windows") {
+                s = s.replace(/[\\\/:*?"<>|]/g, "")
+            } else if (platform === "macos" || platform === "linux") {
+                s = s.replace(/\//g, "")
+            } else {
+                s = s.replace(/[\\\/:*?"<>|]/g, "")
+            }
+        }
+
+        return s
+    }
+
     function commitRenameTab(index, newTitle) {
         if (index < 0 || index >= tabsModel.count) {
             editingTabIndex = -1
@@ -476,7 +503,6 @@ Window {
 
     function showTabContextMenu(index) {
         contextTabIndex = index
-        applySnapshot(backend.openTabContextMenu(index), { preserveTabsOrder: true })
         tabContextMenu.popup()
     }
 
@@ -892,6 +918,98 @@ Window {
             currentTab -= 1
         else if (currentTab < from && currentTab >= to)
             currentTab += 1
+    }
+
+    function invalidCharactersForCurrentPlatform() {
+        if (!backend || !backend.currentPlatform)
+            return "\\/:*?\"<>|"
+
+        var platform = backend.currentPlatform()
+        if (platform === "windows")
+            return "\\/:*?\"<>|"
+        if (platform === "macos" || platform === "linux")
+            return "/"
+
+        return "\\/:*?\"<>|"
+    }
+
+    function validateNameDraft(value) {
+        var s = value || ""
+        var trimmed = s.trim()
+
+        if (trimmed.length === 0) {
+            return {
+                ok: false,
+                message: "Name cannot be empty"
+            }
+        }
+
+        if (trimmed === "." || trimmed === "..") {
+            return {
+                ok: false,
+                message: "This name is not valid."
+            }
+        }
+
+        if (s.indexOf("\u0000") >= 0) {
+            return {
+                ok: false,
+                message: "Name contains invalid characters."
+            }
+        }
+
+        var platform = backend && backend.currentPlatform ? backend.currentPlatform() : "windows"
+
+        if (platform === "windows") {
+            if (/[\\\/:*?"<>|]/.test(s)) {
+                return {
+                    ok: false,
+                    message: "A file name can't contain any of the following characters: \\ / : * ? \" < > |"
+                }
+            }
+
+            if (/[. ]$/.test(s)) {
+                return {
+                    ok: false,
+                    message: "A file name can't end with a space or a dot."
+                }
+            }
+
+            var upperBase = trimmed.toUpperCase().split(".")[0]
+            var reserved = {
+                "CON": true, "PRN": true, "AUX": true, "NUL": true,
+                "COM1": true, "COM2": true, "COM3": true, "COM4": true, "COM5": true,
+                "COM6": true, "COM7": true, "COM8": true, "COM9": true,
+                "LPT1": true, "LPT2": true, "LPT3": true, "LPT4": true, "LPT5": true,
+                "LPT6": true, "LPT7": true, "LPT8": true, "LPT9": true
+            }
+
+            if (reserved[upperBase]) {
+                return {
+                    ok: false,
+                    message: "This name is reserved by Windows."
+                }
+            }
+        } else {
+            if (/\//.test(s)) {
+                return {
+                    ok: false,
+                    message: "A file name can't contain /"
+                }
+            }
+        }
+
+        if (trimmed.length > 255) {
+            return {
+                ok: false,
+                message: "Name is too long."
+            }
+        }
+
+        return {
+            ok: true,
+            message: ""
+        }
     }
 
     function moveTabLocally(from, to) {
@@ -2065,6 +2183,7 @@ Window {
                         }
 
                         TextField {
+                            id: renameField
                             visible: column === 0 && root.editingFileRow === row
                             width: parent.width - 28
                             height: 24
@@ -2078,10 +2197,13 @@ Window {
                             topPadding: 0
                             bottomPadding: 0
 
+                            property var validation: root.validateNameDraft(text)
+                            property bool showValidation: visible && text.length > 0 && !validation.ok
+
                             background: Rectangle {
                                 radius: 6
                                 color: root.darkTheme ? "#1b2230" : "#ffffff"
-                                border.color: root.accent
+                                border.color: renameField.showValidation ? "#df5c5c" : root.accent
                                 border.width: 1
                             }
 
@@ -2097,14 +2219,42 @@ Window {
                                     root.editingFileNameDraft = text
                             }
 
-                            onAccepted: root.commitRenameRow(row, root.editingFileNameDraft)
+                            onAccepted: {
+                                if (validation.ok)
+                                    root.commitRenameRow(row, text)
+                            }
 
                             onActiveFocusChanged: {
-                                if (!activeFocus && visible)
-                                    root.commitRenameRow(row, root.editingFileNameDraft)
+                                if (!activeFocus && visible) {
+                                    if (validation.ok)
+                                        root.commitRenameRow(row, text)
+                                }
                             }
 
                             Keys.onEscapePressed: root.cancelRenameRow()
+                        }
+
+                        Rectangle {
+                            visible: column === 0 && root.editingFileRow === row && renameField.showValidation
+                            z: 300
+                            x: 22
+                            y: parent.height + 4
+                            width: Math.min(360, fileTable.width - 40)
+                            height: validationText.implicitHeight + 12
+                            radius: 6
+                            color: root.darkTheme ? "#2a1618" : "#fff1f1"
+                            border.color: "#df5c5c"
+                            border.width: 1
+
+                            Text {
+                                id: validationText
+                                anchors.fill: parent
+                                anchors.margins: 6
+                                text: renameField.validation.message
+                                color: root.darkTheme ? "#ffb3b3" : "#b42318"
+                                font.pixelSize: 12
+                                wrapMode: Text.Wrap
+                            }
                         }
                     }
 
@@ -2365,7 +2515,6 @@ Window {
                 onReleased: function(mouse) {
                     if (pendingEmptyContextMenu && !root.detailsSelectionMoved) {
                         root.contextFileRow = -1
-                        applySnapshot(backend.openEmptyAreaContextMenu())
                         emptyAreaContextMenu.popup()
                     }
 
@@ -2839,7 +2988,6 @@ Window {
                         onReleased: function(mouse) {
                             if (pendingEmptyContextMenu && !tilesRoot.selectionMoved) {
                                 root.contextFileRow = -1
-                                applySnapshot(backend.openEmptyAreaContextMenu())
                                 emptyAreaContextMenu.popup()
                             }
 
@@ -3271,7 +3419,6 @@ Window {
                         onReleased: function(mouse) {
                             if (pendingEmptyContextMenu && !compactRoot.selectionMoved) {
                                 root.contextFileRow = -1
-                                applySnapshot(backend.openEmptyAreaContextMenu())
                                 emptyAreaContextMenu.popup()
                             }
 
@@ -3492,7 +3639,6 @@ Window {
                     onReleased: function(mouse) {
                         if (pendingEmptyContextMenu && !largeIconsRoot.selectionMoved) {
                             root.contextFileRow = -1
-                            applySnapshot(backend.openEmptyAreaContextMenu())
                             emptyAreaContextMenu.popup()
                         }
 
@@ -3940,6 +4086,39 @@ Window {
                                                     border.color: index === root.currentTab ? root.border : "transparent"
                                                     border.width: 1
 
+                                                    DropArea {
+                                                        anchors.fill: parent
+                                                        z: 2
+
+                                                        function maybeActivate() {
+                                                            if (root.draggedFileCount > 0 && root.currentTab !== tabDelegate.index) {
+                                                                tabDelegate.rootWindow.activateTabLocal(tabDelegate.index)
+                                                                tabDelegate.rootWindow.ensureTabVisible(tabDelegate.index)
+                                                            }
+                                                        }
+
+                                                        onEntered: function(drag) {
+                                                            if (root.draggedFileCount > 0) {
+                                                                drag.accepted = true
+                                                                maybeActivate()
+                                                            }
+                                                        }
+
+                                                        onPositionChanged: function(drag) {
+                                                            if (root.draggedFileCount > 0) {
+                                                                drag.accepted = true
+                                                                maybeActivate()
+                                                            }
+                                                        }
+
+                                                        onDropped: function(drop) {
+                                                            if (root.draggedFileCount > 0) {
+                                                                drop.accepted = true
+                                                                maybeActivate()
+                                                            }
+                                                        }
+                                                    }
+
                                                     Row {
                                                         anchors.verticalCenter: parent.verticalCenter
                                                         anchors.left: parent.left
@@ -3997,7 +4176,7 @@ Window {
 
                                                         onTextChanged: {
                                                             if (visible)
-                                                                root.editingTabTitleDraft = text || ""
+                                                                root.editingTabTitleDraft = text
                                                         }
 
                                                         onAccepted: root.commitRenameTab(index, text || "")
@@ -4064,6 +4243,15 @@ Window {
                                                                 root.tabAutoScrollDirection = 0
                                                                 tabAutoScrollTimer.start()
                                                             } else {
+                                                                if (root.draggedTabStartIndex >= 0
+                                                                        && root.draggedTabIndex >= 0
+                                                                        && root.draggedTabStartIndex !== root.draggedTabIndex) {
+                                                                    applySnapshot(
+                                                                        backend.moveTab(root.draggedTabStartIndex, root.draggedTabIndex),
+                                                                        { preserveTabsOrder: true }
+                                                                    )
+                                                                }
+
                                                                 root.tabAutoScrollDirection = 0
                                                                 tabAutoScrollTimer.stop()
                                                                 root.draggedTabIndex = -1
@@ -4559,7 +4747,6 @@ Window {
                                         var p = searchScopeButton.mapToItem(root.contentItem, 0, searchScopeButton.height + 6)
                                         searchScopeMenu.x = p.x
                                         searchScopeMenu.y = p.y
-                                        applySnapshot(backend.openSearchScopeMenu())
                                         searchScopeMenu.open()
                                     }
                                 }
@@ -4617,10 +4804,7 @@ Window {
                         iconName: "add"
                         tooltipText: "Create"
                         darkTheme: root.darkTheme
-                        onClicked: {
-                            applySnapshot(backend.openCreateMenu())
-                            createMenu.popup()
-                        }
+                        onClicked: createMenu.popup()
                     }
 
                     IconButton {
@@ -4681,10 +4865,7 @@ Window {
                         iconName: root.viewModeIcon(root.currentViewMode)
                         tooltipText: "View"
                         darkTheme: root.darkTheme
-                        onClicked: {
-                            applySnapshot(backend.openViewModeMenu())
-                            viewModeMenu.popup()
-                        }
+                        onClicked: viewModeMenu.popup()
                     }
 
                     IconButton {
@@ -4692,10 +4873,7 @@ Window {
                         iconName: "more-horiz"
                         tooltipText: "More"
                         darkTheme: root.darkTheme
-                        onClicked: {
-                            applySnapshot(backend.openMoreActionsMenu())
-                            moreActionsMenu.popup()
-                        }
+                        onClicked: moreActionsMenu.popup()
                     }
 
                     Item {
@@ -4709,7 +4887,6 @@ Window {
 
                             onPressed: function(mouse) {
                                 if (mouse.button === Qt.RightButton) {
-                                    applySnapshot(backend.openMoreActionsMenu())
                                     moreActionsMenu.popup()
                                     mouse.accepted = true
                                 }
@@ -4756,15 +4933,10 @@ Window {
                             anchors.fill: parent
                             hoverEnabled: true
                             acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            onClicked: {
-                                applySnapshot(backend.openThemeMenu())
-                                themeMenu.popup()
-                            }
+                            onClicked: themeMenu.popup()
                             onPressed: function(mouse) {
-                                if (mouse.button === Qt.RightButton) {
-                                    applySnapshot(backend.openThemeMenu())
+                                if (mouse.button === Qt.RightButton)
                                     themeMenu.popup()
-                                }
                             }
                         }
                     }
@@ -4977,7 +5149,6 @@ Window {
                                                     root.contextSidebarLabel = itemLabel
                                                     root.contextSidebarKind = itemKind
                                                     root.contextSidebarIcon = itemIcon
-                                                    applySnapshot(backend.openSidebarContextMenu(itemLabel, itemKind))
                                                     sidebarContextMenu.popup()
                                                 }
                                             }
@@ -5583,16 +5754,11 @@ Window {
                                             hoverEnabled: true
                                             acceptedButtons: Qt.LeftButton | Qt.RightButton
 
-                                            onClicked: {
-                                                applySnapshot(backend.openViewModeMenu())
-                                                viewModeMenu.popup()
-                                            }
+                                            onClicked: viewModeMenu.popup()
 
                                             onPressed: function(mouse) {
-                                                if (mouse.button === Qt.RightButton) {
-                                                    applySnapshot(backend.openViewModeMenu())
+                                                if (mouse.button === Qt.RightButton)
                                                     viewModeMenu.popup()
-                                                }
                                             }
                                         }
                                     }
@@ -5647,7 +5813,6 @@ Window {
                                                 )
                                                 notificationsPopup.x = p.x
                                                 notificationsPopup.y = p.y
-                                                applySnapshot(backend.openNotifications())
                                                 notificationsPopup.open()
                                             }
                                         }
