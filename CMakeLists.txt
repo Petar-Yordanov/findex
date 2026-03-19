@@ -195,6 +195,8 @@ qt_add_qml_module(appFileExplorer
         SOURCES FileManagerFileOpsService.h FileManagerFileOpsService.cpp
         SOURCES FileManagerSearchService.h FileManagerSearchService.cpp
         SOURCES FileManagerSidebarService.h FileManagerSidebarService.cpp
+        RESOURCES assets/icons/dark/preview.png
+        RESOURCES assets/icons/light/preview.png
 )
 
 set_target_properties(appFileExplorer PROPERTIES

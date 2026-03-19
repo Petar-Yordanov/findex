@@ -6,11 +6,6 @@
 #include "FileAssociationService.h"
 #include "FileManagerBridge.h"
 #include <QQmlContext>
-// TODO:
-// Split up into reusable files (Start with views and context menus)
-// Clicking away from filepath bar should turn it back into pills
-// Opening context menu outside item boundaries makes it change the order of the items - fix that
-// Fix tabs reorder
 
 void dumpApps(const QString& filePath)
 {

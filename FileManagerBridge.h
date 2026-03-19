@@ -84,16 +84,19 @@ public:
     Q_INVOKABLE QString invalidNameCharacters() const;
     Q_INVOKABLE bool isValidFileOrFolderName(const QString& name) const;
     Q_INVOKABLE QString sanitizeFileOrFolderName(const QString& name) const;
+    Q_INVOKABLE QVariantMap previewItemByRow(int row);
+    Q_INVOKABLE QVariantMap clearPreview();
+
 private:
     QVariantMap makeSnapshot(const QString& message = QString(),
                              const QString& messageKind = QString()) const;
-
     QVariantList normalizeItems(const QVariantList& items) const;
     QVariantList rowsFromItems(const QVariantList& items) const;
     QVariantList singleRowItemList(int row) const;
     QString describeItemCount(const QVariantList& items) const;
     bool isValidFileName(const QString& name, QString* error = nullptr) const;
     bool isValidPathText(const QString& pathText, QString* error = nullptr) const;
+    QVariantMap buildMockPreviewForItem(const QVariantMap& item) const;
 
 private:
     FileManagerSessionService* m_sessionService;

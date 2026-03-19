@@ -127,10 +127,234 @@ Window {
     property int editingTabIndex: -1
     property string editingTabTitleDraft: ""
 
+    property bool previewEnabled: true
+    property int previewPaneWidth: 320
+    property int previewPaneMinWidth: 220
+    property int previewPaneMaxWidth: Math.max(420, Math.floor(width * 0.45))
+    property int previewPaneLastExpandedWidth: 320
+
+    property var previewData: ({
+        visible: false,
+        name: "",
+        type: "",
+        icon: "insert-drive-file",
+        previewType: "none",
+        size: "",
+        dateModified: "",
+        summary: "",
+        lines: []
+    })
+
+    onCurrentFileRowChanged: refreshPreviewSelection()
+    onSelectedFileRowsChanged: refreshPreviewSelection()
+    onPreviewEnabledChanged: refreshPreviewSelection()
+    onPreviewPaneWidthChanged: {
+        if (root.previewEnabled && root.previewPaneWidth >= root.previewPaneMinWidth)
+            root.previewPaneLastExpandedWidth = root.previewPaneWidth
+    }
+
     function replaceListModel(model, rows) {
         model.clear()
         for (var i = 0; i < rows.length; ++i)
             model.append(rows[i])
+    }
+
+    function formatBytes(bytes) {
+        if (bytes < 0 || isNaN(bytes))
+            return ""
+
+        var units = ["B", "KB", "MB", "GB", "TB"]
+        var value = bytes
+        var unitIndex = 0
+
+        while (value >= 1024 && unitIndex < units.length - 1) {
+            value /= 1024
+            ++unitIndex
+        }
+
+        var decimals = value >= 100 || unitIndex === 0 ? 0 : value >= 10 ? 1 : 2
+        return value.toFixed(decimals) + " " + units[unitIndex]
+    }
+
+    function showPreviewData(data) {
+        if (!root.previewEnabled || !data) {
+            root.previewData = root.emptyPreviewData()
+            return
+        }
+
+        root.previewData = {
+            visible: data.visible === undefined ? true : !!data.visible,
+            name: data.name || "",
+            type: data.type || "",
+            icon: data.icon || "insert-drive-file",
+            previewType: data.previewType || "none",
+            size: data.size || "",
+            dateModified: data.dateModified || "",
+            summary: data.summary || "",
+            lines: root.toJsArray(data.lines)
+        }
+    }
+
+    function togglePreviewEnabled() {
+        if (root.previewEnabled && root.previewPaneWidth >= root.previewPaneMinWidth)
+            root.previewPaneLastExpandedWidth = root.previewPaneWidth
+
+        root.previewEnabled = !root.previewEnabled
+
+        if (root.previewEnabled)
+            root.previewPaneWidth = Math.max(root.previewPaneMinWidth, root.previewPaneLastExpandedWidth)
+    }
+
+    function emptyPreviewData() {
+        return {
+            visible: false,
+            name: "",
+            type: "",
+            icon: "insert-drive-file",
+            previewType: "none",
+            size: "",
+            dateModified: "",
+            summary: "",
+            lines: []
+        }
+    }
+
+    function multiSelectionPreviewData(rows) {
+        if (!rows || rows.length === 0)
+            return root.emptyPreviewData()
+
+        var totalCount = rows.length
+        var folderCount = 0
+        var fileCount = 0
+        var knownSizeBytes = 0
+        var knownSizeCount = 0
+        var latestModified = 0
+        var typeCounts = {}
+        var extensions = {}
+
+        for (var i = 0; i < rows.length; ++i) {
+            var row = rows[i]
+            var item = filesModel.rows[row]
+            if (!item)
+                continue
+
+            var typeText = item.type || ""
+            var nameText = item.name || ""
+
+            if (typeText === "File folder")
+                ++folderCount
+            else
+                ++fileCount
+
+            if (typeText !== "") {
+                if (!typeCounts[typeText])
+                    typeCounts[typeText] = 0
+                ++typeCounts[typeText]
+            }
+
+            var sizeBytes = parseSizeToBytes(item.size)
+            if (sizeBytes >= 0) {
+                knownSizeBytes += sizeBytes
+                ++knownSizeCount
+            }
+
+            var dt = parseDateTimeValue(item.dateModified)
+            if (dt > latestModified)
+                latestModified = dt
+
+            var dot = nameText.lastIndexOf(".")
+            if (dot > 0 && dot < nameText.length - 1) {
+                var ext = nameText.slice(dot + 1).toLowerCase()
+                if (!extensions[ext])
+                    extensions[ext] = 0
+                ++extensions[ext]
+            }
+        }
+
+        var dominantType = ""
+        var dominantTypeCount = 0
+        for (var t in typeCounts) {
+            if (typeCounts[t] > dominantTypeCount) {
+                dominantType = t
+                dominantTypeCount = typeCounts[t]
+            }
+        }
+
+        var extensionList = []
+        for (var extKey in extensions)
+            extensionList.push(extKey)
+        extensionList.sort()
+
+        var lines = []
+        lines.push(totalCount + " selected")
+        lines.push(folderCount + " folder" + (folderCount === 1 ? "" : "s"))
+        lines.push(fileCount + " file" + (fileCount === 1 ? "" : "s"))
+
+        if (knownSizeCount > 0)
+            lines.push("Combined file size: " + formatBytes(knownSizeBytes))
+
+        if (extensionList.length > 0)
+            lines.push("Extensions: " + extensionList.slice(0, 6).join(", ") + (extensionList.length > 6 ? " ..." : ""))
+
+        return {
+            visible: true,
+            name: totalCount + " items selected",
+            type: folderCount > 0 && fileCount > 0
+                  ? "Multiple item types"
+                  : folderCount > 0
+                    ? "Folders"
+                    : (dominantType !== "" && dominantTypeCount === totalCount ? dominantType : "Files"),
+            icon: totalCount > 1 ? "content-copy" : "insert-drive-file",
+            previewType: "multi",
+            size: knownSizeCount > 0 ? formatBytes(knownSizeBytes) : "—",
+            dateModified: latestModified > 0 ? new Date(latestModified).toLocaleString(Qt.locale(), "dd/MM/yyyy HH:mm") : "—",
+            summary: folderCount > 0 && fileCount > 0
+                     ? "Selection contains both files and folders."
+                     : folderCount === totalCount
+                       ? "Selection contains folders only."
+                       : "Selection contains multiple files.",
+            lines: lines
+        }
+    }
+
+    function refreshPreviewSelection() {
+        if (!root.previewEnabled) {
+            root.showPreviewData(null)
+            return
+        }
+
+        var rows = root.selectedFileRowsArray()
+
+        if (rows.length > 1) {
+            root.showPreviewData(root.multiSelectionPreviewData(rows))
+            return
+        }
+
+        if (rows.length === 1) {
+            root.currentFileRow = rows[0]
+            applySnapshot(backend.previewItemByRow(rows[0]))
+            return
+        }
+
+        if (root.currentFileRow >= 0 && root.currentFileRow < filesModel.rows.length)
+            applySnapshot(backend.previewItemByRow(root.currentFileRow))
+        else if (backend && backend.clearPreview)
+            applySnapshot(backend.clearPreview())
+        else
+            root.showPreviewData(null)
+    }
+
+    function finishPathEditing(acceptTypedPath) {
+        if (!editingPath)
+            return
+
+        if (acceptTypedPath) {
+            editingPath = false
+            applySnapshot(backend.navigateToPathString(pathField.text))
+        } else {
+            editingPath = false
+            syncPathField()
+        }
     }
 
     function updateTabsPreservingOrder(newTabs) {
@@ -148,32 +372,35 @@ Window {
             return (tab.title || "") + "|" + (tab.icon || "")
         }
 
-        var incomingByKey = {}
-        var incomingKeys = {}
+        function bucketTake(buckets, key) {
+            var arr = buckets[key]
+            if (!arr || arr.length === 0)
+                return null
+            return arr.shift()
+        }
+
+        var incomingBuckets = {}
         for (var j = 0; j < incoming.length; ++j) {
-            var k1 = tabKey(incoming[j])
-            incomingByKey[k1] = incoming[j]
-            incomingKeys[k1] = true
+            var k = tabKey(incoming[j])
+            if (!incomingBuckets[k])
+                incomingBuckets[k] = []
+            incomingBuckets[k].push(incoming[j])
         }
 
         var merged = []
 
-        // keep current visual order for tabs that still exist
         for (var a = 0; a < current.length; ++a) {
             var ck = tabKey(current[a])
-            if (incomingKeys[ck]) {
-                merged.push(incomingByKey[ck])
-                delete incomingKeys[ck]
-            }
+            var match = bucketTake(incomingBuckets, ck)
+            if (match)
+                merged.push(match)
         }
 
-        // append any newly added tabs that were not already in current visual order
         for (var b = 0; b < incoming.length; ++b) {
             var ik = tabKey(incoming[b])
-            if (incomingKeys[ik]) {
-                merged.push(incoming[b])
-                delete incomingKeys[ik]
-            }
+            var bucket = incomingBuckets[ik]
+            if (bucket && bucket.length > 0)
+                merged.push(bucket.shift())
         }
 
         replaceListModel(tabsModel, merged)
@@ -215,6 +442,11 @@ Window {
 
         if (snapshot.pathText !== undefined && pathField)
             pathField.text = snapshot.pathText
+
+        if (snapshot.preview !== undefined)
+            root.showPreviewData(snapshot.preview)
+        else if (!root.previewEnabled)
+            root.showPreviewData(null)
 
         if (snapshot.message)
             addToastNotification(snapshot.message, snapshot.messageKind || "info")
@@ -365,7 +597,6 @@ Window {
         if (backend && backend.currentPlatform) {
             var platform = backend.currentPlatform()
 
-            // remove null everywhere
             s = s.replace(/\u0000/g, "")
 
             if (platform === "windows") {
@@ -4227,79 +4458,82 @@ Window {
                                                         id: dragHandler
                                                         target: null
                                                         acceptedButtons: Qt.LeftButton
-                                                        enabled: root.editingTabIndex !== index
+                                                        enabled: tabDelegate.rootWindow.editingTabIndex !== index
                                                         xAxis.enabled: true
                                                         yAxis.enabled: false
 
                                                         onActiveChanged: {
-                                                            root.tabDragActive = active
+                                                            tabDelegate.rootWindow.tabDragActive = active
 
                                                             if (active) {
-                                                                root.currentTab = index
-                                                                root.draggedTabIndex = index
-                                                                root.draggedTabStartIndex = index
-                                                                root.draggedTabOffset = 0
+                                                                tabDelegate.rootWindow.currentTab = index
+                                                                tabDelegate.rootWindow.draggedTabIndex = index
+                                                                tabDelegate.rootWindow.draggedTabStartIndex = index
+                                                                tabDelegate.rootWindow.draggedTabOffset = 0
                                                                 tabDelegate.movedEnough = false
-                                                                root.tabAutoScrollDirection = 0
-                                                                tabAutoScrollTimer.start()
+                                                                tabDelegate.rootWindow.tabAutoScrollDirection = 0
+                                                                tabDelegate.rootWindow.tabAutoScrollTimerRef.start()
                                                             } else {
-                                                                if (root.draggedTabStartIndex >= 0
-                                                                        && root.draggedTabIndex >= 0
-                                                                        && root.draggedTabStartIndex !== root.draggedTabIndex) {
+                                                                if (tabDelegate.rootWindow.draggedTabStartIndex >= 0
+                                                                        && tabDelegate.rootWindow.draggedTabIndex >= 0
+                                                                        && tabDelegate.rootWindow.draggedTabStartIndex !== tabDelegate.rootWindow.draggedTabIndex) {
                                                                     applySnapshot(
-                                                                        backend.moveTab(root.draggedTabStartIndex, root.draggedTabIndex),
+                                                                        tabDelegate.rootWindow.backend.moveTab(
+                                                                            tabDelegate.rootWindow.draggedTabStartIndex,
+                                                                            tabDelegate.rootWindow.draggedTabIndex
+                                                                        ),
                                                                         { preserveTabsOrder: true }
                                                                     )
                                                                 }
 
-                                                                root.tabAutoScrollDirection = 0
-                                                                tabAutoScrollTimer.stop()
-                                                                root.draggedTabIndex = -1
-                                                                root.draggedTabStartIndex = -1
-                                                                root.draggedTabOffset = 0
+                                                                tabDelegate.rootWindow.tabAutoScrollDirection = 0
+                                                                tabDelegate.rootWindow.tabAutoScrollTimerRef.stop()
+                                                                tabDelegate.rootWindow.draggedTabIndex = -1
+                                                                tabDelegate.rootWindow.draggedTabStartIndex = -1
+                                                                tabDelegate.rootWindow.draggedTabOffset = 0
                                                                 tabDelegate.movedEnough = false
                                                             }
                                                         }
 
                                                         onTranslationChanged: {
-                                                            if (root.draggedTabIndex !== index)
+                                                            if (tabDelegate.rootWindow.draggedTabIndex !== index)
                                                                 return
 
                                                             if (Math.abs(translation.x) > 8)
                                                                 tabDelegate.movedEnough = true
 
-                                                            var slotSize = root.tabWidth + root.tabSpacing
+                                                            var slotSize = tabDelegate.rootWindow.tabWidth + tabDelegate.rootWindow.tabSpacing
 
                                                             var draggedCenterX =
-                                                                    root.draggedTabStartIndex * slotSize
+                                                                    tabDelegate.rootWindow.draggedTabStartIndex * slotSize
                                                                     + translation.x
-                                                                    + root.tabWidth / 2
+                                                                    + tabDelegate.rootWindow.tabWidth / 2
 
                                                             var targetIndex = Math.floor(draggedCenterX / slotSize)
                                                             targetIndex = Math.max(0, Math.min(tabsModel.count - 1, targetIndex))
 
-                                                            root.draggedTabOffset =
+                                                            tabDelegate.rootWindow.draggedTabOffset =
                                                                     draggedCenterX
-                                                                    - (index * slotSize + root.tabWidth / 2)
+                                                                    - (index * slotSize + tabDelegate.rootWindow.tabWidth / 2)
 
                                                             if (targetIndex !== index) {
-                                                                root.moveTab(index, targetIndex)
-                                                                root.draggedTabIndex = targetIndex
-                                                                root.ensureTabVisible(targetIndex)
+                                                                tabDelegate.rootWindow.moveTab(index, targetIndex)
+                                                                tabDelegate.rootWindow.draggedTabIndex = targetIndex
+                                                                tabDelegate.rootWindow.ensureTabVisible(targetIndex)
                                                             }
 
                                                             var posInViewport = tabDelegate.mapToItem(
                                                                 tabViewport,
                                                                 tabDelegate.width / 2,
                                                                 tabDelegate.height / 2
-                                                            ).x + root.draggedTabOffset
+                                                            ).x + tabDelegate.rootWindow.draggedTabOffset
 
                                                             if (posInViewport < 36)
-                                                                root.tabAutoScrollDirection = -1
+                                                                tabDelegate.rootWindow.tabAutoScrollDirection = -1
                                                             else if (posInViewport > tabViewport.width - 36)
-                                                                root.tabAutoScrollDirection = 1
+                                                                tabDelegate.rootWindow.tabAutoScrollDirection = 1
                                                             else
-                                                                root.tabAutoScrollDirection = 0
+                                                                tabDelegate.rootWindow.tabAutoScrollDirection = 0
                                                         }
                                                     }
 
@@ -4682,15 +4916,13 @@ Window {
                                 bottomPadding: 0
                                 verticalAlignment: TextInput.AlignVCenter
                                 background: Rectangle { color: "transparent" }
-                                onAccepted: {
-                                    root.editingPath = false
-                                    applySnapshot(backend.navigateToPathString(text))
-                                }
+
+                                onAccepted: root.finishPathEditing(true)
                                 onActiveFocusChanged: {
-                                    if (!activeFocus)
-                                        root.editingPath = false
+                                    if (!activeFocus && root.editingPath)
+                                        root.finishPathEditing(false)
                                 }
-                                Keys.onEscapePressed: root.editingPath = false
+                                Keys.onEscapePressed: root.finishPathEditing(false)
                             }
                         }
                     }
@@ -4891,6 +5123,49 @@ Window {
                                     mouse.accepted = true
                                 }
                             }
+                        }
+                    }
+
+
+                    Rectangle {
+                        id: previewToggleButton
+                        width: 108
+                        height: 32
+                        radius: 9
+                        color: root.previewEnabled
+                               ? (darkTheme ? "#243249" : "#e3edff")
+                               : (previewToolbarMouse.pressed
+                                    ? (darkTheme ? "#3a475d" : "#cadbf8")
+                                    : previewToolbarMouse.containsMouse
+                                      ? (darkTheme ? "#2d3748" : "#dce8fb")
+                                      : (darkTheme ? "#1d2431" : "#fafbfc"))
+                        border.color: root.previewEnabled ? root.accent : root.border
+                        border.width: 1
+
+                        Row {
+                            anchors.centerIn: parent
+                            spacing: 8
+
+                            AppIcon {
+                                name: "preview"
+                                darkTheme: root.darkTheme
+                                iconSize: 14
+                            }
+
+                            Text {
+                                text: "Preview"
+                                color: root.text
+                                font.pixelSize: 12
+                                font.bold: root.previewEnabled
+                            }
+                        }
+
+                        MouseArea {
+                            id: previewToolbarMouse
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton
+                            onClicked: root.togglePreviewEnabled()
                         }
                     }
 
@@ -5675,145 +5950,441 @@ Window {
                                 }
                             }
 
-                            Rectangle {
+                            RowLayout {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                color: "transparent"
+                                spacing: 0
 
-                                Loader {
-                                    id: fileViewLoader
-                                    anchors.fill: parent
-                                    sourceComponent: {
-                                        if (root.currentViewMode === "Details")
-                                            return detailsViewComponent
-                                        if (root.currentViewMode === "Tiles")
-                                            return tilesViewComponent
-                                        if (root.currentViewMode === "Compact")
-                                            return compactViewComponent
-                                        if (root.currentViewMode === "Large icons")
-                                            return largeIconsViewComponent
-                                        return detailsViewComponent
-                                    }
-                                }
-                            }
+                                Item {
+                                    Layout.fillWidth: true
+                                    Layout.fillHeight: true
 
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: 30
-                                color: darkTheme ? "#141920" : "#f6f7f9"
-                                border.color: root.borderSoft
-                                border.width: 1
+                                    ColumnLayout {
+                                        anchors.fill: parent
+                                        spacing: 0
 
-                                RowLayout {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
+                                        Rectangle {
+                                            Layout.fillWidth: true
+                                            Layout.fillHeight: true
+                                            color: "transparent"
 
-                                    Text {
-                                        text: root.selectedFileCount() > 0
-                                              ? (filesModel.rowCount + " items   " + root.selectedFileCount() + " selected")
-                                              : (filesModel.rowCount + " items")
-                                        color: root.muted
-                                        font.pixelSize: 11
-                                    }
-
-                                    Item { Layout.fillWidth: true }
-
-                                    Rectangle {
-                                        id: bottomViewButton
-                                        width: 24
-                                        height: 24
-                                        radius: 7
-                                        color: bottomViewMouse.pressed
-                                            ? root.pressed
-                                            : bottomViewMouse.containsMouse
-                                                ? root.hover
-                                                : (darkTheme ? "#1a1f27" : "#ffffff")
-                                        border.color: bottomViewMouse.containsMouse || bottomViewMouse.pressed
-                                                    ? root.border
-                                                    : root.borderSoft
-                                        border.width: 1
-
-                                        AppIcon {
-                                            anchors.centerIn: parent
-                                            name: root.currentViewMode === "Large icons"
-                                                  ? "grid-view"
-                                                  : root.currentViewMode === "Tiles"
-                                                    ? "tile-view"
-                                                    : root.currentViewMode === "Details"
-                                                      ? "detailed-view"
-                                                      : "list-view"
-                                            darkTheme: root.darkTheme
-                                            iconSize: 13
-                                            iconOpacity: 0.75
-                                        }
-
-                                        MouseArea {
-                                            id: bottomViewMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-                                            onClicked: viewModeMenu.popup()
-
-                                            onPressed: function(mouse) {
-                                                if (mouse.button === Qt.RightButton)
-                                                    viewModeMenu.popup()
+                                            Loader {
+                                                id: fileViewLoader
+                                                anchors.fill: parent
+                                                sourceComponent: {
+                                                    if (root.currentViewMode === "Details")
+                                                        return detailsViewComponent
+                                                    if (root.currentViewMode === "Tiles")
+                                                        return tilesViewComponent
+                                                    if (root.currentViewMode === "Compact")
+                                                        return compactViewComponent
+                                                    if (root.currentViewMode === "Large icons")
+                                                        return largeIconsViewComponent
+                                                    return detailsViewComponent
+                                                }
                                             }
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        id: notificationsButton
-                                        width: 24
-                                        height: 24
-                                        radius: 7
-                                        color: notificationsMouse.pressed
-                                            ? root.pressed
-                                            : notificationsMouse.containsMouse
-                                                ? root.hover
-                                                : (darkTheme ? "#1a1f27" : "#ffffff")
-                                        border.color: notificationsMouse.containsMouse || notificationsMouse.pressed
-                                                    ? root.border
-                                                    : root.borderSoft
-                                        border.width: 1
-
-                                        AppIcon {
-                                            anchors.centerIn: parent
-                                            name: "notifications"
-                                            darkTheme: root.darkTheme
-                                            iconSize: 13
-                                            iconOpacity: 0.8
                                         }
 
                                         Rectangle {
-                                            visible: notificationsModel.count > 0
-                                            width: 8
-                                            height: 8
-                                            radius: 4
-                                            anchors.top: parent.top
-                                            anchors.right: parent.right
-                                            anchors.topMargin: 2
-                                            anchors.rightMargin: 2
-                                            color: root.accent
-                                            z: 2
+                                            Layout.fillWidth: true
+                                            Layout.preferredHeight: 30
+                                            color: darkTheme ? "#141920" : "#f6f7f9"
+                                            border.color: root.borderSoft
+                                            border.width: 1
+
+                                            RowLayout {
+                                                anchors.fill: parent
+                                                anchors.leftMargin: 12
+                                                anchors.rightMargin: 12
+
+                                                Text {
+                                                    text: root.selectedFileCount() > 0
+                                                          ? (filesModel.rowCount + " items   " + root.selectedFileCount() + " selected")
+                                                          : (filesModel.rowCount + " items")
+                                                    color: root.muted
+                                                    font.pixelSize: 11
+                                                }
+
+                                                Item { Layout.fillWidth: true }
+
+                                                Rectangle {
+                                                    id: bottomViewButton
+                                                    width: 24
+                                                    height: 24
+                                                    radius: 7
+                                                    color: bottomViewMouse.pressed
+                                                        ? root.pressed
+                                                        : bottomViewMouse.containsMouse
+                                                            ? root.hover
+                                                            : (darkTheme ? "#1a1f27" : "#ffffff")
+                                                    border.color: bottomViewMouse.containsMouse || bottomViewMouse.pressed
+                                                                ? root.border
+                                                                : root.borderSoft
+                                                    border.width: 1
+
+                                                    AppIcon {
+                                                        anchors.centerIn: parent
+                                                        name: root.currentViewMode === "Large icons"
+                                                              ? "grid-view"
+                                                              : root.currentViewMode === "Tiles"
+                                                                ? "tile-view"
+                                                                : root.currentViewMode === "Details"
+                                                                  ? "detailed-view"
+                                                                  : "list-view"
+                                                        darkTheme: root.darkTheme
+                                                        iconSize: 13
+                                                        iconOpacity: 0.75
+                                                    }
+
+                                                    MouseArea {
+                                                        id: bottomViewMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+                                                        onClicked: viewModeMenu.popup()
+
+                                                        onPressed: function(mouse) {
+                                                            if (mouse.button === Qt.RightButton)
+                                                                viewModeMenu.popup()
+                                                        }
+                                                    }
+                                                }
+
+                                                Rectangle {
+                                                    id: notificationsButton
+                                                    width: 24
+                                                    height: 24
+                                                    radius: 7
+                                                    color: notificationsMouse.pressed
+                                                        ? root.pressed
+                                                        : notificationsMouse.containsMouse
+                                                            ? root.hover
+                                                            : (darkTheme ? "#1a1f27" : "#ffffff")
+                                                    border.color: notificationsMouse.containsMouse || notificationsMouse.pressed
+                                                                ? root.border
+                                                                : root.borderSoft
+                                                    border.width: 1
+
+                                                    AppIcon {
+                                                        anchors.centerIn: parent
+                                                        name: "notifications"
+                                                        darkTheme: root.darkTheme
+                                                        iconSize: 13
+                                                        iconOpacity: 0.8
+                                                    }
+
+                                                    Rectangle {
+                                                        visible: notificationsModel.count > 0
+                                                        width: 8
+                                                        height: 8
+                                                        radius: 4
+                                                        anchors.top: parent.top
+                                                        anchors.right: parent.right
+                                                        anchors.topMargin: 2
+                                                        anchors.rightMargin: 2
+                                                        color: root.accent
+                                                        z: 2
+                                                    }
+
+                                                    MouseArea {
+                                                        id: notificationsMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+                                                        onClicked: {
+                                                            var p = notificationsButton.mapToItem(
+                                                                root.contentItem,
+                                                                notificationsButton.width - notificationsPopup.width,
+                                                                -notificationsPopup.height - 8
+                                                            )
+                                                            notificationsPopup.x = p.x
+                                                            notificationsPopup.y = p.y
+                                                            notificationsPopup.open()
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    id: previewSplitter
+                                    visible: root.previewEnabled
+                                    Layout.preferredWidth: root.previewEnabled ? 8 : 0
+                                    Layout.minimumWidth: root.previewEnabled ? 8 : 0
+                                    Layout.maximumWidth: root.previewEnabled ? 8 : 0
+                                    Layout.fillHeight: true
+                                    color: previewResizeMouse.pressed
+                                           ? (darkTheme ? "#2a3342" : "#d7dfeb")
+                                           : previewResizeMouse.containsMouse
+                                             ? (darkTheme ? "#212938" : "#e3e9f2")
+                                             : "transparent"
+
+                                    Rectangle {
+                                        anchors.centerIn: parent
+                                        width: 2
+                                        height: parent.height
+                                        radius: 1
+                                        color: previewResizeMouse.pressed
+                                               ? root.accent
+                                               : previewResizeMouse.containsMouse
+                                                 ? root.border
+                                                 : "transparent"
+                                    }
+
+                                    MouseArea {
+                                        id: previewResizeMouse
+                                        anchors.fill: parent
+                                        hoverEnabled: true
+                                        cursorShape: Qt.SizeHorCursor
+                                        acceptedButtons: Qt.LeftButton
+
+                                        property real pressSceneX: 0
+                                        property int startWidth: 0
+
+                                        onPressed: function(mouse) {
+                                            var p = previewResizeMouse.mapToItem(contentPane, mouse.x, mouse.y)
+                                            pressSceneX = p.x
+                                            startWidth = root.previewPaneWidth
                                         }
 
-                                        MouseArea {
-                                            id: notificationsMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                                        onPositionChanged: function(mouse) {
+                                            if (!pressed)
+                                                return
 
-                                            onClicked: {
-                                                var p = notificationsButton.mapToItem(
-                                                    root.contentItem,
-                                                    notificationsButton.width - notificationsPopup.width,
-                                                    -notificationsPopup.height - 8
-                                                )
-                                                notificationsPopup.x = p.x
-                                                notificationsPopup.y = p.y
-                                                notificationsPopup.open()
+                                            var p = previewResizeMouse.mapToItem(contentPane, mouse.x, mouse.y)
+                                            var dx = p.x - pressSceneX
+
+                                            var maxAllowed = Math.max(
+                                                root.previewPaneMinWidth,
+                                                Math.min(root.previewPaneMaxWidth, contentPane.width - 220)
+                                            )
+
+                                            root.previewPaneWidth = Math.max(
+                                                root.previewPaneMinWidth,
+                                                Math.min(maxAllowed, startWidth - dx)
+                                            )
+                                        }
+                                    }
+                                }
+
+                                Rectangle {
+                                    visible: root.previewEnabled
+                                    Layout.preferredWidth: root.previewEnabled ? root.previewPaneWidth : 0
+                                    Layout.minimumWidth: root.previewEnabled ? root.previewPaneWidth : 0
+                                    Layout.maximumWidth: root.previewEnabled ? root.previewPaneWidth : 0
+                                    Layout.fillHeight: true
+                                    color: darkTheme ? "#141920" : "#fbfcfd"
+                                    border.color: root.borderSoft
+                                    border.width: 1
+
+                                    Flickable {
+                                        id: previewFlick
+                                        anchors.fill: parent
+                                        anchors.leftMargin: 12
+                                        anchors.topMargin: 12
+                                        anchors.bottomMargin: 12
+                                        anchors.rightMargin: 6
+                                        clip: true
+                                        contentWidth: width
+                                        contentHeight: previewColumn.implicitHeight
+
+                                        ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
+
+                                        Column {
+                                            id: previewColumn
+                                            width: Math.max(0, previewFlick.width - 20)
+                                            spacing: 12
+
+                                            Text {
+                                                text: "Preview"
+                                                color: root.text
+                                                font.pixelSize: 13
+                                                font.bold: true
+                                            }
+
+                                            Rectangle {
+                                                width: parent.width
+                                                height: 180
+                                                radius: 12
+                                                color: darkTheme ? "#1b2230" : "#f4f7fb"
+                                                border.color: root.borderSoft
+                                                border.width: 1
+
+                                                Column {
+                                                    anchors.centerIn: parent
+                                                    spacing: 8
+                                                    visible: !root.previewData.visible
+
+                                                    AppIcon {
+                                                        anchors.horizontalCenter: parent.horizontalCenter
+                                                        name: "preview"
+                                                        darkTheme: root.darkTheme
+                                                        iconSize: 42
+                                                        iconOpacity: 0.55
+                                                    }
+
+                                                    Text {
+                                                        text: "Select an item to preview"
+                                                        color: root.muted
+                                                        font.pixelSize: 12
+                                                    }
+                                                }
+
+                                                Column {
+                                                    anchors.centerIn: parent
+                                                    spacing: 8
+                                                    visible: root.previewData.visible
+
+                                                    AppIcon {
+                                                        anchors.horizontalCenter: parent.horizontalCenter
+                                                        name: root.previewData.icon || "insert-drive-file"
+                                                        darkTheme: root.darkTheme
+                                                        iconSize: 52
+                                                    }
+
+                                                    Text {
+                                                        anchors.horizontalCenter: parent.horizontalCenter
+                                                        text: root.previewData.previewType === "multi"
+                                                              ? "Multiple items"
+                                                              : root.previewData.previewType === "image"
+                                                                ? "Mock image preview"
+                                                                : root.previewData.previewType === "text"
+                                                                  ? "Mock text preview"
+                                                                  : root.previewData.previewType === "document"
+                                                                    ? "Mock document preview"
+                                                                    : root.previewData.previewType === "audio"
+                                                                      ? "Mock audio preview"
+                                                                      : root.previewData.previewType === "video"
+                                                                        ? "Mock video preview"
+                                                                        : root.previewData.previewType === "archive"
+                                                                          ? "Mock archive preview"
+                                                                          : root.previewData.previewType === "folder"
+                                                                            ? "Mock folder preview"
+                                                                            : "Mock file preview"
+                                                        color: root.text
+                                                        font.pixelSize: 13
+                                                        font.bold: true
+                                                    }
+
+                                                    Text {
+                                                        anchors.horizontalCenter: parent.horizontalCenter
+                                                        text: "Backend-driven placeholder"
+                                                        color: root.muted
+                                                        font.pixelSize: 11
+                                                    }
+                                                }
+                                            }
+
+                                            Text {
+                                                visible: root.previewData.visible
+                                                width: parent.width
+                                                text: root.previewData.name || ""
+                                                color: root.text
+                                                font.pixelSize: 14
+                                                font.bold: true
+                                                wrapMode: Text.Wrap
+                                            }
+
+                                            Text {
+                                                visible: root.previewData.visible
+                                                width: parent.width
+                                                text: root.previewData.type || ""
+                                                color: root.muted
+                                                font.pixelSize: 12
+                                                wrapMode: Text.Wrap
+                                            }
+
+                                            Text {
+                                                visible: root.previewData.visible && root.previewData.summary !== ""
+                                                width: parent.width
+                                                text: root.previewData.summary || ""
+                                                color: root.text
+                                                font.pixelSize: 12
+                                                wrapMode: Text.Wrap
+                                            }
+
+                                            Rectangle {
+                                                visible: root.previewData.visible
+                                                width: parent.width
+                                                height: 1
+                                                color: root.borderSoft
+                                            }
+
+                                            Column {
+                                                visible: root.previewData.visible
+                                                width: parent.width
+                                                spacing: 6
+
+                                                Text {
+                                                    text: "Details"
+                                                    color: root.text
+                                                    font.pixelSize: 12
+                                                    font.bold: true
+                                                }
+
+                                                Row {
+                                                    spacing: 6
+
+                                                    Text {
+                                                        text: "Modified:"
+                                                        color: root.muted
+                                                        font.pixelSize: 11
+                                                        font.bold: true
+                                                    }
+
+                                                    Text {
+                                                        text: root.previewData.dateModified || "—"
+                                                        color: root.text
+                                                        font.pixelSize: 11
+                                                    }
+                                                }
+
+                                                Row {
+                                                    spacing: 6
+
+                                                    Text {
+                                                        text: "Size:"
+                                                        color: root.muted
+                                                        font.pixelSize: 11
+                                                        font.bold: true
+                                                    }
+
+                                                    Text {
+                                                        text: root.previewData.size || "—"
+                                                        color: root.text
+                                                        font.pixelSize: 11
+                                                    }
+                                                }
+                                            }
+
+                                            Column {
+                                                visible: root.previewData.visible
+                                                width: parent.width
+                                                spacing: 6
+
+                                                Text {
+                                                    text: "Mock content"
+                                                    color: root.text
+                                                    font.pixelSize: 12
+                                                    font.bold: true
+                                                }
+
+                                                Repeater {
+                                                    model: root.previewData.lines ? root.previewData.lines : []
+
+                                                    delegate: Text {
+                                                        required property var modelData
+                                                        width: previewColumn.width
+                                                        text: "• " + modelData
+                                                        color: root.muted
+                                                        font.pixelSize: 11
+                                                        wrapMode: Text.Wrap
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -6018,7 +6589,32 @@ Window {
 
     Component.onCompleted: {
         applySnapshot(backend.bootstrap())
+
         if (!pathField.text || pathField.text === "")
             syncPathField()
+
+        refreshPreviewSelection()
+    }
+
+    MouseArea {
+        anchors.fill: parent
+        z: 10000
+        visible: root.editingPath
+        enabled: root.editingPath
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        hoverEnabled: false
+
+        onPressed: function(mouse) {
+            var p = mapToItem(pathBar, mouse.x, mouse.y)
+            var insidePathBar = p.x >= 0 && p.y >= 0 && p.x < pathBar.width && p.y < pathBar.height
+
+            if (!insidePathBar) {
+                root.finishPathEditing(false)
+                mouse.accepted = false
+                return
+            }
+
+            mouse.accepted = false
+        }
     }
 }
