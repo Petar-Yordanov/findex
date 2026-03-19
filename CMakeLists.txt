@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(FileExplorer VERSION 0.1 LANGUAGES CXX)
+project(Findex VERSION 0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -14,8 +14,9 @@ endif()
 
 qt_standard_project_setup(REQUIRES 6.10)
 
-qt_add_executable(appFileExplorer
+qt_add_executable(Findex
     main.cpp
+
     FileAssociationService.cpp
     FileAssociationService.h
     FileManagerBridge.cpp
@@ -34,34 +35,37 @@ qt_add_executable(appFileExplorer
 )
 
 if(WIN32)
-    target_sources(appFileExplorer PRIVATE FileAssociationService_win.cpp)
+    target_sources(Findex PRIVATE FileAssociationService_win.cpp appicon.rc)
 elseif(APPLE)
-    target_sources(appFileExplorer PRIVATE FileAssociationService_mac.cpp)
+    target_sources(Findex PRIVATE FileAssociationService_mac.cpp)
 elseif(UNIX)
-    target_sources(appFileExplorer PRIVATE FileAssociationService_linux.cpp)
+    target_sources(Findex PRIVATE FileAssociationService_linux.cpp)
 endif()
 
-target_include_directories(appFileExplorer PRIVATE
+target_include_directories(Findex PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
-qt_add_qml_module(appFileExplorer
-    URI FileExplorer
+qt_add_qml_module(Findex
+    URI Findex
 
     QML_FILES
         qml/Main.qml
-        qml/components/AppIcon.qml
-        qml/components/ExplorerScrollbarH.qml
-        qml/components/ExplorerScrollbarV.qml
-        qml/components/IconButton.qml
-        qml/components/InlineRenameField.qml
-        qml/components/NotificationCard.qml
-        qml/components/SelectionBand.qml
-        qml/components/StyledMenu.qml
-        qml/components/StyledMenuItem.qml
-        qml/components/StyledMenuSeparator.qml
-        qml/components/ThinProgressBar.qml
-        qml/components/WindowButton.qml
+        qml/components/foundation/AppIcon.qml
+        qml/components/foundation/ExplorerScrollbarH.qml
+        qml/components/foundation/ExplorerScrollbarV.qml
+        qml/components/foundation/IconButton.qml
+        qml/components/foundation/InlineRenameField.qml
+        qml/components/foundation/NotificationCard.qml
+        qml/components/foundation/SelectionBand.qml
+        qml/components/foundation/StyledMenu.qml
+        qml/components/foundation/StyledMenuItem.qml
+        qml/components/foundation/StyledMenuSeparator.qml
+        qml/components/foundation/ThinProgressBar.qml
+        qml/components/foundation/WindowButton.qml
+        qml/components/theme/AppTheme.qml
+        qml/components/theme/Metrics.qml
+        qml/components/theme/Typography.qml
 
     RESOURCES
         assets/icons/light/add.png
@@ -126,6 +130,7 @@ qt_add_qml_module(appFileExplorer
         assets/icons/light/view-list-alt.png
         assets/icons/light/visibility.png
         assets/icons/light/zip.png
+        assets/icons/light/preview.png
 
         assets/icons/dark/add.png
         assets/icons/dark/add-to-drive.png
@@ -189,24 +194,41 @@ qt_add_qml_module(appFileExplorer
         assets/icons/dark/view-list-alt.png
         assets/icons/dark/visibility.png
         assets/icons/dark/zip.png
+        assets/icons/dark/preview.png
+
         SOURCES FileManagerBridge.h FileManagerBridge.cpp
         SOURCES FileManagerSessionService.h FileManagerSessionService.cpp
         SOURCES FileManagerNavigationService.h FileManagerNavigationService.cpp
         SOURCES FileManagerFileOpsService.h FileManagerFileOpsService.cpp
         SOURCES FileManagerSearchService.h FileManagerSearchService.cpp
         SOURCES FileManagerSidebarService.h FileManagerSidebarService.cpp
-        RESOURCES assets/icons/dark/preview.png
-        RESOURCES assets/icons/light/preview.png
+        RESOURCES qml/components/theme/qmldir
+        RESOURCES assets/icons/findex-color.png assets/icons/findex-plain.png
+        RESOURCES appicon.rc
+        RESOURCES findex.desktop
+        QML_FILES qml/shared/menus/ViewModeMenu.qml
+        QML_FILES qml/shared/menus/ThemeMenu.qml
+        QML_FILES qml/shared/menus/OpenWithMenu.qml
+        QML_FILES qml/shared/menus/CopyPathsMenu.qml
+        QML_FILES qml/shared/menus/SortByMenu.qml
+        QML_FILES qml/shared/menus/CreateMenu.qml
+        QML_FILES qml/features/files/FileContextMenu.qml
+        QML_FILES qml/features/files/MultiFileContextMenu.qml
+        QML_FILES qml/features/files/EmptyAreaContextMenu.qml
+        QML_FILES qml/features/files/SidebarContextMenu.qml
+        QML_FILES qml/features/files/TabContextMenu.qml
+        QML_FILES qml/features/files/BreadcrumbContextMenu.qml
+        QML_FILES qml/components/foundation/BaseTooltip.qml
 )
 
-set_target_properties(appFileExplorer PROPERTIES
+set_target_properties(Findex PROPERTIES
     MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
     MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
     MACOSX_BUNDLE TRUE
     WIN32_EXECUTABLE TRUE
 )
 
-target_link_libraries(appFileExplorer
+target_link_libraries(Findex
     PRIVATE
         Qt6::Quick
         Qt6::Qml
@@ -214,34 +236,34 @@ target_link_libraries(appFileExplorer
 )
 
 if(WIN32)
-    target_link_libraries(appFileExplorer PRIVATE
+    target_link_libraries(Findex PRIVATE
         Shlwapi
         Advapi32
     )
 endif()
 
 if(APPLE)
-    target_link_libraries(appFileExplorer PRIVATE
+    target_link_libraries(Findex PRIVATE
         "-framework CoreFoundation"
         "-framework CoreServices"
     )
 endif()
 
 if(UNIX AND NOT APPLE)
-    target_link_libraries(appFileExplorer PRIVATE
+    target_link_libraries(Findex PRIVATE
         PkgConfig::GIO
     )
 endif()
 
 include(GNUInstallDirs)
 
-install(TARGETS appFileExplorer
+install(TARGETS Findex
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
 qt_generate_deploy_qml_app_script(
-    TARGET appFileExplorer
+    TARGET Findex
     OUTPUT_SCRIPT deploy_script
 )
 install(SCRIPT ${deploy_script})

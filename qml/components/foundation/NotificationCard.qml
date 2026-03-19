@@ -1,10 +1,11 @@
 import QtQuick
 import QtQuick.Layouts
+import "../theme" as Theme
 
 Rectangle {
     id: control
 
-    property bool darkTheme: false
+    property bool darkTheme: Theme.AppTheme.isDark
 
     property int notificationId: -1
     property string title: ""
@@ -13,23 +14,23 @@ Rectangle {
     property bool autoClose: false
     property bool done: false
 
-    property color bgColor: darkTheme ? "#1b2230" : "#ffffff"
-    property color borderColor: darkTheme ? "#252b36" : "#d7dbe1"
-    property color textColor: darkTheme ? "#edf1f7" : "#1f2329"
-    property color mutedColor: darkTheme ? "#9aa4b2" : "#6b7280"
-    property color hoverColor: darkTheme ? "#212835" : "#e9edf3"
-    property color accentColor: "#4c82f7"
-    property color successColor: "#3f73f1"
-    property color trackColor: darkTheme ? "#4b5563" : "#d4d8de"
+    property color bgColor: Theme.AppTheme.popupBg
+    property color borderColor: Theme.AppTheme.border
+    property color textColor: Theme.AppTheme.text
+    property color mutedColor: Theme.AppTheme.muted
+    property color hoverColor: Theme.AppTheme.hover
+    property color accentColor: Theme.AppTheme.accent
+    property color successColor: Theme.AppTheme.success
+    property color trackColor: Theme.AppTheme.driveFree
 
     signal closeRequested(int notificationId)
 
     width: 320
     height: progress >= 0 ? 84 : 58
-    radius: 12
+    radius: Theme.Metrics.radiusXl
     color: control.bgColor
     border.color: control.borderColor
-    border.width: 1
+    border.width: Theme.Metrics.borderWidth
 
     function restartTimer() {
         if (autoClose)
@@ -68,14 +69,14 @@ Rectangle {
                             ? "sync"
                             : "info"
                 darkTheme: control.darkTheme
-                iconSize: 16
+                iconSize: Theme.Metrics.iconMd
             }
 
             Text {
                 width: parent.width - 40
                 text: control.title
                 color: control.textColor
-                font.pixelSize: 13
+                font.pixelSize: Theme.Typography.bodyLg
                 wrapMode: Text.Wrap
                 elide: Text.ElideRight
                 maximumLineCount: control.progress >= 0 ? 2 : 1
@@ -91,7 +92,7 @@ Rectangle {
                     anchors.centerIn: parent
                     name: "close"
                     darkTheme: control.darkTheme
-                    iconSize: 12
+                    iconSize: Theme.Metrics.iconXs
                 }
 
                 MouseArea {
@@ -116,7 +117,7 @@ Rectangle {
             visible: control.progress >= 0
             text: control.done ? "Completed" : (control.progress + "%")
             color: control.mutedColor
-            font.pixelSize: 11
+            font.pixelSize: Theme.Typography.caption
         }
     }
 }

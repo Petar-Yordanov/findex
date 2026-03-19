@@ -1,12 +1,13 @@
 import QtQuick
 import QtQuick.Controls
+import "../theme" as Theme
 
 MenuItem {
     id: control
 
-    property bool darkTheme: false
+    property bool darkTheme: Theme.AppTheme.isDark
 
-    implicitWidth: 220
+    implicitWidth: Theme.Metrics.menuWidth
     implicitHeight: 40
 
     leftPadding: 16
@@ -27,17 +28,15 @@ MenuItem {
             anchors.centerIn: parent
             name: "chevron-right"
             darkTheme: control.darkTheme
-            iconSize: 14
+            iconSize: Theme.Metrics.iconSm
             iconOpacity: control.enabled ? 0.8 : 0.45
         }
     }
 
     contentItem: Text {
         text: control.text
-        color: control.enabled
-               ? (control.darkTheme ? "#edf1f7" : "#1f2329")
-               : (control.darkTheme ? "#7f8ba0" : "#98a1ae")
-        font.pixelSize: 13
+        color: control.enabled ? Theme.AppTheme.text : Theme.AppTheme.disabledText
+        font.pixelSize: Theme.Typography.bodyLg
         elide: Text.ElideRight
         verticalAlignment: Text.AlignVCenter
     }
@@ -47,15 +46,10 @@ MenuItem {
         y: 4
         width: control.width - 12
         height: control.height - 8
-        radius: 6
+        radius: Theme.Metrics.radiusSm
 
-        color: control.highlighted
-               ? (control.darkTheme ? "#253041" : "#dfe9f8")
-               : "transparent"
-
-        border.color: control.highlighted
-                      ? (control.darkTheme ? "#334155" : "#c7d7ee")
-                      : "transparent"
-        border.width: control.highlighted ? 1 : 0
+        color: control.highlighted ? Theme.AppTheme.menuHighlight : "transparent"
+        border.color: control.highlighted ? Theme.AppTheme.menuHighlightBorder : "transparent"
+        border.width: control.highlighted ? Theme.Metrics.borderWidth : 0
     }
 }

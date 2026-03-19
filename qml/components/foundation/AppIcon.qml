@@ -1,11 +1,12 @@
 import QtQuick
+import "../theme" as Theme
 
 Item {
     id: root
 
     property string name: ""
-    property bool darkTheme: false
-    property int iconSize: 16
+    property bool darkTheme: Theme.AppTheme.isDark
+    property int iconSize: Theme.Metrics.iconMd
     property real iconOpacity: 1.0
 
     width: iconSize
@@ -14,7 +15,7 @@ Item {
     readonly property string iconSource: {
         if (!name || name.trim() === "")
             return ""
-        return "qrc:/qt/qml/FileExplorer/assets/icons/"
+        return "qrc:/qt/qml/Findex/assets/icons/"
                 + (darkTheme ? "light/" : "dark/")
                 + name + ".png"
     }

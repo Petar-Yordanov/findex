@@ -6,6 +6,8 @@
 #include "FileAssociationService.h"
 #include "FileManagerBridge.h"
 #include <QQmlContext>
+#include <QIcon>
+#include <QFile>
 
 void dumpApps(const QString& filePath)
 {
@@ -22,12 +24,17 @@ void dumpApps(const QString& filePath)
                    .arg(app.command)
                    .arg(app.appUrl.toString());
     }
+
+    qDebug() << QFile::exists(":/icons/findex-plain.png");
+    qDebug() << QFile::exists(":/assets/icons/findex-plain.png");
+    qDebug() << QFile::exists(":/qt/qml/Findex/assets/icons/findex-plain.png");
 }
 
 int main(int argc, char *argv[])
 {
     QQuickStyle::setStyle("Fusion");
     QGuiApplication app(argc, argv);
+    app.setWindowIcon(QIcon(":/assets/icons/findex-plain.ico"));
 
     qInstallMessageHandler([](QtMsgType, const QMessageLogContext&, const QString& msg) {
         fprintf(stderr, "%s\n", msg.toLocal8Bit().constData());
@@ -60,7 +67,7 @@ int main(int argc, char *argv[])
         },
         Qt::QueuedConnection);
 
-    engine.loadFromModule("FileExplorer", "Main");
+    engine.loadFromModule("Findex", "Main");
 
     if (engine.rootObjects().isEmpty()) {
         qCritical() << "No root objects loaded";

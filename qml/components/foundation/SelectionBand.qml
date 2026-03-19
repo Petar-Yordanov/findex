@@ -1,4 +1,5 @@
 import QtQuick
+import "../theme" as Theme
 
 Rectangle {
     id: control
@@ -8,8 +9,8 @@ Rectangle {
     property real startY: 0
     property real currentX: 0
     property real currentY: 0
-    property color accentColor: "#4c82f7"
-    property color fillColor: Qt.rgba(76 / 255, 130 / 255, 247 / 255, 0.18)
+    property color accentColor: Theme.AppTheme.accent
+    property color fillColor: Qt.rgba(accentColor.r, accentColor.g, accentColor.b, 0.18)
 
     visible: active
     z: 1001
@@ -21,5 +22,5 @@ Rectangle {
 
     color: fillColor
     border.color: accentColor
-    border.width: 1
+    border.width: Theme.Metrics.borderWidth
 }

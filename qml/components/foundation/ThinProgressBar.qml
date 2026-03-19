@@ -1,11 +1,12 @@
 import QtQuick
+import "../theme" as Theme
 
 Rectangle {
     id: control
 
     property real value: 0.0
-    property color trackColor: "#d4d8de"
-    property color fillColor: "#4c82f7"
+    property color trackColor: Theme.AppTheme.driveFree
+    property color fillColor: Theme.AppTheme.accent
 
     radius: height / 2
     color: control.trackColor

@@ -157,7 +157,7 @@ jobs:
           set -euo pipefail
 
           WORKDIR="$(realpath -m "${{ github.workspace }}/${{ matrix.package_dir }}")"
-          EXE="$(find "$WORKDIR" -maxdepth 6 -type f -name appFileExplorer | head -n 1)"
+          EXE="$(find "$WORKDIR" -maxdepth 6 -type f -name Findex | head -n 1)"
 
           if [ -z "$EXE" ]; then
             echo "=== packaged files ==="
@@ -204,9 +204,9 @@ jobs:
           set -euo pipefail
           mkdir -p "${{ matrix.package_dir }}"
 
-          APP_BUNDLE=$(find "${{ matrix.build_dir }}" -maxdepth 3 -name "appFileExplorer.app" | head -n 1)
+          APP_BUNDLE=$(find "${{ matrix.build_dir }}" -maxdepth 3 -name "Findex.app" | head -n 1)
           if [ -z "$APP_BUNDLE" ]; then
-            echo "appFileExplorer.app not found"
+            echo "Findex.app not found"
             exit 1
           fi
 
@@ -218,13 +218,13 @@ jobs:
             exit 1
           fi
 
-          "$MACDEPLOYQT" "${{ matrix.package_dir }}/appFileExplorer.app" \
+          "$MACDEPLOYQT" "${{ matrix.package_dir }}/Findex.app" \
             -qmldir="$GITHUB_WORKSPACE" \
             -verbose=2
 
-          rm -rf "${{ matrix.package_dir }}/appFileExplorer.app/Contents/PlugIns/sqldrivers" || true
+          rm -rf "${{ matrix.package_dir }}/Findex.app/Contents/PlugIns/sqldrivers" || true
 
-          codesign --force --deep --sign - "${{ matrix.package_dir }}/appFileExplorer.app"
+          codesign --force --deep --sign - "${{ matrix.package_dir }}/Findex.app"
 
           echo "Packaged files:"
           find "${{ matrix.package_dir }}" -maxdepth 6 -print
@@ -236,7 +236,7 @@ jobs:
           set -euo pipefail
 
           WORKDIR="$(realpath "${{ matrix.package_dir }}")"
-          APP_BUNDLE="$WORKDIR/appFileExplorer.app"
+          APP_BUNDLE="$WORKDIR/Findex.app"
 
           if [ ! -d "$APP_BUNDLE" ]; then
             echo "=== packaged files ==="
@@ -244,7 +244,7 @@ jobs:
             exit 1
           fi
 
-          EXE="$APP_BUNDLE/Contents/MacOS/appFileExplorer"
+          EXE="$APP_BUNDLE/Contents/MacOS/Findex"
           if [ ! -x "$EXE" ]; then
             echo "Executable not found: $EXE"
             find "$APP_BUNDLE" -maxdepth 6 -print || true
@@ -287,7 +287,7 @@ jobs:
 
           New-Item -ItemType Directory -Force -Path "${{ matrix.package_dir }}" | Out-Null
 
-          $exe = Get-ChildItem -Path "${{ matrix.build_dir }}" -Recurse -Filter "appFileExplorer.exe" |
+          $exe = Get-ChildItem -Path "${{ matrix.build_dir }}" -Recurse -Filter "Findex.exe" |
             Select-Object -First 1
 
           if (-not $exe) {
@@ -298,12 +298,12 @@ jobs:
               Out-String -Width 4096 |
               Write-Host
 
-            throw "appFileExplorer.exe not found in build output"
+            throw "Findex.exe not found in build output"
           }
 
           Copy-Item $exe.FullName "${{ matrix.package_dir }}\" -Force
 
-          if (-not (Test-Path "${{ matrix.package_dir }}\appFileExplorer.exe")) {
+          if (-not (Test-Path "${{ matrix.package_dir }}\Findex.exe")) {
             throw "Copy to dist failed"
           }
 
@@ -319,7 +319,7 @@ jobs:
             --compiler-runtime `
             --qmldir "$env:GITHUB_WORKSPACE" `
             --dir "${{ matrix.package_dir }}" `
-            "${{ matrix.package_dir }}\appFileExplorer.exe"
+            "${{ matrix.package_dir }}\Findex.exe"
 
           if (-not (Test-Path "${{ matrix.package_dir }}\platforms\qwindows.dll")) {
             throw "qwindows.dll was not deployed"
@@ -340,7 +340,7 @@ jobs:
 
           $workDir = (Resolve-Path "${{ matrix.package_dir }}").Path
 
-          $exe = Get-ChildItem -Path $workDir -Recurse -Filter "appFileExplorer.exe" |
+          $exe = Get-ChildItem -Path $workDir -Recurse -Filter "Findex.exe" |
             Select-Object -First 1
 
           if (-not $exe) {
@@ -351,7 +351,7 @@ jobs:
               Out-String -Width 4096 |
               Write-Host
 
-            throw "appFileExplorer.exe not found under $workDir"
+            throw "Findex.exe not found under $workDir"
           }
 
           $exePath = $exe.FullName
@@ -395,7 +395,7 @@ jobs:
               Out-String -Width 4096 |
               Write-Host
 
-            throw "appFileExplorer.exe exited immediately with code $($proc.ExitCode)"
+            throw "Findex.exe exited immediately with code $($proc.ExitCode)"
           }
 
           Stop-Process -Id $proc.Id -Force
@@ -420,7 +420,7 @@ jobs:
         run: |
           set -euo pipefail
           cd "${{ matrix.package_dir }}"
-          ditto -c -k --sequesterRsrc --keepParent "appFileExplorer.app" "app-macos.zip"
+          ditto -c -k --sequesterRsrc --keepParent "Findex.app" "app-macos.zip"
 
       - name: Upload artifact (Windows)
         if: runner.os == 'Windows'

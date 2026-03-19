@@ -1,21 +1,22 @@
 import QtQuick
+import "../theme" as Theme
 
 Rectangle {
     id: control
 
-    property bool darkTheme: false
+    property bool darkTheme: Theme.AppTheme.isDark
     property bool hoverFxEnabled: true
 
     property string iconName: ""
-    property color hoverColor: darkTheme ? "#2c3544" : "#dbe7fb"
-    property color pressedColor: darkTheme ? "#39465b" : "#c9daf8"
-    property color hoverBorderColor: darkTheme ? "#3b4659" : "#bfd0ef"
+    property color hoverColor: Theme.AppTheme.isDark ? "#2c3544" : "#dbe7fb"
+    property color pressedColor: Theme.AppTheme.isDark ? "#39465b" : "#c9daf8"
+    property color hoverBorderColor: Theme.AppTheme.isDark ? "#3b4659" : "#bfd0ef"
 
-    signal clicked
+    signal clicked()
 
     width: 42
     height: 28
-    radius: 8
+    radius: Theme.Metrics.radiusMd
 
     color: mouse.pressed
            ? control.pressedColor
@@ -24,13 +25,13 @@ Rectangle {
     border.color: control.hoverFxEnabled && mouse.containsMouse && !mouse.pressed
                   ? control.hoverBorderColor
                   : "transparent"
-    border.width: control.hoverFxEnabled && mouse.containsMouse ? 1 : 0
+    border.width: control.hoverFxEnabled && mouse.containsMouse ? Theme.Metrics.borderWidth : 0
 
     AppIcon {
         anchors.centerIn: parent
         name: control.iconName
         darkTheme: control.darkTheme
-        iconSize: 14
+        iconSize: Theme.Metrics.iconSm
     }
 
     MouseArea {

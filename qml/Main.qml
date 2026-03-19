@@ -1,18 +1,20 @@
-import QtQuick
+﻿import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Window
 import QtQml.Models
 import Qt.labs.qmlmodels as Labs
-import "components"
+import "components/foundation"
+import "components/theme" as Theme
+import "features/files"
 
 Window {
     id: root
     width: 1400
     height: 860
     visible: true
-    title: "File Explorer"
-    color: bg
+    title: "Findex"
+    color: Theme.AppTheme.bg
     flags: Qt.Window
          | Qt.FramelessWindowHint
          | Qt.WindowMinMaxButtonsHint
@@ -21,30 +23,10 @@ Window {
     minimumHeight: 480
 
     property string themeMode: "Light" // Dark | Light | System
-    property bool darkTheme: themeMode === "System" ? false : themeMode === "Dark"
-
     property var backend: fileManagerBridge
-    property color bg: darkTheme ? "#0f1115" : "#f3f4f6"
-    property color titleBg: darkTheme ? "#14171d" : "#eceef1"
-    property color surface: darkTheme ? "#171b22" : "#f7f7f8"
-    property color surface2: darkTheme ? "#161b22" : "#f1f2f4"
-    property color surface3: darkTheme ? "#11161d" : "#ffffff"
-    property color border: darkTheme ? "#252b36" : "#d7dbe1"
-    property color borderSoft: darkTheme ? "#1d232c" : "#e4e7ec"
-    property color text: darkTheme ? "#edf1f7" : "#1f2329"
-    property color muted: darkTheme ? "#9aa4b2" : "#6b7280"
-    property color hover: darkTheme ? "#212835" : "#e9edf3"
-    property color pressed: darkTheme ? "#2c3646" : "#dde4ee"
-    property color accent: "#4c82f7"
-    property color selected: darkTheme ? "#2c3544" : "#dfe9f8"
-    property color selectedSoft: darkTheme ? "#202837" : "#eef3fb"
-    property color driveUsedBlue: "#3f73f1"
-    property color driveUsedRed: "#df5c5c"
-    property color driveFree: darkTheme ? "#4b5563" : "#d4d8de"
-    property color scrollbarThumb: darkTheme ? "#8f98a7" : "#b8c0cb"
-    property color scrollbarThumbHover: darkTheme ? "#a0a9b8" : "#9ea8b6"
-    property color scrollbarThumbPressed: darkTheme ? "#b0b8c6" : "#8d98a8"
-    property color scrollbarTrack: darkTheme ? "transparent" : "#eef1f5"
+
+    onThemeModeChanged: Theme.AppTheme.mode = themeMode
+
     property int notificationOverlayBottomOffset: notificationsPopup.visible ? (notificationsPopup.height + 52) : 40
     property var tabAutoScrollTimerRef: tabAutoScrollTimer
 
@@ -81,6 +63,9 @@ Window {
     property string confirmDialogMessage: ""
     property string confirmDialogAction: ""
     property int confirmDialogRow: -1
+
+    property string tooltipText: ""
+    property int tooltipDelay: 450
 
     ListModel {
         id: notificationsModel
@@ -131,7 +116,7 @@ Window {
     property int editingTabIndex: -1
     property string editingTabTitleDraft: ""
 
-    property bool previewEnabled: true
+    property bool previewEnabled: false
     property int previewPaneWidth: 320
     property int previewPaneMinWidth: 220
     property int previewPaneMaxWidth: Math.max(420, Math.floor(width * 0.45))
@@ -595,6 +580,23 @@ Window {
         interval: 120
         repeat: false
         onTriggered: root.windowMoveActive = false
+    }
+
+    Timer {
+        id: tooltipTimer
+        interval: root.tooltipDelay
+        repeat: false
+        onTriggered: {
+            if (hoverArea.containsMouse && root.enabled && root.tooltipText !== "")
+                buttonTooltip.shown = true
+        }
+    }
+
+    BaseTooltip {
+        id: buttonTooltip
+        text: root.tooltipText
+        darkTheme: root.darkTheme
+        shown: false
     }
 
     function currentDateTimeString() {
@@ -1548,202 +1550,44 @@ Window {
         ]
     }
 
-    StyledMenu {
-        id: breadcrumbContextMenu
-        darkTheme: root.darkTheme
-
-        StyledMenuItem {
-            text: "Copy path"
-            darkTheme: root.darkTheme
-            enabled: root.contextBreadcrumbIndex >= 0
-            onTriggered: root.copyBreadcrumbPathAt(root.contextBreadcrumbIndex)
-        }
-    }
-
-    StyledMenu {
-        id: emptyAreaContextMenu
-        darkTheme: root.darkTheme
-
-        StyledMenu {
-            title: "Change view"
-            darkTheme: root.darkTheme
-
-            StyledMenuItem {
-                text: "Details"
-                darkTheme: root.darkTheme
-                onTriggered: {
-                    root.currentViewMode = "Details"
-                    applySnapshot(backend.setViewMode("Details"))
-                }
-            }
-            StyledMenuItem {
-                text: "Tiles"
-                darkTheme: root.darkTheme
-                onTriggered: {
-                    root.currentViewMode = "Tiles"
-                    applySnapshot(backend.setViewMode("Tiles"))
-                }
-            }
-            StyledMenuItem {
-                text: "Compact"
-                darkTheme: root.darkTheme
-                onTriggered: {
-                    root.currentViewMode = "Compact"
-                    applySnapshot(backend.setViewMode("Compact"))
-                }
-            }
-            StyledMenuItem {
-                text: "Large icons"
-                darkTheme: root.darkTheme
-                onTriggered: {
-                    root.currentViewMode = "Large icons"
-                    applySnapshot(backend.setViewMode("Large icons"))
-                }
-            }
-        }
-
-        StyledMenu {
-            title: "New"
-            darkTheme: root.darkTheme
-
-            StyledMenuItem {
-                text: "File"
-                onTriggered: root.addNewFile()
-                darkTheme: root.darkTheme
-            }
-
-            StyledMenuItem {
-                text: "Folder"
-                darkTheme: root.darkTheme
-                onTriggered: root.addNewFolder()
-            }
-        }
-
-        StyledMenu {
-            title: "Sort by"
-            darkTheme: root.darkTheme
-
-            StyledMenu {
-                title: "Name"
-                darkTheme: root.darkTheme
-
-                StyledMenuItem { darkTheme: root.darkTheme; text: "Ascending"; onTriggered: root.sortFilesExplicit(0, true) }
-                StyledMenuItem { darkTheme: root.darkTheme; text: "Descending"; onTriggered: root.sortFilesExplicit(0, false) }
-            }
-
-            StyledMenu {
-                title: "Date modified"
-                darkTheme: root.darkTheme
-
-                StyledMenuItem { darkTheme: root.darkTheme; text: "Ascending"; onTriggered: root.sortFilesExplicit(1, true) }
-                StyledMenuItem { darkTheme: root.darkTheme; text: "Descending"; onTriggered: root.sortFilesExplicit(1, false) }
-            }
-
-            StyledMenu {
-                title: "Type"
-                darkTheme: root.darkTheme
-
-                StyledMenuItem { darkTheme: root.darkTheme; text: "Ascending"; onTriggered: root.sortFilesExplicit(2, true) }
-                StyledMenuItem { darkTheme: root.darkTheme; text: "Descending"; onTriggered: root.sortFilesExplicit(2, false) }
-            }
-
-            StyledMenu {
-                title: "Size"
-                darkTheme: root.darkTheme
-
-                StyledMenuItem { darkTheme: root.darkTheme; text: "Ascending"; onTriggered: root.sortFilesExplicit(3, true) }
-                StyledMenuItem { darkTheme: root.darkTheme; text: "Descending"; onTriggered: root.sortFilesExplicit(3, false) }
-            }
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Select all"
-            darkTheme: root.darkTheme
-            onTriggered: root.selectAllFiles()
-        }
-
-        StyledMenuItem {
-            darkTheme: root.darkTheme
-            text: "Properties"
-            onTriggered: applySnapshot(backend.showCurrentLocationProperties())
-        }
-    }
-
-    StyledMenu {
-        id: tabContextMenu
-        darkTheme: root.darkTheme
-
-        StyledMenuItem { darkTheme: root.darkTheme; text: "New tab"; onTriggered: root.addTab("New Tab") }
-
-        StyledMenuItem {
-            text: "Close tab"
-            enabled: root.contextTabIndex >= 0 && tabsModel.count > 1
-            onTriggered: root.closeTab(root.contextTabIndex)
-            darkTheme: root.darkTheme
-        }
-
-        StyledMenuItem {
-            text: "Duplicate tab"
-            enabled: root.contextTabIndex >= 0
-            onTriggered: {
-                if (root.contextTabIndex >= 0)
-                    applySnapshot(backend.duplicateTab(root.contextTabIndex))
-            }
-            darkTheme: root.darkTheme
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Rename active tab"
-            enabled: root.contextTabIndex >= 0
-            onTriggered: {
-                if (root.contextTabIndex >= 0)
-                    root.beginRenameTab(root.contextTabIndex)
-            }
-            darkTheme: root.darkTheme
-        }
-    }
 
     StyledMenu {
         id: createMenu
-        darkTheme: root.darkTheme
+        darkTheme: Theme.AppTheme.isDark
 
         StyledMenuItem {
             text: "New folder"
             onTriggered: root.addNewFolder()
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
 
         StyledMenuItem {
             text: "New file"
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             onTriggered: root.addNewFile()
         }
     }
 
     StyledMenu {
         id: moreActionsMenu
-        darkTheme: root.darkTheme
+        darkTheme: Theme.AppTheme.isDark
 
         StyledMenuItem {
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             text: "Compress"
             enabled: root.hasSelectedOrCurrentItems()
             onTriggered: root.compressSelectedOrCurrent()
         }
 
         StyledMenuItem {
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             text: "Extract here"
             enabled: root.hasSelectedOrCurrentItems()
             onTriggered: root.extractSelectedOrCurrent()
         }
 
         StyledMenuItem {
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             text: "Duplicate"
             enabled: root.hasSelectedOrCurrentItems()
             onTriggered: root.duplicateSelectedOrCurrent()
@@ -1753,31 +1597,31 @@ Window {
 
         StyledMenu {
             title: "Open with..."
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
 
             StyledMenuItem {
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 text: "Notepad"
                 enabled: root.hasSelectedOrCurrentItems()
                 onTriggered: root.openSelectedOrCurrentWith("Notepad")
             }
 
             StyledMenuItem {
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 text: "Visual Studio Code"
                 enabled: root.hasSelectedOrCurrentItems()
                 onTriggered: root.openSelectedOrCurrentWith("Visual Studio Code")
             }
 
             StyledMenuItem {
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 text: "Qt Creator"
                 enabled: root.hasSelectedOrCurrentItems()
                 onTriggered: root.openSelectedOrCurrentWith("Qt Creator")
             }
 
             StyledMenuItem {
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 text: "Windows Media Player"
                 enabled: root.hasSelectedOrCurrentItems()
                 onTriggered: root.openSelectedOrCurrentWith("Windows Media Player")
@@ -1786,7 +1630,7 @@ Window {
             StyledMenuSeparator {}
 
             StyledMenuItem {
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 text: "Choose another app..."
                 enabled: root.hasSelectedOrCurrentItems()
                 onTriggered: root.chooseOpenWithForSelectedOrCurrent()
@@ -1795,19 +1639,19 @@ Window {
 
         StyledMenu {
             title: "Copy paths"
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
 
             StyledMenuItem {
                 text: "Full path"
                 enabled: root.selectedFileCount() > 0 || root.currentFileRow >= 0
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 onTriggered: root.copySelectedOrCurrentPaths(false, false)
             }
 
             StyledMenuItem {
                 text: "Relative path"
                 enabled: root.selectedFileCount() > 0 || root.currentFileRow >= 0
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 onTriggered: root.copySelectedOrCurrentPaths(true, false)
             }
 
@@ -1816,20 +1660,20 @@ Window {
             StyledMenuItem {
                 text: "Full paths recursively"
                 enabled: root.selectedFileCount() > 0 || root.currentFileRow >= 0
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 onTriggered: root.copySelectedOrCurrentPaths(false, true)
             }
 
             StyledMenuItem {
                 text: "Relative paths recursively"
                 enabled: root.selectedFileCount() > 0 || root.currentFileRow >= 0
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 onTriggered: root.copySelectedOrCurrentPaths(true, true)
             }
         }
 
         StyledMenuItem {
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             text: "Open in terminal"
             enabled: root.hasSelectedOrCurrentItems()
             onTriggered: root.openSelectedOrCurrentInTerminal()
@@ -1839,18 +1683,18 @@ Window {
 
         StyledMenuItem {
             text: "Select all"
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             onTriggered: root.selectAllFiles()
         }
 
         StyledMenuItem {
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             text: root.showHiddenFiles ? "Hide hidden files" : "Show hidden files"
             onTriggered: applySnapshot(backend.setShowHiddenFiles(!root.showHiddenFiles))
         }
 
         StyledMenuItem {
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             text: "Properties"
             onTriggered: root.showPropertiesForSelectedOrCurrentOrLocation()
         }
@@ -1868,8 +1712,8 @@ Window {
 
         background: Rectangle {
             radius: 14
-            color: darkTheme ? "#1b2230" : "#ffffff"
-            border.color: root.border
+            color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+            border.color: Theme.AppTheme.border
             border.width: 1
         }
 
@@ -1887,7 +1731,7 @@ Window {
                     anchors.left: parent.left
                     anchors.leftMargin: 18
                     text: root.confirmDialogTitle
-                    color: root.text
+                    color: Theme.AppTheme.text
                     font.pixelSize: 15
                     font.bold: true
                 }
@@ -1896,7 +1740,7 @@ Window {
             Rectangle {
                 width: parent ? parent.width : 360
                 height: 1
-                color: root.borderSoft
+                color: Theme.AppTheme.borderSoft
             }
 
             Item {
@@ -1907,7 +1751,7 @@ Window {
                     anchors.fill: parent
                     anchors.margins: 18
                     text: root.confirmDialogMessage
-                    color: root.text
+                    color: Theme.AppTheme.text
                     font.pixelSize: 13
                     wrapMode: Text.Wrap
                     verticalAlignment: Text.AlignVCenter
@@ -1917,7 +1761,7 @@ Window {
             Rectangle {
                 width: parent ? parent.width : 360
                 height: 1
-                color: root.borderSoft
+                color: Theme.AppTheme.borderSoft
             }
 
             Row {
@@ -1969,17 +1813,17 @@ Window {
                     radius: 9
                     anchors.verticalCenter: parent.verticalCenter
                     color: noMouse.pressed
-                           ? (darkTheme ? "#384355" : "#dce4ef")
+                           ? (Theme.AppTheme.isDark ? "#384355" : "#dce4ef")
                            : noMouse.containsMouse
-                             ? root.hover
+                             ? Theme.AppTheme.hover
                              : "transparent"
-                    border.color: root.border
+                    border.color: Theme.AppTheme.border
                     border.width: 1
 
                     Text {
                         anchors.centerIn: parent
                         text: "No"
-                        color: root.text
+                        color: Theme.AppTheme.text
                         font.pixelSize: 12
                         font.bold: true
                     }
@@ -2010,8 +1854,8 @@ Window {
             implicitWidth: notificationsPopup.width
             implicitHeight: notificationsPopup.height
             radius: 12
-            color: darkTheme ? "#1b2230" : "#ffffff"
-            border.color: root.border
+            color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+            border.color: Theme.AppTheme.border
             border.width: 1
         }
 
@@ -2021,7 +1865,7 @@ Window {
 
             Text {
                 text: "Notifications"
-                color: root.text
+                color: Theme.AppTheme.text
                 font.pixelSize: 13
                 font.bold: true
                 leftPadding: 4
@@ -2047,8 +1891,8 @@ Window {
                             width: notificationsPopup.width - 16
                             height: modelData.progress >= 0 ? 78 : 54
                             radius: 10
-                            color: darkTheme ? "#232c3a" : "#f8fafc"
-                            border.color: root.borderSoft
+                            color: Theme.AppTheme.isDark ? "#232c3a" : "#f8fafc"
+                            border.color: Theme.AppTheme.borderSoft
                             border.width: 1
 
                             Column {
@@ -2063,7 +1907,7 @@ Window {
                                     Text {
                                         width: parent.width - 30
                                         text: modelData.title
-                                        color: root.text
+                                        color: Theme.AppTheme.text
                                         font.pixelSize: 12
                                         elide: Text.ElideRight
                                     }
@@ -2072,11 +1916,11 @@ Window {
                                         width: 20
                                         height: 20
                                         radius: 10
-                                        color: trayCloseMouse.containsMouse ? root.hover : "transparent"
+                                        color: trayCloseMouse.containsMouse ? Theme.AppTheme.hover : "transparent"
 
                                         AppIcon {
                                             name: "close"
-                                            darkTheme: root.darkTheme
+                                            darkTheme: Theme.AppTheme.isDark
                                             iconSize: 12
                                             iconOpacity: 0.75
                                         }
@@ -2095,13 +1939,13 @@ Window {
                                     width: parent.width
                                     height: 6
                                     radius: 3
-                                    color: root.driveFree
+                                    color: Theme.AppTheme.driveFree
 
                                     Rectangle {
                                         width: parent.width * Math.max(0, Math.min(1, modelData.progress / 100))
                                         height: parent.height
                                         radius: 3
-                                        color: modelData.done ? root.driveUsedBlue : root.accent
+                                        color: modelData.done ? Theme.AppTheme.driveUsedBlue : Theme.AppTheme.accent
                                     }
                                 }
                             }
@@ -2123,8 +1967,8 @@ Window {
 
         background: Rectangle {
             radius: 12
-            color: darkTheme ? "#1b2230" : "#fcfcfd"
-            border.color: root.border
+            color: Theme.AppTheme.isDark ? "#1b2230" : "#fcfcfd"
+            border.color: Theme.AppTheme.border
             border.width: 1
         }
 
@@ -2137,19 +1981,19 @@ Window {
                 height: 40
                 radius: 8
                 color: folderMouse.pressed
-                       ? (darkTheme ? "#3a475d" : "#cadbf8")
+                       ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
                        : folderMouse.containsMouse
-                         ? (darkTheme ? "#2a3444" : "#e6eefb")
+                         ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
                          : "transparent"
                 border.color: folderMouse.pressed
-                              ? (darkTheme ? "#4a5a72" : "#b7caf0")
+                              ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
                               : "transparent"
                 border.width: folderMouse.pressed ? 1 : 0
 
                 AppIcon {
                     anchors.centerIn: parent
                     name: "folder"
-                    darkTheme: root.darkTheme
+                    darkTheme: Theme.AppTheme.isDark
                     iconSize: 16
                 }
 
@@ -2170,19 +2014,19 @@ Window {
                 height: 40
                 radius: 8
                 color: driveMouse.pressed
-                       ? (darkTheme ? "#3a475d" : "#cadbf8")
+                       ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
                        : driveMouse.containsMouse
-                         ? (darkTheme ? "#2a3444" : "#e6eefb")
+                         ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
                          : "transparent"
                 border.color: driveMouse.pressed
-                              ? (darkTheme ? "#4a5a72" : "#b7caf0")
+                              ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
                               : "transparent"
                 border.width: driveMouse.pressed ? 1 : 0
 
                 AppIcon {
                     anchors.centerIn: parent
                     name: "hard-drive"
-                    darkTheme: root.darkTheme
+                    darkTheme: Theme.AppTheme.isDark
                     iconSize: 16
                 }
 
@@ -2200,375 +2044,52 @@ Window {
         }
     }
 
-    StyledMenu {
+
+    BreadcrumbContextMenu {
+        id: breadcrumbContextMenu
+        rootWindow: root
+    }
+
+    EmptyAreaContextMenu {
+        id: emptyAreaContextMenu
+        rootWindow: root
+    }
+
+    TabContextMenu {
+        id: tabContextMenu
+        rootWindow: root
+        tabsCount: tabsModel.count
+    }
+
+    SidebarContextMenu {
         id: sidebarContextMenu
-        darkTheme: root.darkTheme
-
-        StyledMenuItem {
-            text: "Open"
-            enabled: root.contextSidebarLabel !== ""
-            onTriggered: root.openLocation(
-                root.contextSidebarLabel,
-                root.contextSidebarIcon,
-                root.contextSidebarKind
-            )
-            darkTheme: root.darkTheme
-        }
-
-        StyledMenuItem {
-            text: "Open in new tab"
-            enabled: root.contextSidebarLabel !== ""
-            onTriggered: root.openSidebarContextInNewTab()
-            darkTheme: root.darkTheme
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Copy path"
-            enabled: root.contextSidebarLabel !== ""
-            darkTheme: root.darkTheme
-            onTriggered: root.copySidebarContextPath()
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            darkTheme: root.darkTheme
-            text: "Pin"
-            enabled: root.contextSidebarKind !== "section"
-            onTriggered: applySnapshot(backend.pinSidebarLocation(root.contextSidebarLabel,
-                                                                  root.contextSidebarKind))
-        }
-
-        StyledMenuItem {
-            darkTheme: root.darkTheme
-            text: "Properties"
-            enabled: root.contextSidebarKind !== "section"
-            onTriggered: applySnapshot(backend.showSidebarLocationProperties(root.contextSidebarLabel,
-                                                                             root.contextSidebarKind))
-        }
+        rootWindow: root
     }
 
-    StyledMenu {
+    FileContextMenu {
         id: fileRowContextMenu
-        darkTheme: root.darkTheme
-
-        StyledMenuItem {
-            text: "Open"
-            enabled: root.contextFileRow >= 0
-            darkTheme: root.darkTheme
-            onTriggered: {
-                if (root.contextFileRow >= 0)
-                    applySnapshot(backend.openItems(root.singleItemForBackend(root.contextFileRow)))
-            }
-        }
-
-        StyledMenuItem {
-            text: "Open in new tab"
-            enabled: root.contextFileRow >= 0
-            darkTheme: root.darkTheme
-            onTriggered: {
-                if (root.contextFileRow >= 0)
-                    applySnapshot(backend.openItemsInNewTab(root.singleItemForBackend(root.contextFileRow)))
-            }
-        }
-
-        StyledMenu {
-            title: "Open with..."
-            darkTheme: root.darkTheme
-
-            StyledMenuItem {
-                text: "Notepad"
-                enabled: root.contextFileRow >= 0
-                darkTheme: root.darkTheme
-                onTriggered: {
-                    if (root.contextFileRow >= 0)
-                        applySnapshot(backend.openItemsWith(root.singleItemForBackend(root.contextFileRow), "Notepad"))
-                }
-            }
-
-            StyledMenuItem {
-                text: "Visual Studio Code"
-                enabled: root.contextFileRow >= 0
-                darkTheme: root.darkTheme
-                onTriggered: {
-                    if (root.contextFileRow >= 0)
-                        applySnapshot(backend.openItemsWith(root.singleItemForBackend(root.contextFileRow), "Visual Studio Code"))
-                }
-            }
-
-            StyledMenuItem {
-                text: "Qt Creator"
-                enabled: root.contextFileRow >= 0
-                darkTheme: root.darkTheme
-                onTriggered: {
-                    if (root.contextFileRow >= 0)
-                        applySnapshot(backend.openItemsWith(root.singleItemForBackend(root.contextFileRow), "Qt Creator"))
-                }
-            }
-
-            StyledMenuItem {
-                text: "Windows Media Player"
-                enabled: root.contextFileRow >= 0
-                darkTheme: root.darkTheme
-                onTriggered: {
-                    if (root.contextFileRow >= 0)
-                        applySnapshot(backend.openItemsWith(root.singleItemForBackend(root.contextFileRow), "Windows Media Player"))
-                }
-            }
-
-            StyledMenuSeparator {}
-
-            StyledMenuItem {
-                text: "Choose another app..."
-                enabled: root.contextFileRow >= 0
-                darkTheme: root.darkTheme
-                onTriggered: {
-                    if (root.contextFileRow >= 0)
-                        applySnapshot(backend.chooseOpenWithApp(root.singleItemForBackend(root.contextFileRow)))
-                }
-            }
-        }
-
-        StyledMenuItem {
-            text: "Select all"
-            darkTheme: root.darkTheme
-            onTriggered: root.selectAllFiles()
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Cut"
-            enabled: root.contextFileRow >= 0
-            darkTheme: root.darkTheme
-            onTriggered: {
-                if (root.contextFileRow >= 0)
-                    applySnapshot(backend.cutItems(root.singleItemForBackend(root.contextFileRow)))
-            }
-        }
-
-        StyledMenuItem {
-            text: "Copy"
-            enabled: root.contextFileRow >= 0
-            darkTheme: root.darkTheme
-            onTriggered: {
-                if (root.contextFileRow >= 0)
-                    applySnapshot(backend.copyItems(root.singleItemForBackend(root.contextFileRow)))
-            }
-        }
-
-        StyledMenu {
-            title: "Copy paths"
-            darkTheme: root.darkTheme
-
-            StyledMenuItem {
-                text: "Full path"
-                enabled: root.contextFileRow >= 0
-                darkTheme: root.darkTheme
-                onTriggered: root.copyPathsForItems(root.singleItemForBackend(root.contextFileRow), false, false)
-            }
-
-            StyledMenuItem {
-                text: "Relative path"
-                enabled: root.contextFileRow >= 0
-                darkTheme: root.darkTheme
-                onTriggered: root.copyPathsForItems(root.singleItemForBackend(root.contextFileRow), true, false)
-            }
-
-            StyledMenuSeparator {}
-
-            StyledMenuItem {
-                text: "Full paths recursively"
-                enabled: root.contextFileRow >= 0
-                darkTheme: root.darkTheme
-                onTriggered: root.copyPathsForItems(root.singleItemForBackend(root.contextFileRow), false, true)
-            }
-
-            StyledMenuItem {
-                text: "Relative paths recursively"
-                enabled: root.contextFileRow >= 0
-                darkTheme: root.darkTheme
-                onTriggered: root.copyPathsForItems(root.singleItemForBackend(root.contextFileRow), true, true)
-            }
-        }
-
-        StyledMenuItem {
-            text: "Rename"
-            enabled: root.contextFileRow >= 0
-            darkTheme: root.darkTheme
-            onTriggered: root.beginRenameRow(root.contextFileRow)
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Delete"
-            enabled: root.contextFileRow >= 0
-            darkTheme: root.darkTheme
-            onTriggered: root.askDeleteRow(root.contextFileRow)
-        }
-
-        StyledMenuItem {
-            text: "Properties"
-            enabled: root.contextFileRow >= 0
-            darkTheme: root.darkTheme
-            onTriggered: {
-                if (root.contextFileRow >= 0)
-                    applySnapshot(backend.showItemProperties(root.singleItemForBackend(root.contextFileRow)))
-            }
-        }
+        rootWindow: root
     }
 
-    StyledMenu {
+    MultiFileContextMenu {
         id: multiFileContextMenu
-        darkTheme: root.darkTheme
-
-        StyledMenuItem {
-            text: "Open"
-            enabled: root.selectedFileCount() > 0
-            darkTheme: root.darkTheme
-            onTriggered: {
-                if (root.selectedFileCount() > 0)
-                    applySnapshot(backend.openItems(root.selectedItemsForBackend()))
-            }
-        }
-
-        StyledMenuItem {
-            text: "Open in new tab"
-            enabled: root.selectedFileCount() === 1
-            darkTheme: root.darkTheme
-            onTriggered: {
-                if (root.selectedFileCount() === 1 && root.currentFileRow >= 0)
-                    applySnapshot(backend.openItemsInNewTab(root.singleItemForBackend(root.currentFileRow)))
-            }
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Cut"
-            enabled: root.selectedFileCount() > 0
-            darkTheme: root.darkTheme
-            onTriggered: applySnapshot(backend.cutItems(root.selectedItemsForBackend()))
-        }
-
-        StyledMenuItem {
-            text: "Copy"
-            enabled: root.selectedFileCount() > 0
-            darkTheme: root.darkTheme
-            onTriggered: applySnapshot(backend.copyItems(root.selectedItemsForBackend()))
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Compress"
-            enabled: root.selectedFileCount() > 0
-            darkTheme: root.darkTheme
-            onTriggered: applySnapshot(backend.compressItems(root.selectedItemsForBackend()))
-        }
-
-        StyledMenuItem {
-            text: "Extract here"
-            enabled: root.selectedFileCount() > 0
-            darkTheme: root.darkTheme
-            onTriggered: applySnapshot(backend.extractItems(root.selectedItemsForBackend()))
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenu {
-            title: "Copy paths"
-            darkTheme: root.darkTheme
-
-            StyledMenuItem {
-                text: "Full paths"
-                enabled: root.selectedFileCount() > 0
-                darkTheme: root.darkTheme
-                onTriggered: root.copyPathsForItems(root.selectedItemsForBackend(), false, false)
-            }
-
-            StyledMenuItem {
-                text: "Relative paths"
-                enabled: root.selectedFileCount() > 0
-                darkTheme: root.darkTheme
-                onTriggered: root.copyPathsForItems(root.selectedItemsForBackend(), true, false)
-            }
-
-            StyledMenuSeparator {}
-
-            StyledMenuItem {
-                text: "Full paths recursively"
-                enabled: root.selectedFileCount() > 0
-                darkTheme: root.darkTheme
-                onTriggered: root.copyPathsForItems(root.selectedItemsForBackend(), false, true)
-            }
-
-            StyledMenuItem {
-                text: "Relative paths recursively"
-                enabled: root.selectedFileCount() > 0
-                darkTheme: root.darkTheme
-                onTriggered: root.copyPathsForItems(root.selectedItemsForBackend(), true, true)
-            }
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Delete"
-            enabled: root.selectedFileCount() > 0
-            darkTheme: root.darkTheme
-            onTriggered: root.askDeleteSelection()
-        }
-
-        StyledMenuItem {
-            text: "Rename"
-            enabled: root.selectedFileCount() === 1 && root.currentFileRow >= 0
-            darkTheme: root.darkTheme
-            onTriggered: root.beginRenameRow(root.currentFileRow)
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Select all"
-            darkTheme: root.darkTheme
-            onTriggered: root.selectAllFiles()
-        }
-
-        StyledMenuItem {
-            text: "Clear selection"
-            darkTheme: root.darkTheme
-            enabled: root.selectedFileCount() > 0
-            onTriggered: root.clearFileSelection()
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Properties"
-            darkTheme: root.darkTheme
-            enabled: root.selectedFileCount() > 0
-            onTriggered: applySnapshot(backend.showItemProperties(root.selectedItemsForBackend()))
-        }
+        rootWindow: root
     }
 
     StyledMenu {
         id: fileAreaContextMenu
-        darkTheme: root.darkTheme
+        darkTheme: Theme.AppTheme.isDark
 
         StyledMenuItem {
             text: "New folder"
             onTriggered: root.addNewFolder()
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
 
         StyledMenuItem {
             text: "New file"
             onTriggered: root.addNewFile()
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
 
         StyledMenuSeparator {}
@@ -2576,7 +2097,7 @@ Window {
         StyledMenuItem {
             text: "Paste"
             onTriggered: applySnapshot(backend.pasteItems())
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
 
         StyledMenuSeparator {}
@@ -2584,19 +2105,19 @@ Window {
         StyledMenuItem {
             text: "Refresh"
             onTriggered: applySnapshot(backend.refresh())
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
 
         StyledMenuItem {
             text: "Properties"
             onTriggered: applySnapshot(backend.showCurrentLocationProperties())
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
     }
 
     StyledMenu {
         id: viewModeMenu
-        darkTheme: root.darkTheme
+        darkTheme: Theme.AppTheme.isDark
 
         StyledMenuItem {
             text: "Details"
@@ -2604,7 +2125,7 @@ Window {
                 root.currentViewMode = "Details"
                 applySnapshot(backend.setViewMode("Details"))
             }
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
         StyledMenuItem {
             text: "Tiles"
@@ -2612,7 +2133,7 @@ Window {
                 root.currentViewMode = "Tiles"
                 applySnapshot(backend.setViewMode("Tiles"))
             }
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
         StyledMenuItem {
             text: "Compact"
@@ -2620,7 +2141,7 @@ Window {
                 root.currentViewMode = "Compact"
                 applySnapshot(backend.setViewMode("Compact"))
             }
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
         StyledMenuItem {
             text: "Large icons"
@@ -2628,17 +2149,17 @@ Window {
                 root.currentViewMode = "Large icons"
                 applySnapshot(backend.setViewMode("Large icons"))
             }
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
         }
     }
 
     StyledMenu {
         id: themeMenu
-        darkTheme: root.darkTheme
+        darkTheme: Theme.AppTheme.isDark
 
         StyledMenuItem {
             text: "Dark"
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             onTriggered: {
                 root.themeMode = "Dark"
                 applySnapshot(backend.setTheme("Dark"))
@@ -2646,7 +2167,7 @@ Window {
         }
         StyledMenuItem {
             text: "Light"
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             onTriggered: {
                 root.themeMode = "Light"
                 applySnapshot(backend.setTheme("Light"))
@@ -2654,7 +2175,7 @@ Window {
         }
         StyledMenuItem {
             text: "System"
-            darkTheme: root.darkTheme
+            darkTheme: Theme.AppTheme.isDark
             onTriggered: {
                 root.themeMode = "System"
                 applySnapshot(backend.setTheme("System"))
@@ -2716,8 +2237,8 @@ Window {
                     return root.detailsRowHeight
                 }
 
-                ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
-                ScrollBar.horizontal: ExplorerScrollbarH { darkTheme: root.darkTheme }
+                ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
+                ScrollBar.horizontal: ExplorerScrollbarH { darkTheme: Theme.AppTheme.isDark }
 
                 delegate: Rectangle {
                     id: rowDelegate
@@ -2734,10 +2255,10 @@ Window {
                     z: column === 0 ? 50 : 1
 
                     color: root.detailsDropHoverRow === row && isFolderTarget && !sameAsDragged
-                           ? root.selectedSoft
+                           ? Theme.AppTheme.selectedSoft
                            : root.isFileRowSelected(row)
-                             ? root.selected
-                             : cellMouse.containsMouse ? root.selectedSoft : "transparent"
+                             ? Theme.AppTheme.selected
+                             : cellMouse.containsMouse ? Theme.AppTheme.selectedSoft : "transparent"
 
                     Row {
                         anchors.fill: parent
@@ -2748,7 +2269,7 @@ Window {
                         AppIcon {
                             visible: column === 0
                             name: root.fileRowValue(row, "icon")
-                            darkTheme: root.darkTheme
+                            darkTheme: Theme.AppTheme.isDark
                             iconSize: 16
                             anchors.verticalCenter: parent.verticalCenter
                         }
@@ -2763,7 +2284,7 @@ Window {
                                 if (column === 3) return root.fileRowValue(row, "size")
                                 return ""
                             }
-                            color: column === 0 ? root.text : root.muted
+                            color: column === 0 ? Theme.AppTheme.text : Theme.AppTheme.muted
                             font.pixelSize: 13
                             elide: Text.ElideRight
                             width: parent.width - (column === 0 ? 28 : 0)
@@ -2777,7 +2298,7 @@ Window {
                             height: 24
                             anchors.verticalCenter: parent.verticalCenter
                             text: root.editingFileNameDraft
-                            color: root.text
+                            color: Theme.AppTheme.text
                             font.pixelSize: 13
                             selectByMouse: true
                             leftPadding: 8
@@ -2790,8 +2311,8 @@ Window {
 
                             background: Rectangle {
                                 radius: 6
-                                color: root.darkTheme ? "#1b2230" : "#ffffff"
-                                border.color: renameField.showValidation ? "#df5c5c" : root.accent
+                                color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+                                border.color: renameField.showValidation ? "#df5c5c" : Theme.AppTheme.accent
                                 border.width: 1
                             }
 
@@ -2830,7 +2351,7 @@ Window {
                             width: Math.min(360, fileTable.width - 40)
                             height: validationText.implicitHeight + 12
                             radius: 6
-                            color: root.darkTheme ? "#2a1618" : "#fff1f1"
+                            color: Theme.AppTheme.isDark ? "#2a1618" : "#fff1f1"
                             border.color: "#df5c5c"
                             border.width: 1
 
@@ -2839,7 +2360,7 @@ Window {
                                 anchors.fill: parent
                                 anchors.margins: 6
                                 text: renameField.validation.message
-                                color: root.darkTheme ? "#ffb3b3" : "#b42318"
+                                color: Theme.AppTheme.isDark ? "#ffb3b3" : "#b42318"
                                 font.pixelSize: 12
                                 wrapMode: Text.Wrap
                             }
@@ -3129,7 +2650,7 @@ Window {
                 height: Math.abs(root.detailsSelectionCurrentY - root.detailsSelectionStartY)
 
                 color: Qt.rgba(76 / 255, 130 / 255, 247 / 255, 0.18)
-                border.color: root.accent
+                border.color: Theme.AppTheme.accent
                 border.width: 1
             }
         }
@@ -3231,7 +2752,7 @@ Window {
                     maximumFlickVelocity: 2200
                     flickDeceleration: 9000
 
-                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
+                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
                     ScrollBar.horizontal: null
 
                     delegate: Item {
@@ -3249,12 +2770,12 @@ Window {
                             anchors.fill: parent
                             radius: 8
                             color: root.detailsDropHoverRow === index && tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged
-                                   ? root.selectedSoft
+                                   ? Theme.AppTheme.selectedSoft
                                    : root.isFileRowSelected(index)
-                                     ? root.selected
-                                     : tileMouse.containsMouse ? root.selectedSoft : "transparent"
+                                     ? Theme.AppTheme.selected
+                                     : tileMouse.containsMouse ? Theme.AppTheme.selectedSoft : "transparent"
                             border.color: root.detailsDropHoverRow === index && tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged
-                                          ? root.accent
+                                          ? Theme.AppTheme.accent
                                           : "transparent"
                             border.width: root.detailsDropHoverRow === index && tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged ? 1 : 0
                         }
@@ -3264,7 +2785,7 @@ Window {
                             anchors.right: parent.right
                             anchors.bottom: parent.bottom
                             height: 1
-                            color: root.borderSoft
+                            color: Theme.AppTheme.borderSoft
                             opacity: 0.9
                         }
 
@@ -3279,7 +2800,7 @@ Window {
                             AppIcon {
                                 anchors.verticalCenter: parent.verticalCenter
                                 name: modelData.icon
-                                darkTheme: root.darkTheme
+                                darkTheme: Theme.AppTheme.isDark
                                 iconSize: 34
                             }
 
@@ -3291,7 +2812,7 @@ Window {
                                 Text {
                                     visible: root.editingFileRow !== index
                                     text: modelData.name
-                                    color: root.text
+                                    color: Theme.AppTheme.text
                                     font.pixelSize: 14
                                     elide: Text.ElideRight
                                     width: parent.width
@@ -3302,7 +2823,7 @@ Window {
                                     width: parent.width
                                     height: 26
                                     text: root.editingFileNameDraft
-                                    color: root.text
+                                    color: Theme.AppTheme.text
                                     font.pixelSize: 14
                                     selectByMouse: true
                                     leftPadding: 8
@@ -3312,8 +2833,8 @@ Window {
 
                                     background: Rectangle {
                                         radius: 6
-                                        color: root.darkTheme ? "#1b2230" : "#ffffff"
-                                        border.color: root.accent
+                                        color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+                                        border.color: Theme.AppTheme.accent
                                         border.width: 1
                                     }
 
@@ -3341,7 +2862,7 @@ Window {
 
                                 Text {
                                     text: "Type: " + (modelData.type || "")
-                                    color: root.muted
+                                    color: Theme.AppTheme.muted
                                     font.pixelSize: 11
                                     elide: Text.ElideRight
                                     width: parent.width
@@ -3357,7 +2878,7 @@ Window {
 
                                 Text {
                                     text: "Date modified: " + (modelData.dateModified || "")
-                                    color: root.text
+                                    color: Theme.AppTheme.text
                                     font.pixelSize: 11
                                     elide: Text.ElideRight
                                     width: parent.width
@@ -3365,7 +2886,7 @@ Window {
 
                                 Text {
                                     text: "Size: " + ((modelData.size && modelData.size !== "") ? modelData.size : "—")
-                                    color: root.text
+                                    color: Theme.AppTheme.text
                                     font.pixelSize: 11
                                     elide: Text.ElideRight
                                     width: parent.width
@@ -3602,7 +3123,7 @@ Window {
                         height: Math.abs(tilesRoot.selectionCurrentY - tilesRoot.selectionStartY)
 
                         color: Qt.rgba(76 / 255, 130 / 255, 247 / 255, 0.18)
-                        border.color: root.accent
+                        border.color: Theme.AppTheme.accent
                         border.width: 1
                     }
                 }
@@ -3707,7 +3228,7 @@ Window {
                     maximumFlickVelocity: 2200
                     flickDeceleration: 9000
 
-                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
+                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
                     ScrollBar.horizontal: null
 
                     delegate: Item {
@@ -3725,12 +3246,12 @@ Window {
                             anchors.fill: parent
                             radius: 6
                             color: root.detailsDropHoverRow === index && compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged
-                                   ? root.selectedSoft
+                                   ? Theme.AppTheme.selectedSoft
                                    : root.isFileRowSelected(index)
-                                     ? root.selected
-                                     : compactMouse.containsMouse ? root.selectedSoft : "transparent"
+                                     ? Theme.AppTheme.selected
+                                     : compactMouse.containsMouse ? Theme.AppTheme.selectedSoft : "transparent"
                             border.color: root.detailsDropHoverRow === index && compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged
-                                          ? root.accent
+                                          ? Theme.AppTheme.accent
                                           : "transparent"
                             border.width: root.detailsDropHoverRow === index && compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged ? 1 : 0
                         }
@@ -3745,7 +3266,7 @@ Window {
 
                             AppIcon {
                                 name: modelData.icon
-                                darkTheme: root.darkTheme
+                                darkTheme: Theme.AppTheme.isDark
                                 iconSize: 14
                                 anchors.verticalCenter: parent.verticalCenter
                             }
@@ -3754,7 +3275,7 @@ Window {
                                 visible: root.editingFileRow !== index
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: modelData.name
-                                color: root.text
+                                color: Theme.AppTheme.text
                                 font.pixelSize: 13
                                 elide: Text.ElideRight
                                 width: parent.width - 24
@@ -3766,7 +3287,7 @@ Window {
                                 height: 24
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: root.editingFileNameDraft
-                                color: root.text
+                                color: Theme.AppTheme.text
                                 font.pixelSize: 13
                                 selectByMouse: true
                                 leftPadding: 8
@@ -3776,8 +3297,8 @@ Window {
 
                                 background: Rectangle {
                                     radius: 6
-                                    color: root.darkTheme ? "#1b2230" : "#ffffff"
-                                    border.color: root.accent
+                                    color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+                                    border.color: Theme.AppTheme.accent
                                     border.width: 1
                                 }
 
@@ -4033,7 +3554,7 @@ Window {
                         height: Math.abs(compactRoot.selectionCurrentY - compactRoot.selectionStartY)
 
                         color: Qt.rgba(76 / 255, 130 / 255, 247 / 255, 0.18)
-                        border.color: root.accent
+                        border.color: Theme.AppTheme.accent
                         border.width: 1
                     }
                 }
@@ -4144,7 +3665,7 @@ Window {
                 maximumFlickVelocity: 2200
                 flickDeceleration: 9000
 
-                ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
+                ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
                 ScrollBar.horizontal: null
 
                 MouseArea {
@@ -4260,12 +3781,12 @@ Window {
                     readonly property bool sameAsDragged: root.isDraggedRow(index)
 
                     color: root.detailsDropHoverRow === index && gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged
-                           ? root.selectedSoft
+                           ? Theme.AppTheme.selectedSoft
                            : root.isFileRowSelected(index)
-                             ? root.selected
-                             : gridMouse.containsMouse ? root.selectedSoft : "transparent"
+                             ? Theme.AppTheme.selected
+                             : gridMouse.containsMouse ? Theme.AppTheme.selectedSoft : "transparent"
                     border.color: root.detailsDropHoverRow === index && gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged
-                                  ? root.accent
+                                  ? Theme.AppTheme.accent
                                   : "transparent"
                     border.width: root.detailsDropHoverRow === index && gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged ? 1 : 0
 
@@ -4276,7 +3797,7 @@ Window {
                         AppIcon {
                             anchors.horizontalCenter: parent.horizontalCenter
                             name: modelData.icon
-                            darkTheme: root.darkTheme
+                            darkTheme: Theme.AppTheme.isDark
                             iconSize: 28
                         }
 
@@ -4288,7 +3809,7 @@ Window {
                             maximumLineCount: 2
                             elide: Text.ElideRight
                             text: modelData.name
-                            color: root.text
+                            color: Theme.AppTheme.text
                             font.pixelSize: 12
                         }
 
@@ -4297,7 +3818,7 @@ Window {
                             width: 88
                             height: 24
                             text: root.editingFileNameDraft
-                            color: root.text
+                            color: Theme.AppTheme.text
                             font.pixelSize: 12
                             horizontalAlignment: TextInput.AlignHCenter
                             selectByMouse: true
@@ -4308,8 +3829,8 @@ Window {
 
                             background: Rectangle {
                                 radius: 6
-                                color: root.darkTheme ? "#1b2230" : "#ffffff"
-                                border.color: root.accent
+                                color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+                                border.color: Theme.AppTheme.accent
                                 border.width: 1
                             }
 
@@ -4465,7 +3986,7 @@ Window {
                     height: Math.abs(largeIconsRoot.selectionCurrentY - largeIconsRoot.selectionStartY)
 
                     color: Qt.rgba(76 / 255, 130 / 255, 247 / 255, 0.18)
-                    border.color: root.accent
+                    border.color: Theme.AppTheme.accent
                     border.width: 1
                 }
             }
@@ -4475,8 +3996,8 @@ Window {
     Rectangle {
         anchors.fill: parent
         radius: (root.visibility === Window.Maximized || root.windowMoveActive) ? 0 : 14
-        color: root.bg
-        border.color: (root.visibility === Window.Maximized || root.windowMoveActive) ? "transparent" : root.border
+        color: Theme.AppTheme.bg
+        border.color: (root.visibility === Window.Maximized || root.windowMoveActive) ? "transparent" : Theme.AppTheme.border
         border.width: (root.visibility === Window.Maximized || root.windowMoveActive) ? 0 : 1
         clip: !root.windowMoveActive
 
@@ -4488,8 +4009,8 @@ Window {
                 id: titleBar
                 Layout.fillWidth: true
                 Layout.preferredHeight: 46
-                color: root.titleBg
-                border.color: root.borderSoft
+                color: Theme.AppTheme.titleBg
+                border.color: Theme.AppTheme.borderSoft
                 border.width: 1
 
                 RowLayout {
@@ -4537,16 +4058,16 @@ Window {
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: tabsRow.overflowing
                                 color: leftScrollMouse.pressed
-                                       ? root.pressed
+                                       ? Theme.AppTheme.pressed
                                        : leftScrollMouse.containsMouse
-                                         ? root.hover
+                                         ? Theme.AppTheme.hover
                                          : "transparent"
                                 opacity: tabFlick.contentX > 0 ? 1.0 : 0.45
 
                                 AppIcon {
                                     anchors.centerIn: parent
                                     name: "chevron-left"
-                                    darkTheme: root.darkTheme
+                                    darkTheme: Theme.AppTheme.isDark
                                     iconSize: 14
                                 }
 
@@ -4587,12 +4108,12 @@ Window {
                                         height: 28
                                         radius: 8
                                         anchors.verticalCenter: parent.verticalCenter
-                                        color: addTabMouse.containsMouse ? root.hover : "transparent"
+                                        color: addTabMouse.containsMouse ? Theme.AppTheme.hover : "transparent"
 
                                         AppIcon {
                                             anchors.centerIn: parent
                                             name: "add"
-                                            darkTheme: root.darkTheme
+                                            darkTheme: Theme.AppTheme.isDark
                                             iconSize: 16
                                         }
 
@@ -4664,17 +4185,17 @@ Window {
 
                                                     color: tabDelegate.index === rootWindow.currentTab
                                                            ? (tabMouse.pressed
-                                                                ? (rootWindow.darkTheme ? "#2a3342" : "#e7edf8")
+                                                                ? (Theme.AppTheme.isDark ? "#2a3342" : "#e7edf8")
                                                                 : tabMouse.containsMouse
-                                                                  ? (rootWindow.darkTheme ? "#242c3a" : "#f4f7fc")
-                                                                  : (rootWindow.darkTheme ? "#202633" : "#ffffff"))
+                                                                  ? (Theme.AppTheme.isDark ? "#242c3a" : "#f4f7fc")
+                                                                  : (Theme.AppTheme.isDark ? "#202633" : "#ffffff"))
                                                            : (tabMouse.pressed
-                                                                ? rootWindow.pressed
+                                                                ? Theme.AppTheme.pressed
                                                                 : tabMouse.containsMouse
-                                                                  ? rootWindow.hover
+                                                                  ? Theme.AppTheme.hover
                                                                   : "transparent")
 
-                                                    border.color: tabDelegate.index === rootWindow.currentTab ? rootWindow.border : "transparent"
+                                                    border.color: tabDelegate.index === rootWindow.currentTab ? Theme.AppTheme.border : "transparent"
                                                     border.width: 1
 
                                                     DropArea {
@@ -4720,13 +4241,13 @@ Window {
 
                                                         AppIcon {
                                                             name: tabDelegate.icon || ""
-                                                            darkTheme: tabDelegate.rootWindow.darkTheme
+                                                            darkTheme: tabDelegate.Theme.AppTheme.isDark
                                                             iconSize: 15
                                                         }
 
                                                         Text {
                                                             text: tabDelegate.title || ""
-                                                            color: tabDelegate.rootWindow.text
+                                                            color: Theme.AppTheme.text
                                                             font.pixelSize: 13
                                                             font.bold: tabDelegate.index === tabDelegate.rootWindow.currentTab
                                                             elide: Text.ElideRight
@@ -4744,7 +4265,7 @@ Window {
                                                         height: 24
 
                                                         text: tabDelegate.rootWindow.editingTabTitleDraft || ""
-                                                        color: tabDelegate.rootWindow.text
+                                                        color: Theme.AppTheme.text
                                                         font.pixelSize: 13
                                                         selectByMouse: true
                                                         leftPadding: 8
@@ -4754,8 +4275,8 @@ Window {
 
                                                         background: Rectangle {
                                                             radius: 6
-                                                            color: tabDelegate.rootWindow.darkTheme ? "#1b2230" : "#ffffff"
-                                                            border.color: tabDelegate.rootWindow.accent
+                                                            color: tabDelegate.Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+                                                            border.color: Theme.AppTheme.accent
                                                             border.width: 1
                                                         }
 
@@ -4789,14 +4310,14 @@ Window {
                                                         width: 18
                                                         height: 18
                                                         radius: 9
-                                                        color: closeMouse.containsMouse ? tabDelegate.rootWindow.hover : "transparent"
+                                                        color: closeMouse.containsMouse ? tabDelegate.Theme.AppTheme.hover : "transparent"
                                                         z: 3
                                                         visible: tabDelegate.rootWindow.editingTabIndex !== tabDelegate.index
 
                                                         AppIcon {
                                                             anchors.centerIn: parent
                                                             name: "close"
-                                                            darkTheme: tabDelegate.rootWindow.darkTheme
+                                                            darkTheme: tabDelegate.Theme.AppTheme.isDark
                                                             iconSize: 12
                                                             iconOpacity: 0.75
                                                         }
@@ -4984,7 +4505,7 @@ Window {
 
                                         gradient: Gradient {
                                             orientation: Gradient.Horizontal
-                                            GradientStop { position: 0.0; color: darkTheme ? "#000000" : "#cfd5dd" }
+                                            GradientStop { position: 0.0; color: Theme.AppTheme.isDark ? "#000000" : "#cfd5dd" }
                                             GradientStop { position: 1.0; color: Qt.rgba(0, 0, 0, 0) }
                                         }
                                     }
@@ -5001,7 +4522,7 @@ Window {
                                         gradient: Gradient {
                                             orientation: Gradient.Horizontal
                                             GradientStop { position: 0.0; color: Qt.rgba(0, 0, 0, 0) }
-                                            GradientStop { position: 1.0; color: darkTheme ? "#000000" : "#cfd5dd" }
+                                            GradientStop { position: 1.0; color: Theme.AppTheme.isDark ? "#000000" : "#cfd5dd" }
                                         }
                                     }
                                 }
@@ -5015,16 +4536,16 @@ Window {
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: tabsRow.overflowing
                                 color: rightScrollMouse.pressed
-                                       ? root.pressed
+                                       ? Theme.AppTheme.pressed
                                        : rightScrollMouse.containsMouse
-                                         ? root.hover
+                                         ? Theme.AppTheme.hover
                                          : "transparent"
                                 opacity: tabFlick.contentX < (tabFlick.contentWidth - tabFlick.width - 1) ? 1.0 : 0.45
 
                                 AppIcon {
                                     anchors.centerIn: parent
                                     name: "chevron-right"
-                                    darkTheme: root.darkTheme
+                                    darkTheme: Theme.AppTheme.isDark
                                     iconSize: 14
                                 }
 
@@ -5079,7 +4600,7 @@ Window {
 
                         WindowButton {
                             iconName: "minimize"
-                            darkTheme: root.darkTheme
+                            darkTheme: Theme.AppTheme.isDark
                             onClicked: root.showMinimized()
                         }
 
@@ -5087,13 +4608,13 @@ Window {
                             iconName: root.visibility === Window.Maximized
                                       ? "filter-none"
                                       : "check-box-outline-blank"
-                            darkTheme: root.darkTheme
+                            darkTheme: Theme.AppTheme.isDark
                             onClicked: root.toggleMaximize()
                         }
 
                         WindowButton {
                             iconName: "close"
-                            darkTheme: root.darkTheme
+                            darkTheme: Theme.AppTheme.isDark
                             hoverColor: "#d85b5b"
                             pressedColor: "#c94c4c"
                             onClicked: Qt.quit()
@@ -5105,8 +4626,8 @@ Window {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 54
-                color: root.surface
-                border.color: root.borderSoft
+                color: Theme.AppTheme.surface
+                border.color: Theme.AppTheme.borderSoft
                 border.width: 1
 
                 RowLayout {
@@ -5118,28 +4639,28 @@ Window {
                     IconButton {
                         iconName: "arrow-back"
                         tooltipText: "Back"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: applySnapshot(backend.goBack())
                     }
 
                     IconButton {
                         iconName: "arrow-forward"
                         tooltipText: "Forward"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: applySnapshot(backend.goForward())
                     }
 
                     IconButton {
                         iconName: "arrow-upward"
                         tooltipText: "Up"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: applySnapshot(backend.goUp())
                     }
 
                     IconButton {
                         iconName: "refresh"
                         tooltipText: "Refresh"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: applySnapshot(backend.refresh())
                     }
 
@@ -5148,8 +4669,8 @@ Window {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 38
                         radius: 10
-                        color: darkTheme ? "#1b2230" : "#fcfcfd"
-                        border.color: root.editingPath ? root.accent : root.border
+                        color: Theme.AppTheme.isDark ? "#1b2230" : "#fcfcfd"
+                        border.color: root.editingPath ? Theme.AppTheme.accent : Theme.AppTheme.border
                         border.width: 1
 
                         StackLayout {
@@ -5191,13 +4712,13 @@ Window {
                                                     height: 28
                                                     radius: 8
                                                     color: dropHovered
-                                                           ? root.selectedSoft
+                                                           ? Theme.AppTheme.selectedSoft
                                                            : crumbMouse.pressed
-                                                             ? root.pressed
+                                                             ? Theme.AppTheme.pressed
                                                              : crumbMouse.containsMouse
-                                                               ? (root.darkTheme ? "#344055" : "#dfe9f8")
+                                                               ? (Theme.AppTheme.isDark ? "#344055" : "#dfe9f8")
                                                                : "transparent"
-                                                    border.color: dropHovered ? root.accent : "transparent"
+                                                    border.color: dropHovered ? Theme.AppTheme.accent : "transparent"
                                                     border.width: dropHovered ? 1 : 0
                                                     width: Math.min(crumbContent.implicitWidth + 16, 190)
                                                     clip: true
@@ -5238,7 +4759,7 @@ Window {
                                                         AppIcon {
                                                             anchors.verticalCenter: parent.verticalCenter
                                                             name: modelData.icon
-                                                            darkTheme: root.darkTheme
+                                                            darkTheme: Theme.AppTheme.isDark
                                                             iconSize: 13
                                                             visible: modelData.icon !== ""
                                                         }
@@ -5247,7 +4768,7 @@ Window {
                                                             id: crumbText
                                                             anchors.verticalCenter: parent.verticalCenter
                                                             text: modelData.label
-                                                            color: root.text
+                                                            color: Theme.AppTheme.text
                                                             font.pixelSize: 13
                                                             elide: Text.ElideRight
                                                             width: Math.min(140, implicitWidth)
@@ -5287,7 +4808,7 @@ Window {
                                                     visible: index < pathModel.count - 1
                                                     anchors.verticalCenter: parent.verticalCenter
                                                     name: "chevron-right"
-                                                    darkTheme: root.darkTheme
+                                                    darkTheme: Theme.AppTheme.isDark
                                                     iconSize: 12
                                                     iconOpacity: 0.65
                                                 }
@@ -5315,7 +4836,7 @@ Window {
 
                             TextField {
                                 id: pathField
-                                color: root.text
+                                color: Theme.AppTheme.text
                                 font.pixelSize: 13
                                 leftPadding: 12
                                 rightPadding: 12
@@ -5338,8 +4859,8 @@ Window {
                         Layout.preferredWidth: 300
                         Layout.preferredHeight: 38
                         radius: 10
-                        color: darkTheme ? "#1b2230" : "#fcfcfd"
-                        border.color: searchField.activeFocus ? root.accent : root.border
+                        color: Theme.AppTheme.isDark ? "#1b2230" : "#fcfcfd"
+                        border.color: searchField.activeFocus ? Theme.AppTheme.accent : Theme.AppTheme.border
                         border.width: 1
 
                         RowLayout {
@@ -5354,9 +4875,9 @@ Window {
                                 Layout.preferredHeight: 28
                                 radius: 8
                                 color: searchScopeMouse.pressed
-                                       ? root.pressed
+                                       ? Theme.AppTheme.pressed
                                        : searchScopeMouse.containsMouse
-                                         ? root.hover
+                                         ? Theme.AppTheme.hover
                                          : "transparent"
 
                                 Row {
@@ -5365,13 +4886,13 @@ Window {
 
                                     AppIcon {
                                         name: root.searchScope === "global" ? "hard-drive" : "folder"
-                                        darkTheme: root.darkTheme
+                                        darkTheme: Theme.AppTheme.isDark
                                         iconSize: 14
                                     }
 
                                     AppIcon {
                                         name: searchScopeMenu.visible ? "keyboard-arrow-up" : "keyboard-arrow-down"
-                                        darkTheme: root.darkTheme
+                                        darkTheme: Theme.AppTheme.isDark
                                         iconSize: 10
                                         iconOpacity: 0.6
                                     }
@@ -5393,7 +4914,7 @@ Window {
 
                             AppIcon {
                                 name: "search"
-                                darkTheme: root.darkTheme
+                                darkTheme: Theme.AppTheme.isDark
                                 iconSize: 14
                                 iconOpacity: 0.65
                             }
@@ -5405,9 +4926,9 @@ Window {
                                 placeholderText: root.searchScope === "global"
                                                  ? "Search everywhere"
                                                  : "Search in folder"
-                                placeholderTextColor: root.muted
+                                placeholderTextColor: Theme.AppTheme.muted
                                 text: root.currentSearch
-                                color: root.text
+                                color: Theme.AppTheme.text
                                 font.pixelSize: 13
                                 topPadding: 0
                                 bottomPadding: 0
@@ -5428,8 +4949,8 @@ Window {
             Rectangle {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 46
-                color: root.surface2
-                border.color: root.borderSoft
+                color: Theme.AppTheme.surface2
+                border.color: Theme.AppTheme.borderSoft
                 border.width: 1
 
                 RowLayout {
@@ -5442,35 +4963,35 @@ Window {
                         id: createButton
                         iconName: "add"
                         tooltipText: "Create"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: createMenu.popup()
                     }
 
                     IconButton {
                         iconName: "content-cut"
                         tooltipText: "Cut"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: root.cutSelectedOrCurrent()
                     }
 
                     IconButton {
                         iconName: "content-copy"
                         tooltipText: "Copy"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: root.copySelectedOrCurrent()
                     }
 
                     IconButton {
                         iconName: "content-paste"
                         tooltipText: "Paste"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: applySnapshot(backend.pasteItems())
                     }
 
                     IconButton {
                         iconName: "edit"
                         tooltipText: "Rename"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: {
                             if (root.currentFileRow >= 0)
                                 root.beginRenameRow(root.currentFileRow)
@@ -5480,7 +5001,7 @@ Window {
                     IconButton {
                         iconName: "delete"
                         tooltipText: "Delete"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: {
                             if (root.selectedFileCount() > 1)
                                 root.askDeleteSelection()
@@ -5492,7 +5013,7 @@ Window {
                     IconButton {
                         iconName: "sync"
                         tooltipText: "Test progress notification"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: {
                             deleteProgressTimer.stop()
                             deleteProgressTimer.progressValue = 0
@@ -5505,7 +5026,7 @@ Window {
                         id: toolbarViewButton
                         iconName: root.viewModeIcon(root.currentViewMode)
                         tooltipText: "View"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: viewModeMenu.popup()
                     }
 
@@ -5513,7 +5034,7 @@ Window {
                         id: moreButton
                         iconName: "more-horiz"
                         tooltipText: "More"
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         onClicked: moreActionsMenu.popup()
                     }
 
@@ -5542,13 +5063,13 @@ Window {
                         height: 32
                         radius: 9
                         color: root.previewEnabled
-                               ? (darkTheme ? "#243249" : "#e3edff")
+                               ? (Theme.AppTheme.isDark ? "#243249" : "#e3edff")
                                : (previewToolbarMouse.pressed
-                                    ? (darkTheme ? "#3a475d" : "#cadbf8")
+                                    ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
                                     : previewToolbarMouse.containsMouse
-                                      ? (darkTheme ? "#2d3748" : "#dce8fb")
-                                      : (darkTheme ? "#1d2431" : "#fafbfc"))
-                        border.color: root.previewEnabled ? root.accent : root.border
+                                      ? (Theme.AppTheme.isDark ? "#2d3748" : "#dce8fb")
+                                      : (Theme.AppTheme.isDark ? "#1d2431" : "#fafbfc"))
+                        border.color: root.previewEnabled ? Theme.AppTheme.accent : Theme.AppTheme.border
                         border.width: 1
 
                         Row {
@@ -5557,13 +5078,13 @@ Window {
 
                             AppIcon {
                                 name: "preview"
-                                darkTheme: root.darkTheme
+                                darkTheme: Theme.AppTheme.isDark
                                 iconSize: 14
                             }
 
                             Text {
                                 text: "Preview"
-                                color: root.text
+                                color: Theme.AppTheme.text
                                 font.pixelSize: 12
                                 font.bold: root.previewEnabled
                             }
@@ -5584,11 +5105,11 @@ Window {
                         height: 32
                         radius: 9
                         color: themeMouse.pressed
-                               ? (darkTheme ? "#3a475d" : "#cadbf8")
+                               ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
                                : themeMouse.containsMouse
-                                 ? (darkTheme ? "#2d3748" : "#dce8fb")
-                                 : (darkTheme ? "#1d2431" : "#fafbfc")
-                        border.color: root.border
+                                 ? (Theme.AppTheme.isDark ? "#2d3748" : "#dce8fb")
+                                 : (Theme.AppTheme.isDark ? "#1d2431" : "#fafbfc")
+                        border.color: Theme.AppTheme.border
                         border.width: 1
 
                         Row {
@@ -5601,13 +5122,13 @@ Window {
                                       : root.themeMode === "Light"
                                         ? "sun"
                                         : "computer"
-                                darkTheme: root.darkTheme
+                                darkTheme: Theme.AppTheme.isDark
                                 iconSize: 14
                             }
 
                             Text {
                                 text: root.themeMode
-                                color: root.text
+                                color: Theme.AppTheme.text
                                 font.pixelSize: 12
                             }
                         }
@@ -5648,8 +5169,8 @@ Window {
                         y: 0
                         width: splitViewHost.sidebarWidth
                         height: parent.height
-                        color: darkTheme ? "#121820" : "#f4f6f8"
-                        border.color: root.borderSoft
+                        color: Theme.AppTheme.isDark ? "#121820" : "#f4f6f8"
+                        border.color: Theme.AppTheme.borderSoft
                         border.width: 1
 
                         ColumnLayout {
@@ -5673,7 +5194,7 @@ Window {
                                     flickableDirection: Flickable.VerticalFlick
                                     contentWidth: width
 
-                                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
+                                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
                                     ScrollBar.horizontal: null
 
                                     delegate: Item {
@@ -5705,18 +5226,18 @@ Window {
                                             radius: 8
                                             color: itemSection ? "transparent"
                                                                : dropHovered
-                                                                 ? root.selectedSoft
+                                                                 ? Theme.AppTheme.selectedSoft
                                                                  : tapArea.pressed
-                                                                   ? (darkTheme ? "#3a475d" : "#cadbf8")
+                                                                   ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
                                                                    : (root.selectedSidebarLabel === itemLabel && root.selectedSidebarKind === itemKind)
-                                                                     ? root.selected
+                                                                     ? Theme.AppTheme.selected
                                                                      : tapArea.containsMouse
-                                                                       ? (darkTheme ? "#2a3444" : "#e6eefb")
+                                                                       ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
                                                                        : "transparent"
                                             border.color: dropHovered
-                                                          ? root.accent
+                                                          ? Theme.AppTheme.accent
                                                           : tapArea.pressed
-                                                            ? (darkTheme ? "#4a5a72" : "#b7caf0")
+                                                            ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
                                                             : "transparent"
                                             border.width: (dropHovered || tapArea.pressed) ? 1 : 0
                                         }
@@ -5745,7 +5266,7 @@ Window {
                                                             anchors.centerIn: parent
                                                             visible: hasChildren
                                                             name: expanded ? "keyboard-arrow-down" : "chevron-right"
-                                                            darkTheme: root.darkTheme
+                                                            darkTheme: Theme.AppTheme.isDark
                                                             iconSize: 12
                                                             iconOpacity: 0.65
                                                         }
@@ -5774,14 +5295,14 @@ Window {
                                                     AppIcon {
                                                         anchors.centerIn: parent
                                                         name: itemIcon
-                                                        darkTheme: root.darkTheme
+                                                        darkTheme: Theme.AppTheme.isDark
                                                         iconSize: 15
                                                     }
                                                 }
 
                                                 Text {
                                                     text: itemLabel
-                                                    color: itemSection ? root.muted : root.text
+                                                    color: itemSection ? Theme.AppTheme.muted : Theme.AppTheme.text
                                                     font.pixelSize: itemSection ? 11 : 13
                                                     font.bold: itemSection
                                                     anchors.verticalCenter: parent.verticalCenter
@@ -5848,8 +5369,8 @@ Window {
                                 Layout.preferredHeight: 20 + 22 + (drivesModel.count * 48) + Math.max(0, drivesModel.count - 1) * 1 + 20
                                 Layout.minimumHeight: 120
                                 radius: 12
-                                color: darkTheme ? "#171d27" : "#fbfcfd"
-                                border.color: root.borderSoft
+                                color: Theme.AppTheme.isDark ? "#171d27" : "#fbfcfd"
+                                border.color: Theme.AppTheme.borderSoft
                                 border.width: 1
 
                                 ColumnLayout {
@@ -5859,7 +5380,7 @@ Window {
 
                                     Text {
                                         text: "Drives"
-                                        color: root.text
+                                        color: Theme.AppTheme.text
                                         font.pixelSize: 12
                                         font.bold: true
                                     }
@@ -5877,24 +5398,24 @@ Window {
                                             radius: 8
 
                                             readonly property real usedPct: modelData.total > 0 ? (modelData.used / modelData.total) : 0
-                                            readonly property color usedColor: usedPct >= 0.85 ? root.driveUsedRed : root.driveUsedBlue
+                                            readonly property color usedColor: usedPct >= 0.85 ? Theme.AppTheme.driveUsedRed : Theme.AppTheme.driveUsedBlue
                                             readonly property bool dropHovered: root.navDropHoverLabel === modelData.label
                                                                                 && root.navDropHoverKind === "drive"
 
                                             color: dropHovered
-                                                   ? root.selectedSoft
+                                                   ? Theme.AppTheme.selectedSoft
                                                    : driveMouseArea.pressed
-                                                     ? (darkTheme ? "#3a475d" : "#cadbf8")
+                                                     ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
                                                      : (root.selectedSidebarKind === "drive" && root.selectedSidebarLabel === modelData.label)
-                                                       ? root.selected
+                                                       ? Theme.AppTheme.selected
                                                        : driveMouseArea.containsMouse
-                                                         ? (darkTheme ? "#2a3444" : "#e6eefb")
+                                                         ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
                                                          : "transparent"
 
                                             border.color: dropHovered
-                                                          ? root.accent
+                                                          ? Theme.AppTheme.accent
                                                           : driveMouseArea.pressed
-                                                            ? (darkTheme ? "#4a5a72" : "#b7caf0")
+                                                            ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
                                                             : "transparent"
                                             border.width: (dropHovered || driveMouseArea.pressed) ? 1 : 0
 
@@ -5911,13 +5432,13 @@ Window {
 
                                                     AppIcon {
                                                         name: modelData.icon
-                                                        darkTheme: root.darkTheme
+                                                        darkTheme: Theme.AppTheme.isDark
                                                         iconSize: 14
                                                     }
 
                                                     Text {
                                                         text: modelData.label
-                                                        color: root.text
+                                                        color: Theme.AppTheme.text
                                                         font.pixelSize: 12
                                                         font.bold: true
                                                     }
@@ -5927,7 +5448,7 @@ Window {
                                                     width: parent.width
                                                     height: 5
                                                     radius: 3
-                                                    color: root.driveFree
+                                                    color: Theme.AppTheme.driveFree
 
                                                     Rectangle {
                                                         width: parent.width * Math.max(0, Math.min(1, usedPct))
@@ -5939,7 +5460,7 @@ Window {
 
                                                 Text {
                                                     text: modelData.usedText
-                                                    color: root.muted
+                                                    color: Theme.AppTheme.muted
                                                     font.pixelSize: 10
                                                 }
                                             }
@@ -5993,9 +5514,9 @@ Window {
                         width: splitViewHost.splitterWidth
                         height: parent.height
                         color: splitterMouse.pressed
-                               ? (darkTheme ? "#2a3342" : "#d7dfeb")
+                               ? (Theme.AppTheme.isDark ? "#2a3342" : "#d7dfeb")
                                : splitterMouse.containsMouse
-                                 ? (darkTheme ? "#212938" : "#e3e9f2")
+                                 ? (Theme.AppTheme.isDark ? "#212938" : "#e3e9f2")
                                  : "transparent"
 
                         Rectangle {
@@ -6004,9 +5525,9 @@ Window {
                             height: parent.height
                             radius: 1
                             color: splitterMouse.pressed
-                                   ? root.accent
+                                   ? Theme.AppTheme.accent
                                    : splitterMouse.containsMouse
-                                     ? root.border
+                                     ? Theme.AppTheme.border
                                      : "transparent"
                         }
 
@@ -6048,472 +5569,347 @@ Window {
                         y: 0
                         width: parent.width - x
                         height: parent.height
-                        color: root.surface3
-                        border.color: root.borderSoft
+                        color: Theme.AppTheme.surface3
+                        border.color: Theme.AppTheme.borderSoft
                         border.width: 1
 
                         ColumnLayout {
                             anchors.fill: parent
                             spacing: 0
 
-                            Rectangle {
-                                Layout.fillWidth: true
-                                Layout.preferredHeight: root.currentViewMode === "Details" ? 40 : 0
-                                visible: root.currentViewMode === "Details"
-                                color: darkTheme ? "#171d27" : "#f6f7f9"
-                                border.color: root.borderSoft
-                                border.width: 1
-
-                                Item {
-                                    anchors.fill: parent
-                                    anchors.leftMargin: 10
-                                    anchors.rightMargin: 10
-
-                                    Rectangle {
-                                        id: nameHeader
-                                        x: 0
-                                        y: 0
-                                        width: root.detailsNameWidth
-                                        height: parent.height
-                                        color: nameHeaderMouse.pressed
-                                               ? (darkTheme ? "#3a475d" : "#cadbf8")
-                                               : nameHeaderMouse.containsMouse
-                                                 ? (darkTheme ? "#2a3444" : "#e6eefb")
-                                                 : "transparent"
-                                        border.color: nameHeaderMouse.pressed
-                                                      ? (darkTheme ? "#4a5a72" : "#b7caf0")
-                                                      : "transparent"
-                                        border.width: nameHeaderMouse.pressed ? 1 : 0
-
-                                        Row {
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 16
-                                            spacing: 6
-
-                                            Text {
-                                                text: "Name"
-                                                color: root.text
-                                                font.pixelSize: 12
-                                                font.bold: true
-                                            }
-
-                                            AppIcon {
-                                                visible: root.sortColumn === 0
-                                                name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
-                                                darkTheme: root.darkTheme
-                                                iconSize: 12
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: nameHeaderMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: root.sortFiles(0)
-                                        }
-
-                                        Rectangle {
-                                            anchors.right: parent.right
-                                            anchors.top: parent.top
-                                            anchors.bottom: parent.bottom
-                                            width: 8
-                                            color: resizeNameMouse.pressed ? root.accent : resizeNameMouse.containsMouse ? root.hover : "transparent"
-
-                                            MouseArea {
-                                                id: resizeNameMouse
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.SizeHorCursor
-
-                                                property real pressSceneX: 0
-                                                property int startWidth: 0
-
-                                                onPressed: function(mouse) {
-                                                    var p = resizeNameMouse.mapToItem(contentPane, mouse.x, mouse.y)
-                                                    pressSceneX = p.x
-                                                    startWidth = root.detailsNameWidth
-                                                }
-
-                                                onPositionChanged: function(mouse) {
-                                                    if (!pressed)
-                                                        return
-
-                                                    var p = resizeNameMouse.mapToItem(contentPane, mouse.x, mouse.y)
-                                                    var dx = p.x - pressSceneX
-                                                    root.detailsNameWidth = Math.max(180, startWidth + dx)
-
-                                                    if (fileViewLoader.item && fileViewLoader.item.relayout)
-                                                        fileViewLoader.item.relayout()
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        id: dateHeader
-                                        x: root.detailsNameWidth
-                                        y: 0
-                                        width: root.detailsDateWidth
-                                        height: parent.height
-                                        color: dateHeaderMouse.pressed
-                                               ? (darkTheme ? "#3a475d" : "#cadbf8")
-                                               : dateHeaderMouse.containsMouse
-                                                 ? (darkTheme ? "#2a3444" : "#e6eefb")
-                                                 : "transparent"
-                                        border.color: dateHeaderMouse.pressed
-                                                      ? (darkTheme ? "#4a5a72" : "#b7caf0")
-                                                      : "transparent"
-                                        border.width: dateHeaderMouse.pressed ? 1 : 0
-
-                                        Row {
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 16
-                                            spacing: 6
-
-                                            Text {
-                                                text: "Date modified"
-                                                color: root.text
-                                                font.pixelSize: 12
-                                                font.bold: true
-                                            }
-
-                                            AppIcon {
-                                                visible: root.sortColumn === 1
-                                                name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
-                                                darkTheme: root.darkTheme
-                                                iconSize: 12
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: dateHeaderMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: root.sortFiles(1)
-                                        }
-
-                                        Rectangle {
-                                            anchors.right: parent.right
-                                            anchors.top: parent.top
-                                            anchors.bottom: parent.bottom
-                                            width: 8
-                                            color: resizeDateMouse.pressed ? root.accent : resizeDateMouse.containsMouse ? root.hover : "transparent"
-
-                                            MouseArea {
-                                                id: resizeDateMouse
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.SizeHorCursor
-
-                                                property real pressSceneX: 0
-                                                property int startWidth: 0
-
-                                                onPressed: function(mouse) {
-                                                    var p = resizeDateMouse.mapToItem(contentPane, mouse.x, mouse.y)
-                                                    pressSceneX = p.x
-                                                    startWidth = root.detailsDateWidth
-                                                }
-
-                                                onPositionChanged: function(mouse) {
-                                                    if (!pressed)
-                                                        return
-
-                                                    var p = resizeDateMouse.mapToItem(contentPane, mouse.x, mouse.y)
-                                                    var dx = p.x - pressSceneX
-                                                    root.detailsDateWidth = Math.max(160, startWidth + dx)
-
-                                                    if (fileViewLoader.item && fileViewLoader.item.relayout)
-                                                        fileViewLoader.item.relayout()
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        id: typeHeader
-                                        x: root.detailsNameWidth + root.detailsDateWidth
-                                        y: 0
-                                        width: root.detailsTypeWidth
-                                        height: parent.height
-                                        color: typeHeaderMouse.pressed
-                                               ? (darkTheme ? "#3a475d" : "#cadbf8")
-                                               : typeHeaderMouse.containsMouse
-                                                 ? (darkTheme ? "#2a3444" : "#e6eefb")
-                                                 : "transparent"
-                                        border.color: typeHeaderMouse.pressed
-                                                      ? (darkTheme ? "#4a5a72" : "#b7caf0")
-                                                      : "transparent"
-                                        border.width: typeHeaderMouse.pressed ? 1 : 0
-
-                                        Row {
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 16
-                                            spacing: 6
-
-                                            Text {
-                                                text: "Type"
-                                                color: root.text
-                                                font.pixelSize: 12
-                                                font.bold: true
-                                            }
-
-                                            AppIcon {
-                                                visible: root.sortColumn === 2
-                                                name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
-                                                darkTheme: root.darkTheme
-                                                iconSize: 12
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: typeHeaderMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: root.sortFiles(2)
-                                        }
-
-                                        Rectangle {
-                                            anchors.right: parent.right
-                                            anchors.top: parent.top
-                                            anchors.bottom: parent.bottom
-                                            width: 8
-                                            color: resizeTypeMouse.pressed ? root.accent : resizeTypeMouse.containsMouse ? root.hover : "transparent"
-
-                                            MouseArea {
-                                                id: resizeTypeMouse
-                                                anchors.fill: parent
-                                                hoverEnabled: true
-                                                cursorShape: Qt.SizeHorCursor
-
-                                                property real pressSceneX: 0
-                                                property int startWidth: 0
-
-                                                onPressed: function(mouse) {
-                                                    var p = resizeTypeMouse.mapToItem(contentPane, mouse.x, mouse.y)
-                                                    pressSceneX = p.x
-                                                    startWidth = root.detailsTypeWidth
-                                                }
-
-                                                onPositionChanged: function(mouse) {
-                                                    if (!pressed)
-                                                        return
-
-                                                    var p = resizeTypeMouse.mapToItem(contentPane, mouse.x, mouse.y)
-                                                    var dx = p.x - pressSceneX
-                                                    root.detailsTypeWidth = Math.max(140, startWidth + dx)
-
-                                                    if (fileViewLoader.item && fileViewLoader.item.relayout)
-                                                        fileViewLoader.item.relayout()
-                                                }
-                                            }
-                                        }
-                                    }
-
-                                    Rectangle {
-                                        id: sizeHeader
-                                        x: root.detailsNameWidth + root.detailsDateWidth + root.detailsTypeWidth
-                                        y: 0
-                                        width: parent.width - x
-                                        height: parent.height
-                                        color: sizeHeaderMouse.pressed
-                                               ? (darkTheme ? "#3a475d" : "#cadbf8")
-                                               : sizeHeaderMouse.containsMouse
-                                                 ? (darkTheme ? "#2a3444" : "#e6eefb")
-                                                 : "transparent"
-                                        border.color: sizeHeaderMouse.pressed
-                                                      ? (darkTheme ? "#4a5a72" : "#b7caf0")
-                                                      : "transparent"
-                                        border.width: sizeHeaderMouse.pressed ? 1 : 0
-
-                                        Row {
-                                            anchors.verticalCenter: parent.verticalCenter
-                                            anchors.left: parent.left
-                                            anchors.leftMargin: 16
-                                            spacing: 6
-
-                                            Text {
-                                                text: "Size"
-                                                color: root.text
-                                                font.pixelSize: 12
-                                                font.bold: true
-                                            }
-
-                                            AppIcon {
-                                                visible: root.sortColumn === 3
-                                                name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
-                                                darkTheme: root.darkTheme
-                                                iconSize: 12
-                                            }
-                                        }
-
-                                        MouseArea {
-                                            id: sizeHeaderMouse
-                                            anchors.fill: parent
-                                            hoverEnabled: true
-                                            onClicked: root.sortFiles(3)
-                                        }
-                                    }
-                                }
-                            }
-
                             RowLayout {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 spacing: 0
 
-                                Item {
+                                ColumnLayout {
                                     Layout.fillWidth: true
                                     Layout.fillHeight: true
+                                    Layout.minimumWidth: 0
+                                    spacing: 0
 
-                                    ColumnLayout {
-                                        anchors.fill: parent
-                                        spacing: 0
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.preferredHeight: root.currentViewMode === "Details" ? 40 : 0
+                                        visible: root.currentViewMode === "Details"
+                                        color: Theme.AppTheme.isDark ? "#171d27" : "#f6f7f9"
+                                        border.color: Theme.AppTheme.borderSoft
+                                        border.width: 1
 
-                                        Rectangle {
-                                            Layout.fillWidth: true
-                                            Layout.fillHeight: true
-                                            color: "transparent"
+                                        Item {
+                                            anchors.fill: parent
+                                            anchors.leftMargin: 10
+                                            anchors.rightMargin: 10
 
-                                            Loader {
-                                                id: fileViewLoader
-                                                anchors.fill: parent
-                                                sourceComponent: {
-                                                    if (root.currentViewMode === "Details")
-                                                        return detailsViewComponent
-                                                    if (root.currentViewMode === "Tiles")
-                                                        return tilesViewComponent
-                                                    if (root.currentViewMode === "Compact")
-                                                        return compactViewComponent
-                                                    if (root.currentViewMode === "Large icons")
-                                                        return largeIconsViewComponent
-                                                    return detailsViewComponent
+                                            Rectangle {
+                                                id: nameHeader
+                                                x: 0
+                                                y: 0
+                                                width: root.detailsNameWidth
+                                                height: parent.height
+                                                color: nameHeaderMouse.pressed
+                                                       ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
+                                                       : nameHeaderMouse.containsMouse
+                                                         ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
+                                                         : "transparent"
+                                                border.color: nameHeaderMouse.pressed
+                                                              ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
+                                                              : "transparent"
+                                                border.width: nameHeaderMouse.pressed ? 1 : 0
+
+                                                Row {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.left: parent.left
+                                                    anchors.leftMargin: 16
+                                                    spacing: 6
+
+                                                    Text {
+                                                        text: "Name"
+                                                        color: Theme.AppTheme.text
+                                                        font.pixelSize: 12
+                                                        font.bold: true
+                                                    }
+
+                                                    AppIcon {
+                                                        visible: root.sortColumn === 0
+                                                        name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
+                                                        darkTheme: Theme.AppTheme.isDark
+                                                        iconSize: 12
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: nameHeaderMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    onClicked: root.sortFiles(0)
+                                                }
+
+                                                Rectangle {
+                                                    anchors.right: parent.right
+                                                    anchors.top: parent.top
+                                                    anchors.bottom: parent.bottom
+                                                    width: 8
+                                                    color: resizeNameMouse.pressed ? Theme.AppTheme.accent : resizeNameMouse.containsMouse ? Theme.AppTheme.hover : "transparent"
+
+                                                    MouseArea {
+                                                        id: resizeNameMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.SizeHorCursor
+
+                                                        property real pressSceneX: 0
+                                                        property int startWidth: 0
+
+                                                        onPressed: function(mouse) {
+                                                            var p = resizeNameMouse.mapToItem(contentPane, mouse.x, mouse.y)
+                                                            pressSceneX = p.x
+                                                            startWidth = root.detailsNameWidth
+                                                        }
+
+                                                        onPositionChanged: function(mouse) {
+                                                            if (!pressed)
+                                                                return
+
+                                                            var p = resizeNameMouse.mapToItem(contentPane, mouse.x, mouse.y)
+                                                            var dx = p.x - pressSceneX
+                                                            root.detailsNameWidth = Math.max(180, startWidth + dx)
+
+                                                            if (fileViewLoader.item && fileViewLoader.item.relayout)
+                                                                fileViewLoader.item.relayout()
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                id: dateHeader
+                                                x: root.detailsNameWidth
+                                                y: 0
+                                                width: root.detailsDateWidth
+                                                height: parent.height
+                                                color: dateHeaderMouse.pressed
+                                                       ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
+                                                       : dateHeaderMouse.containsMouse
+                                                         ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
+                                                         : "transparent"
+                                                border.color: dateHeaderMouse.pressed
+                                                              ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
+                                                              : "transparent"
+                                                border.width: dateHeaderMouse.pressed ? 1 : 0
+
+                                                Row {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.left: parent.left
+                                                    anchors.leftMargin: 16
+                                                    spacing: 6
+
+                                                    Text {
+                                                        text: "Date modified"
+                                                        color: Theme.AppTheme.text
+                                                        font.pixelSize: 12
+                                                        font.bold: true
+                                                    }
+
+                                                    AppIcon {
+                                                        visible: root.sortColumn === 1
+                                                        name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
+                                                        darkTheme: Theme.AppTheme.isDark
+                                                        iconSize: 12
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: dateHeaderMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    onClicked: root.sortFiles(1)
+                                                }
+
+                                                Rectangle {
+                                                    anchors.right: parent.right
+                                                    anchors.top: parent.top
+                                                    anchors.bottom: parent.bottom
+                                                    width: 8
+                                                    color: resizeDateMouse.pressed ? Theme.AppTheme.accent : resizeDateMouse.containsMouse ? Theme.AppTheme.hover : "transparent"
+
+                                                    MouseArea {
+                                                        id: resizeDateMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.SizeHorCursor
+
+                                                        property real pressSceneX: 0
+                                                        property int startWidth: 0
+
+                                                        onPressed: function(mouse) {
+                                                            var p = resizeDateMouse.mapToItem(contentPane, mouse.x, mouse.y)
+                                                            pressSceneX = p.x
+                                                            startWidth = root.detailsDateWidth
+                                                        }
+
+                                                        onPositionChanged: function(mouse) {
+                                                            if (!pressed)
+                                                                return
+
+                                                            var p = resizeDateMouse.mapToItem(contentPane, mouse.x, mouse.y)
+                                                            var dx = p.x - pressSceneX
+                                                            root.detailsDateWidth = Math.max(160, startWidth + dx)
+
+                                                            if (fileViewLoader.item && fileViewLoader.item.relayout)
+                                                                fileViewLoader.item.relayout()
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                id: typeHeader
+                                                x: root.detailsNameWidth + root.detailsDateWidth
+                                                y: 0
+                                                width: root.detailsTypeWidth
+                                                height: parent.height
+                                                color: typeHeaderMouse.pressed
+                                                       ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
+                                                       : typeHeaderMouse.containsMouse
+                                                         ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
+                                                         : "transparent"
+                                                border.color: typeHeaderMouse.pressed
+                                                              ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
+                                                              : "transparent"
+                                                border.width: typeHeaderMouse.pressed ? 1 : 0
+
+                                                Row {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.left: parent.left
+                                                    anchors.leftMargin: 16
+                                                    spacing: 6
+
+                                                    Text {
+                                                        text: "Type"
+                                                        color: Theme.AppTheme.text
+                                                        font.pixelSize: 12
+                                                        font.bold: true
+                                                    }
+
+                                                    AppIcon {
+                                                        visible: root.sortColumn === 2
+                                                        name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
+                                                        darkTheme: Theme.AppTheme.isDark
+                                                        iconSize: 12
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: typeHeaderMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    onClicked: root.sortFiles(2)
+                                                }
+
+                                                Rectangle {
+                                                    anchors.right: parent.right
+                                                    anchors.top: parent.top
+                                                    anchors.bottom: parent.bottom
+                                                    width: 8
+                                                    color: resizeTypeMouse.pressed ? Theme.AppTheme.accent : resizeTypeMouse.containsMouse ? Theme.AppTheme.hover : "transparent"
+
+                                                    MouseArea {
+                                                        id: resizeTypeMouse
+                                                        anchors.fill: parent
+                                                        hoverEnabled: true
+                                                        cursorShape: Qt.SizeHorCursor
+
+                                                        property real pressSceneX: 0
+                                                        property int startWidth: 0
+
+                                                        onPressed: function(mouse) {
+                                                            var p = resizeTypeMouse.mapToItem(contentPane, mouse.x, mouse.y)
+                                                            pressSceneX = p.x
+                                                            startWidth = root.detailsTypeWidth
+                                                        }
+
+                                                        onPositionChanged: function(mouse) {
+                                                            if (!pressed)
+                                                                return
+
+                                                            var p = resizeTypeMouse.mapToItem(contentPane, mouse.x, mouse.y)
+                                                            var dx = p.x - pressSceneX
+                                                            root.detailsTypeWidth = Math.max(140, startWidth + dx)
+
+                                                            if (fileViewLoader.item && fileViewLoader.item.relayout)
+                                                                fileViewLoader.item.relayout()
+                                                        }
+                                                    }
+                                                }
+                                            }
+
+                                            Rectangle {
+                                                id: sizeHeader
+                                                x: root.detailsNameWidth + root.detailsDateWidth + root.detailsTypeWidth
+                                                y: 0
+                                                width: parent.width - x
+                                                height: parent.height
+                                                color: sizeHeaderMouse.pressed
+                                                       ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
+                                                       : sizeHeaderMouse.containsMouse
+                                                         ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
+                                                         : "transparent"
+                                                border.color: sizeHeaderMouse.pressed
+                                                              ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
+                                                              : "transparent"
+                                                border.width: sizeHeaderMouse.pressed ? 1 : 0
+
+                                                Row {
+                                                    anchors.verticalCenter: parent.verticalCenter
+                                                    anchors.left: parent.left
+                                                    anchors.leftMargin: 16
+                                                    spacing: 6
+
+                                                    Text {
+                                                        text: "Size"
+                                                        color: Theme.AppTheme.text
+                                                        font.pixelSize: 12
+                                                        font.bold: true
+                                                    }
+
+                                                    AppIcon {
+                                                        visible: root.sortColumn === 3
+                                                        name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
+                                                        darkTheme: Theme.AppTheme.isDark
+                                                        iconSize: 12
+                                                    }
+                                                }
+
+                                                MouseArea {
+                                                    id: sizeHeaderMouse
+                                                    anchors.fill: parent
+                                                    hoverEnabled: true
+                                                    onClicked: root.sortFiles(3)
                                                 }
                                             }
                                         }
+                                    }
 
-                                        Rectangle {
-                                            Layout.fillWidth: true
-                                            Layout.preferredHeight: 30
-                                            color: darkTheme ? "#141920" : "#f6f7f9"
-                                            border.color: root.borderSoft
-                                            border.width: 1
+                                    Rectangle {
+                                        Layout.fillWidth: true
+                                        Layout.fillHeight: true
+                                        Layout.minimumWidth: 0
+                                        color: "transparent"
 
-                                            RowLayout {
-                                                anchors.fill: parent
-                                                anchors.leftMargin: 12
-                                                anchors.rightMargin: 12
-
-                                                Text {
-                                                    text: root.selectedFileCount() > 0
-                                                          ? (filesModel.rowCount + " items   " + root.selectedFileCount() + " selected")
-                                                          : (filesModel.rowCount + " items")
-                                                    color: root.muted
-                                                    font.pixelSize: 11
-                                                }
-
-                                                Item { Layout.fillWidth: true }
-
-                                                Rectangle {
-                                                    id: bottomViewButton
-                                                    width: 24
-                                                    height: 24
-                                                    radius: 7
-                                                    color: bottomViewMouse.pressed
-                                                        ? root.pressed
-                                                        : bottomViewMouse.containsMouse
-                                                            ? root.hover
-                                                            : (darkTheme ? "#1a1f27" : "#ffffff")
-                                                    border.color: bottomViewMouse.containsMouse || bottomViewMouse.pressed
-                                                                ? root.border
-                                                                : root.borderSoft
-                                                    border.width: 1
-
-                                                    AppIcon {
-                                                        anchors.centerIn: parent
-                                                        name: root.currentViewMode === "Large icons"
-                                                              ? "grid-view"
-                                                              : root.currentViewMode === "Tiles"
-                                                                ? "tile-view"
-                                                                : root.currentViewMode === "Details"
-                                                                  ? "detailed-view"
-                                                                  : "list-view"
-                                                        darkTheme: root.darkTheme
-                                                        iconSize: 13
-                                                        iconOpacity: 0.75
-                                                    }
-
-                                                    MouseArea {
-                                                        id: bottomViewMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-                                                        onClicked: viewModeMenu.popup()
-
-                                                        onPressed: function(mouse) {
-                                                            if (mouse.button === Qt.RightButton)
-                                                                viewModeMenu.popup()
-                                                        }
-                                                    }
-                                                }
-
-                                                Rectangle {
-                                                    id: notificationsButton
-                                                    width: 24
-                                                    height: 24
-                                                    radius: 7
-                                                    color: notificationsMouse.pressed
-                                                        ? root.pressed
-                                                        : notificationsMouse.containsMouse
-                                                            ? root.hover
-                                                            : (darkTheme ? "#1a1f27" : "#ffffff")
-                                                    border.color: notificationsMouse.containsMouse || notificationsMouse.pressed
-                                                                ? root.border
-                                                                : root.borderSoft
-                                                    border.width: 1
-
-                                                    AppIcon {
-                                                        anchors.centerIn: parent
-                                                        name: "notifications"
-                                                        darkTheme: root.darkTheme
-                                                        iconSize: 13
-                                                        iconOpacity: 0.8
-                                                    }
-
-                                                    Rectangle {
-                                                        visible: notificationsModel.count > 0
-                                                        width: 8
-                                                        height: 8
-                                                        radius: 4
-                                                        anchors.top: parent.top
-                                                        anchors.right: parent.right
-                                                        anchors.topMargin: 2
-                                                        anchors.rightMargin: 2
-                                                        color: root.accent
-                                                        z: 2
-                                                    }
-
-                                                    MouseArea {
-                                                        id: notificationsMouse
-                                                        anchors.fill: parent
-                                                        hoverEnabled: true
-                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-
-                                                        onClicked: {
-                                                            var p = notificationsButton.mapToItem(
-                                                                root.contentItem,
-                                                                notificationsButton.width - notificationsPopup.width,
-                                                                -notificationsPopup.height - 8
-                                                            )
-                                                            notificationsPopup.x = p.x
-                                                            notificationsPopup.y = p.y
-                                                            notificationsPopup.open()
-                                                        }
-                                                    }
-                                                }
+                                        Loader {
+                                            id: fileViewLoader
+                                            anchors.fill: parent
+                                            sourceComponent: {
+                                                if (root.currentViewMode === "Details")
+                                                    return detailsViewComponent
+                                                if (root.currentViewMode === "Tiles")
+                                                    return tilesViewComponent
+                                                if (root.currentViewMode === "Compact")
+                                                    return compactViewComponent
+                                                if (root.currentViewMode === "Large icons")
+                                                    return largeIconsViewComponent
+                                                return detailsViewComponent
                                             }
                                         }
                                     }
@@ -6527,9 +5923,9 @@ Window {
                                     Layout.maximumWidth: root.previewEnabled ? 8 : 0
                                     Layout.fillHeight: true
                                     color: previewResizeMouse.pressed
-                                           ? (darkTheme ? "#2a3342" : "#d7dfeb")
+                                           ? (Theme.AppTheme.isDark ? "#2a3342" : "#d7dfeb")
                                            : previewResizeMouse.containsMouse
-                                             ? (darkTheme ? "#212938" : "#e3e9f2")
+                                             ? (Theme.AppTheme.isDark ? "#212938" : "#e3e9f2")
                                              : "transparent"
 
                                     Rectangle {
@@ -6538,9 +5934,9 @@ Window {
                                         height: parent.height
                                         radius: 1
                                         color: previewResizeMouse.pressed
-                                               ? root.accent
+                                               ? Theme.AppTheme.accent
                                                : previewResizeMouse.containsMouse
-                                                 ? root.border
+                                                 ? Theme.AppTheme.border
                                                  : "transparent"
                                     }
 
@@ -6586,8 +5982,8 @@ Window {
                                     Layout.minimumWidth: root.previewEnabled ? root.previewPaneWidth : 0
                                     Layout.maximumWidth: root.previewEnabled ? root.previewPaneWidth : 0
                                     Layout.fillHeight: true
-                                    color: darkTheme ? "#141920" : "#fbfcfd"
-                                    border.color: root.borderSoft
+                                    color: Theme.AppTheme.isDark ? "#141920" : "#fbfcfd"
+                                    border.color: Theme.AppTheme.borderSoft
                                     border.width: 1
 
                                     Flickable {
@@ -6601,7 +5997,7 @@ Window {
                                         contentWidth: width
                                         contentHeight: previewColumn.implicitHeight
 
-                                        ScrollBar.vertical: ExplorerScrollbarV { darkTheme: root.darkTheme }
+                                        ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
 
                                         Column {
                                             id: previewColumn
@@ -6610,7 +6006,7 @@ Window {
 
                                             Text {
                                                 text: "Preview"
-                                                color: root.text
+                                                color: Theme.AppTheme.text
                                                 font.pixelSize: 13
                                                 font.bold: true
                                             }
@@ -6619,8 +6015,8 @@ Window {
                                                 width: parent.width
                                                 height: 180
                                                 radius: 12
-                                                color: darkTheme ? "#1b2230" : "#f4f7fb"
-                                                border.color: root.borderSoft
+                                                color: Theme.AppTheme.isDark ? "#1b2230" : "#f4f7fb"
+                                                border.color: Theme.AppTheme.borderSoft
                                                 border.width: 1
 
                                                 Column {
@@ -6631,14 +6027,14 @@ Window {
                                                     AppIcon {
                                                         anchors.horizontalCenter: parent.horizontalCenter
                                                         name: "preview"
-                                                        darkTheme: root.darkTheme
+                                                        darkTheme: Theme.AppTheme.isDark
                                                         iconSize: 42
                                                         iconOpacity: 0.55
                                                     }
 
                                                     Text {
                                                         text: "Select an item to preview"
-                                                        color: root.muted
+                                                        color: Theme.AppTheme.muted
                                                         font.pixelSize: 12
                                                     }
                                                 }
@@ -6651,7 +6047,7 @@ Window {
                                                     AppIcon {
                                                         anchors.horizontalCenter: parent.horizontalCenter
                                                         name: root.previewData.icon || "insert-drive-file"
-                                                        darkTheme: root.darkTheme
+                                                        darkTheme: Theme.AppTheme.isDark
                                                         iconSize: 52
                                                     }
 
@@ -6674,7 +6070,7 @@ Window {
                                                                           : root.previewData.previewType === "folder"
                                                                             ? "Mock folder preview"
                                                                             : "Mock file preview"
-                                                        color: root.text
+                                                        color: Theme.AppTheme.text
                                                         font.pixelSize: 13
                                                         font.bold: true
                                                     }
@@ -6682,7 +6078,7 @@ Window {
                                                     Text {
                                                         anchors.horizontalCenter: parent.horizontalCenter
                                                         text: "Backend-driven placeholder"
-                                                        color: root.muted
+                                                        color: Theme.AppTheme.muted
                                                         font.pixelSize: 11
                                                     }
                                                 }
@@ -6692,7 +6088,7 @@ Window {
                                                 visible: root.previewData.visible
                                                 width: parent.width
                                                 text: root.previewData.name || ""
-                                                color: root.text
+                                                color: Theme.AppTheme.text
                                                 font.pixelSize: 14
                                                 font.bold: true
                                                 wrapMode: Text.Wrap
@@ -6702,7 +6098,7 @@ Window {
                                                 visible: root.previewData.visible
                                                 width: parent.width
                                                 text: root.previewData.type || ""
-                                                color: root.muted
+                                                color: Theme.AppTheme.muted
                                                 font.pixelSize: 12
                                                 wrapMode: Text.Wrap
                                             }
@@ -6711,7 +6107,7 @@ Window {
                                                 visible: root.previewData.visible && root.previewData.summary !== ""
                                                 width: parent.width
                                                 text: root.previewData.summary || ""
-                                                color: root.text
+                                                color: Theme.AppTheme.text
                                                 font.pixelSize: 12
                                                 wrapMode: Text.Wrap
                                             }
@@ -6720,7 +6116,7 @@ Window {
                                                 visible: root.previewData.visible
                                                 width: parent.width
                                                 height: 1
-                                                color: root.borderSoft
+                                                color: Theme.AppTheme.borderSoft
                                             }
 
                                             Column {
@@ -6730,7 +6126,7 @@ Window {
 
                                                 Text {
                                                     text: "Details"
-                                                    color: root.text
+                                                    color: Theme.AppTheme.text
                                                     font.pixelSize: 12
                                                     font.bold: true
                                                 }
@@ -6740,14 +6136,14 @@ Window {
 
                                                     Text {
                                                         text: "Modified:"
-                                                        color: root.muted
+                                                        color: Theme.AppTheme.muted
                                                         font.pixelSize: 11
                                                         font.bold: true
                                                     }
 
                                                     Text {
                                                         text: root.previewData.dateModified || "—"
-                                                        color: root.text
+                                                        color: Theme.AppTheme.text
                                                         font.pixelSize: 11
                                                     }
                                                 }
@@ -6757,14 +6153,14 @@ Window {
 
                                                     Text {
                                                         text: "Size:"
-                                                        color: root.muted
+                                                        color: Theme.AppTheme.muted
                                                         font.pixelSize: 11
                                                         font.bold: true
                                                     }
 
                                                     Text {
                                                         text: root.previewData.size || "—"
-                                                        color: root.text
+                                                        color: Theme.AppTheme.text
                                                         font.pixelSize: 11
                                                     }
                                                 }
@@ -6777,7 +6173,7 @@ Window {
 
                                                 Text {
                                                     text: "Mock content"
-                                                    color: root.text
+                                                    color: Theme.AppTheme.text
                                                     font.pixelSize: 12
                                                     font.bold: true
                                                 }
@@ -6789,11 +6185,134 @@ Window {
                                                         required property var modelData
                                                         width: previewColumn.width
                                                         text: "• " + modelData
-                                                        color: root.muted
+                                                        color: Theme.AppTheme.muted
                                                         font.pixelSize: 11
                                                         wrapMode: Text.Wrap
                                                     }
                                                 }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            Rectangle {
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 30
+                                color: Theme.AppTheme.isDark ? "#141920" : "#f6f7f9"
+                                border.color: Theme.AppTheme.borderSoft
+                                border.width: 1
+
+                                RowLayout {
+                                    anchors.fill: parent
+                                    anchors.leftMargin: 12
+                                    anchors.rightMargin: 12
+
+                                    Text {
+                                        text: root.selectedFileCount() > 0
+                                              ? (filesModel.rowCount + " items   " + root.selectedFileCount() + " selected")
+                                              : (filesModel.rowCount + " items")
+                                        color: Theme.AppTheme.muted
+                                        font.pixelSize: 11
+                                    }
+
+                                    Item { Layout.fillWidth: true }
+
+                                    Rectangle {
+                                        id: bottomViewButton
+                                        width: 24
+                                        height: 24
+                                        radius: 7
+                                        color: bottomViewMouse.pressed
+                                            ? Theme.AppTheme.pressed
+                                            : bottomViewMouse.containsMouse
+                                                ? Theme.AppTheme.hover
+                                                : (Theme.AppTheme.isDark ? "#1a1f27" : "#ffffff")
+                                        border.color: bottomViewMouse.containsMouse || bottomViewMouse.pressed
+                                                    ? Theme.AppTheme.border
+                                                    : Theme.AppTheme.borderSoft
+                                        border.width: 1
+
+                                        AppIcon {
+                                            anchors.centerIn: parent
+                                            name: root.currentViewMode === "Large icons"
+                                                  ? "grid-view"
+                                                  : root.currentViewMode === "Tiles"
+                                                    ? "tile-view"
+                                                    : root.currentViewMode === "Details"
+                                                      ? "detailed-view"
+                                                      : "list-view"
+                                            darkTheme: Theme.AppTheme.isDark
+                                            iconSize: 13
+                                            iconOpacity: 0.75
+                                        }
+
+                                        MouseArea {
+                                            id: bottomViewMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+                                            onClicked: viewModeMenu.popup()
+
+                                            onPressed: function(mouse) {
+                                                if (mouse.button === Qt.RightButton)
+                                                    viewModeMenu.popup()
+                                            }
+                                        }
+                                    }
+
+                                    Rectangle {
+                                        id: notificationsButton
+                                        width: 24
+                                        height: 24
+                                        radius: 7
+                                        color: notificationsMouse.pressed
+                                            ? Theme.AppTheme.pressed
+                                            : notificationsMouse.containsMouse
+                                                ? Theme.AppTheme.hover
+                                                : (Theme.AppTheme.isDark ? "#1a1f27" : "#ffffff")
+                                        border.color: notificationsMouse.containsMouse || notificationsMouse.pressed
+                                                    ? Theme.AppTheme.border
+                                                    : Theme.AppTheme.borderSoft
+                                        border.width: 1
+
+                                        AppIcon {
+                                            anchors.centerIn: parent
+                                            name: "notifications"
+                                            darkTheme: Theme.AppTheme.isDark
+                                            iconSize: 13
+                                            iconOpacity: 0.8
+                                        }
+
+                                        Rectangle {
+                                            visible: notificationsModel.count > 0
+                                            width: 8
+                                            height: 8
+                                            radius: 4
+                                            anchors.top: parent.top
+                                            anchors.right: parent.right
+                                            anchors.topMargin: 2
+                                            anchors.rightMargin: 2
+                                            color: Theme.AppTheme.accent
+                                            z: 2
+                                        }
+
+                                        MouseArea {
+                                            id: notificationsMouse
+                                            anchors.fill: parent
+                                            hoverEnabled: true
+                                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+
+                                            onClicked: {
+                                                var p = notificationsButton.mapToItem(
+                                                    root.contentItem,
+                                                    notificationsButton.width - notificationsPopup.width,
+                                                    -notificationsPopup.height - 8
+                                                )
+                                                notificationsPopup.x = p.x
+                                                notificationsPopup.y = p.y
+                                                notificationsPopup.open()
                                             }
                                         }
                                     }
@@ -6828,7 +6347,7 @@ Window {
                         required property var modelData
                         required property int index
 
-                        darkTheme: root.darkTheme
+                        darkTheme: Theme.AppTheme.isDark
                         notificationId: modelData.notificationId
                         title: modelData.title
                         kind: modelData.kind
@@ -6937,8 +6456,8 @@ Window {
         Rectangle {
             anchors.fill: parent
             radius: 10
-            color: darkTheme ? "#1b2230" : "#ffffff"
-            border.color: root.border
+            color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+            border.color: Theme.AppTheme.border
             border.width: 1
         }
 
@@ -6951,7 +6470,7 @@ Window {
 
             AppIcon {
                 name: root.draggedFileIcon !== "" ? root.draggedFileIcon : "insert-drive-file"
-                darkTheme: root.darkTheme
+                darkTheme: Theme.AppTheme.isDark
                 iconSize: 20
             }
 
@@ -6959,7 +6478,7 @@ Window {
                 text: root.draggedFileCount > 1
                       ? (root.draggedFileCount + " items")
                       : root.draggedFileName
-                color: root.text
+                color: Theme.AppTheme.text
                 font.pixelSize: 13
                 font.bold: true
                 elide: Text.ElideRight
@@ -6997,6 +6516,8 @@ Window {
     }
 
     Component.onCompleted: {
+        Theme.AppTheme.mode = root.themeMode
+
         applySnapshot(backend.bootstrap())
 
         if (!pathField.text || pathField.text === "")
@@ -7027,3 +6548,5 @@ Window {
         }
     }
 }
+
+
