@@ -43,7 +43,6 @@ public:
     Q_INVOKABLE QVariantMap moveItems(const QVariantList& items,
                                       const QString& targetLabel,
                                       const QString& targetKind);
-
     Q_INVOKABLE QVariantMap copyItems(const QVariantList& items);
     Q_INVOKABLE QVariantMap cutItems(const QVariantList& items);
     Q_INVOKABLE QVariantMap pasteItems();
@@ -64,7 +63,11 @@ public:
     Q_INVOKABLE QVariantMap showCurrentLocationProperties();
     Q_INVOKABLE QVariantMap openItemsWith(const QVariantList& items, const QString& appName);
     Q_INVOKABLE QVariantMap chooseOpenWithApp(const QVariantList& items);
-    Q_INVOKABLE QVariantMap copyItemPaths(const QVariantList& items);
+    Q_INVOKABLE QVariantMap copyItemPaths(const QVariantList& items,
+                                          bool relativeToCurrentDir = false,
+                                          bool recursive = false);
+    Q_INVOKABLE QVariantMap copySidebarPath(const QString& label, const QString& kind);
+    Q_INVOKABLE QVariantMap copyBreadcrumbPath(int index);
     Q_INVOKABLE QVariantMap openItemsInTerminal(const QVariantList& items);
     Q_INVOKABLE QVariantMap search(const QString& query, const QString& scope);
     Q_INVOKABLE QVariantMap setSearchScope(const QString& scope);
@@ -86,6 +89,13 @@ public:
     Q_INVOKABLE QString sanitizeFileOrFolderName(const QString& name) const;
     Q_INVOKABLE QVariantMap previewItemByRow(int row);
     Q_INVOKABLE QVariantMap clearPreview();
+    Q_INVOKABLE QVariantMap pinSidebarLocation(const QString& label, const QString& kind);
+    Q_INVOKABLE QVariantMap showSidebarLocationProperties(const QString& label, const QString& kind);
+    Q_INVOKABLE QVariantMap openSidebarLocationInNewTab(const QString &label,
+                                                        const QString &icon,
+                                                        const QString &kind);
+    Q_INVOKABLE QVariantMap setPreviewEnabled(bool enabled);
+    Q_INVOKABLE QVariantMap setShowHiddenFiles(bool enabled);
 
 private:
     QVariantMap makeSnapshot(const QString& message = QString(),
@@ -97,6 +107,16 @@ private:
     bool isValidFileName(const QString& name, QString* error = nullptr) const;
     bool isValidPathText(const QString& pathText, QString* error = nullptr) const;
     QVariantMap buildMockPreviewForItem(const QVariantMap& item) const;
+    QString normalizedClipboardPath(const QString& path) const;
+    QString currentDirectoryPath() const;
+    QString pathFromParts(const QVariantList& parts, int endIndexInclusive = -1) const;
+    QString absolutePathForItem(const QVariantMap& item) const;
+    QString relativePathFromCurrentDirectory(const QString& absolutePath) const;
+    QString sidebarPathForLabel(const QString& label, const QString& kind) const;
+    QStringList collectedPathsForAbsolutePath(const QString& absolutePath,
+                                              bool relativeToCurrentDir,
+                                              bool recursive) const;
+    void copyTextToClipboard(const QString& text) const;
 
 private:
     FileManagerSessionService* m_sessionService;
@@ -104,4 +124,7 @@ private:
     FileManagerFileOpsService* m_fileOpsService;
     FileManagerSearchService* m_searchService;
     FileManagerSidebarService* m_sidebarService;
+    bool m_previewEnabled = true;
+    bool m_showHiddenFiles = false;
+    int m_currentFileRow = 0;
 };

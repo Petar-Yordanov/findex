@@ -49,6 +49,7 @@ Window {
     property var tabAutoScrollTimerRef: tabAutoScrollTimer
 
     property bool tabDragActive: false
+    property bool tabPressActive: false
 
     property int currentTab: 1
     property int currentFileRow: 0
@@ -84,6 +85,7 @@ Window {
     ListModel {
         id: notificationsModel
     }
+    property int contextBreadcrumbIndex: -1
 
     property int tabWidth: 210
     property int tabSpacing: 6
@@ -105,11 +107,13 @@ Window {
     property string navDropHoverLabel: ""
     property string navDropHoverKind: ""
     property int breadcrumbDropHoverIndex: -1
+    property bool showHiddenFiles: false
 
     property int detailsRowHeight: 34
 
     property var selectedFileRows: ({})
     property int selectionAnchorRow: -1
+    property real draggedTabStartContentX: 0
 
     property bool detailsSelectionActive: false
     property bool detailsSelectionMoved: false
@@ -151,6 +155,34 @@ Window {
     onPreviewPaneWidthChanged: {
         if (root.previewEnabled && root.previewPaneWidth >= root.previewPaneMinWidth)
             root.previewPaneLastExpandedWidth = root.previewPaneWidth
+    }
+
+    function copyPathsForItems(items, relativeToCurrentDir, recursive) {
+        applySnapshot(backend.copyItemPaths(items,
+                                            relativeToCurrentDir === true,
+                                            recursive === true))
+    }
+
+    function copySelectedOrCurrentPaths(relativeToCurrentDir, recursive) {
+        var items = []
+
+        if (root.selectedFileCount() > 0)
+            items = root.selectedItemsForBackend()
+        else if (root.currentFileRow >= 0)
+            items = root.singleItemForBackend(root.currentFileRow)
+
+        root.copyPathsForItems(items, relativeToCurrentDir, recursive)
+    }
+
+    function copySidebarContextPath() {
+        if (root.contextSidebarLabel !== "")
+            applySnapshot(backend.copySidebarPath(root.contextSidebarLabel,
+                                                  root.contextSidebarKind))
+    }
+
+    function copyBreadcrumbPathAt(index) {
+        if (index >= 0)
+            applySnapshot(backend.copyBreadcrumbPath(index))
     }
 
     function replaceListModel(model, rows) {
@@ -196,13 +228,41 @@ Window {
     }
 
     function togglePreviewEnabled() {
-        if (root.previewEnabled && root.previewPaneWidth >= root.previewPaneMinWidth)
-            root.previewPaneLastExpandedWidth = root.previewPaneWidth
+        applySnapshot(backend.setPreviewEnabled(!root.previewEnabled))
+    }
 
-        root.previewEnabled = !root.previewEnabled
+    function openSidebarContextInNewTab() {
+        if (root.contextSidebarLabel === "")
+            return
 
-        if (root.previewEnabled)
-            root.previewPaneWidth = Math.max(root.previewPaneMinWidth, root.previewPaneLastExpandedWidth)
+        applySnapshot(
+            backend.openSidebarLocationInNewTab(
+                root.contextSidebarLabel,
+                root.contextSidebarIcon,
+                root.contextSidebarKind || ""
+            )
+        )
+
+        Qt.callLater(function() {
+            root.ensureTabVisible(root.currentTab)
+        })
+    }
+
+    function addTab(titleText) {
+        applySnapshot(backend.addTab(titleText))
+        Qt.callLater(function() {
+            ensureTabVisible(currentTab)
+        })
+    }
+
+    function activateTabLocal(index) {
+        if (index < 0 || index >= tabsModel.count)
+            return
+
+        currentTab = index
+
+        if (backend && backend.activateTab)
+            applySnapshot(backend.activateTab(index))
     }
 
     function emptyPreviewData() {
@@ -442,6 +502,27 @@ Window {
 
         if (snapshot.pathText !== undefined && pathField)
             pathField.text = snapshot.pathText
+
+        if (snapshot.previewEnabled !== undefined) {
+            var nextPreviewEnabled = !!snapshot.previewEnabled
+
+            if (root.previewEnabled && !nextPreviewEnabled
+                    && root.previewPaneWidth >= root.previewPaneMinWidth) {
+                root.previewPaneLastExpandedWidth = root.previewPaneWidth
+            }
+
+            root.previewEnabled = nextPreviewEnabled
+
+            if (root.previewEnabled) {
+                root.previewPaneWidth = Math.max(
+                    root.previewPaneMinWidth,
+                    root.previewPaneLastExpandedWidth
+                )
+            }
+        }
+
+        if (snapshot.showHiddenFiles !== undefined)
+            root.showHiddenFiles = !!snapshot.showHiddenFiles
 
         if (snapshot.preview !== undefined)
             root.showPreviewData(snapshot.preview)
@@ -1112,29 +1193,82 @@ Window {
             pathField.text = parts.join("/")
     }
 
-    function addTab(titleText) {
-        applySnapshot(backend.addTab(titleText), { preserveTabsOrder: true })
-        Qt.callLater(function() {
-            ensureTabVisible(currentTab)
-        })
-    }
-
-    function activateTabLocal(index) {
-        if (index < 0 || index >= tabsModel.count)
-            return
-
-        currentTab = index
-
-        if (backend && backend.activateTab)
-            applySnapshot(backend.activateTab(index), { preserveTabsOrder: true })
-    }
-
     function closeTab(index) {
         applySnapshot(backend.closeTab(index))
     }
 
     function renameTab(index, newTitle) {
         applySnapshot(backend.renameTab(index, newTitle))
+    }
+
+    function selectedOrCurrentItemsForBackend() {
+        if (root.selectedFileCount() > 0)
+            return root.selectedItemsForBackend()
+
+        if (root.currentFileRow >= 0)
+            return root.singleItemForBackend(root.currentFileRow)
+
+        return []
+    }
+
+    function hasSelectedOrCurrentItems() {
+        return root.selectedOrCurrentItemsForBackend().length > 0
+    }
+
+    function cutSelectedOrCurrent() {
+        var items = root.selectedOrCurrentItemsForBackend()
+        if (items.length > 0)
+            applySnapshot(backend.cutItems(items))
+    }
+
+    function copySelectedOrCurrent() {
+        var items = root.selectedOrCurrentItemsForBackend()
+        if (items.length > 0)
+            applySnapshot(backend.copyItems(items))
+    }
+
+    function duplicateSelectedOrCurrent() {
+        var items = root.selectedOrCurrentItemsForBackend()
+        if (items.length > 0)
+            applySnapshot(backend.duplicateItems(items))
+    }
+
+    function compressSelectedOrCurrent() {
+        var items = root.selectedOrCurrentItemsForBackend()
+        if (items.length > 0)
+            applySnapshot(backend.compressItems(items))
+    }
+
+    function extractSelectedOrCurrent() {
+        var items = root.selectedOrCurrentItemsForBackend()
+        if (items.length > 0)
+            applySnapshot(backend.extractItems(items))
+    }
+
+    function openSelectedOrCurrentWith(appName) {
+        var items = root.selectedOrCurrentItemsForBackend()
+        if (items.length > 0)
+            applySnapshot(backend.openItemsWith(items, appName))
+    }
+
+    function chooseOpenWithForSelectedOrCurrent() {
+        var items = root.selectedOrCurrentItemsForBackend()
+        if (items.length > 0)
+            applySnapshot(backend.chooseOpenWithApp(items))
+    }
+
+    function openSelectedOrCurrentInTerminal() {
+        var items = root.selectedOrCurrentItemsForBackend()
+        if (items.length > 0)
+            applySnapshot(backend.openItemsInTerminal(items))
+    }
+
+    function showPropertiesForSelectedOrCurrentOrLocation() {
+        var items = root.selectedOrCurrentItemsForBackend()
+        if (items.length > 0)
+            applySnapshot(backend.showItemProperties(items))
+        else
+            applySnapshot(backend.showCurrentLocationProperties())
     }
 
     function moveTab(from, to) {
@@ -1415,6 +1549,18 @@ Window {
     }
 
     StyledMenu {
+        id: breadcrumbContextMenu
+        darkTheme: root.darkTheme
+
+        StyledMenuItem {
+            text: "Copy path"
+            darkTheme: root.darkTheme
+            enabled: root.contextBreadcrumbIndex >= 0
+            onTriggered: root.copyBreadcrumbPathAt(root.contextBreadcrumbIndex)
+        }
+    }
+
+    StyledMenu {
         id: emptyAreaContextMenu
         darkTheme: root.darkTheme
 
@@ -1518,7 +1664,11 @@ Window {
             onTriggered: root.selectAllFiles()
         }
 
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Properties" }
+        StyledMenuItem {
+            darkTheme: root.darkTheme
+            text: "Properties"
+            onTriggered: applySnapshot(backend.showCurrentLocationProperties())
+        }
     }
 
     StyledMenu {
@@ -1539,7 +1689,7 @@ Window {
             enabled: root.contextTabIndex >= 0
             onTriggered: {
                 if (root.contextTabIndex >= 0)
-                    root.addTab(tabsModel.get(root.contextTabIndex).title + " Copy")
+                    applySnapshot(backend.duplicateTab(root.contextTabIndex))
             }
             darkTheme: root.darkTheme
         }
@@ -1578,9 +1728,26 @@ Window {
         id: moreActionsMenu
         darkTheme: root.darkTheme
 
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Compress" }
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Extract here" }
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Duplicate" }
+        StyledMenuItem {
+            darkTheme: root.darkTheme
+            text: "Compress"
+            enabled: root.hasSelectedOrCurrentItems()
+            onTriggered: root.compressSelectedOrCurrent()
+        }
+
+        StyledMenuItem {
+            darkTheme: root.darkTheme
+            text: "Extract here"
+            enabled: root.hasSelectedOrCurrentItems()
+            onTriggered: root.extractSelectedOrCurrent()
+        }
+
+        StyledMenuItem {
+            darkTheme: root.darkTheme
+            text: "Duplicate"
+            enabled: root.hasSelectedOrCurrentItems()
+            onTriggered: root.duplicateSelectedOrCurrent()
+        }
 
         StyledMenuSeparator {}
 
@@ -1588,14 +1755,85 @@ Window {
             title: "Open with..."
             darkTheme: root.darkTheme
 
-            StyledMenuItem { darkTheme: root.darkTheme; text: "Notepad" }
-            StyledMenuItem { darkTheme: root.darkTheme; text: "Visual Studio Code" }
-            StyledMenuItem { darkTheme: root.darkTheme; text: "Qt Creator" }
-            StyledMenuItem { darkTheme: root.darkTheme; text: "Windows Media Player" }
+            StyledMenuItem {
+                darkTheme: root.darkTheme
+                text: "Notepad"
+                enabled: root.hasSelectedOrCurrentItems()
+                onTriggered: root.openSelectedOrCurrentWith("Notepad")
+            }
+
+            StyledMenuItem {
+                darkTheme: root.darkTheme
+                text: "Visual Studio Code"
+                enabled: root.hasSelectedOrCurrentItems()
+                onTriggered: root.openSelectedOrCurrentWith("Visual Studio Code")
+            }
+
+            StyledMenuItem {
+                darkTheme: root.darkTheme
+                text: "Qt Creator"
+                enabled: root.hasSelectedOrCurrentItems()
+                onTriggered: root.openSelectedOrCurrentWith("Qt Creator")
+            }
+
+            StyledMenuItem {
+                darkTheme: root.darkTheme
+                text: "Windows Media Player"
+                enabled: root.hasSelectedOrCurrentItems()
+                onTriggered: root.openSelectedOrCurrentWith("Windows Media Player")
+            }
+
+            StyledMenuSeparator {}
+
+            StyledMenuItem {
+                darkTheme: root.darkTheme
+                text: "Choose another app..."
+                enabled: root.hasSelectedOrCurrentItems()
+                onTriggered: root.chooseOpenWithForSelectedOrCurrent()
+            }
         }
 
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Copy path" }
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Open in terminal" }
+        StyledMenu {
+            title: "Copy paths"
+            darkTheme: root.darkTheme
+
+            StyledMenuItem {
+                text: "Full path"
+                enabled: root.selectedFileCount() > 0 || root.currentFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copySelectedOrCurrentPaths(false, false)
+            }
+
+            StyledMenuItem {
+                text: "Relative path"
+                enabled: root.selectedFileCount() > 0 || root.currentFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copySelectedOrCurrentPaths(true, false)
+            }
+
+            StyledMenuSeparator {}
+
+            StyledMenuItem {
+                text: "Full paths recursively"
+                enabled: root.selectedFileCount() > 0 || root.currentFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copySelectedOrCurrentPaths(false, true)
+            }
+
+            StyledMenuItem {
+                text: "Relative paths recursively"
+                enabled: root.selectedFileCount() > 0 || root.currentFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copySelectedOrCurrentPaths(true, true)
+            }
+        }
+
+        StyledMenuItem {
+            darkTheme: root.darkTheme
+            text: "Open in terminal"
+            enabled: root.hasSelectedOrCurrentItems()
+            onTriggered: root.openSelectedOrCurrentInTerminal()
+        }
 
         StyledMenuSeparator {}
 
@@ -1605,8 +1843,17 @@ Window {
             onTriggered: root.selectAllFiles()
         }
 
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Show hidden files" }
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Properties" }
+        StyledMenuItem {
+            darkTheme: root.darkTheme
+            text: root.showHiddenFiles ? "Hide hidden files" : "Show hidden files"
+            onTriggered: applySnapshot(backend.setShowHiddenFiles(!root.showHiddenFiles))
+        }
+
+        StyledMenuItem {
+            darkTheme: root.darkTheme
+            text: "Properties"
+            onTriggered: root.showPropertiesForSelectedOrCurrentOrLocation()
+        }
     }
 
     Dialog {
@@ -1971,14 +2218,36 @@ Window {
         StyledMenuItem {
             text: "Open in new tab"
             enabled: root.contextSidebarLabel !== ""
-            onTriggered: root.addTab(root.contextSidebarLabel)
+            onTriggered: root.openSidebarContextInNewTab()
             darkTheme: root.darkTheme
         }
 
         StyledMenuSeparator {}
 
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Pin"; enabled: root.contextSidebarKind !== "section" }
-        StyledMenuItem { darkTheme: root.darkTheme; text: "Properties"; enabled: root.contextSidebarKind !== "section" }
+        StyledMenuItem {
+            text: "Copy path"
+            enabled: root.contextSidebarLabel !== ""
+            darkTheme: root.darkTheme
+            onTriggered: root.copySidebarContextPath()
+        }
+
+        StyledMenuSeparator {}
+
+        StyledMenuItem {
+            darkTheme: root.darkTheme
+            text: "Pin"
+            enabled: root.contextSidebarKind !== "section"
+            onTriggered: applySnapshot(backend.pinSidebarLocation(root.contextSidebarLabel,
+                                                                  root.contextSidebarKind))
+        }
+
+        StyledMenuItem {
+            darkTheme: root.darkTheme
+            text: "Properties"
+            enabled: root.contextSidebarKind !== "section"
+            onTriggered: applySnapshot(backend.showSidebarLocationProperties(root.contextSidebarLabel,
+                                                                             root.contextSidebarKind))
+        }
     }
 
     StyledMenu {
@@ -2090,6 +2359,41 @@ Window {
             }
         }
 
+        StyledMenu {
+            title: "Copy paths"
+            darkTheme: root.darkTheme
+
+            StyledMenuItem {
+                text: "Full path"
+                enabled: root.contextFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copyPathsForItems(root.singleItemForBackend(root.contextFileRow), false, false)
+            }
+
+            StyledMenuItem {
+                text: "Relative path"
+                enabled: root.contextFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copyPathsForItems(root.singleItemForBackend(root.contextFileRow), true, false)
+            }
+
+            StyledMenuSeparator {}
+
+            StyledMenuItem {
+                text: "Full paths recursively"
+                enabled: root.contextFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copyPathsForItems(root.singleItemForBackend(root.contextFileRow), false, true)
+            }
+
+            StyledMenuItem {
+                text: "Relative paths recursively"
+                enabled: root.contextFileRow >= 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copyPathsForItems(root.singleItemForBackend(root.contextFileRow), true, true)
+            }
+        }
+
         StyledMenuItem {
             text: "Rename"
             enabled: root.contextFileRow >= 0
@@ -2155,6 +2459,59 @@ Window {
             enabled: root.selectedFileCount() > 0
             darkTheme: root.darkTheme
             onTriggered: applySnapshot(backend.copyItems(root.selectedItemsForBackend()))
+        }
+
+        StyledMenuSeparator {}
+
+        StyledMenuItem {
+            text: "Compress"
+            enabled: root.selectedFileCount() > 0
+            darkTheme: root.darkTheme
+            onTriggered: applySnapshot(backend.compressItems(root.selectedItemsForBackend()))
+        }
+
+        StyledMenuItem {
+            text: "Extract here"
+            enabled: root.selectedFileCount() > 0
+            darkTheme: root.darkTheme
+            onTriggered: applySnapshot(backend.extractItems(root.selectedItemsForBackend()))
+        }
+
+        StyledMenuSeparator {}
+
+        StyledMenu {
+            title: "Copy paths"
+            darkTheme: root.darkTheme
+
+            StyledMenuItem {
+                text: "Full paths"
+                enabled: root.selectedFileCount() > 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copyPathsForItems(root.selectedItemsForBackend(), false, false)
+            }
+
+            StyledMenuItem {
+                text: "Relative paths"
+                enabled: root.selectedFileCount() > 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copyPathsForItems(root.selectedItemsForBackend(), true, false)
+            }
+
+            StyledMenuSeparator {}
+
+            StyledMenuItem {
+                text: "Full paths recursively"
+                enabled: root.selectedFileCount() > 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copyPathsForItems(root.selectedItemsForBackend(), false, true)
+            }
+
+            StyledMenuItem {
+                text: "Relative paths recursively"
+                enabled: root.selectedFileCount() > 0
+                darkTheme: root.darkTheme
+                onTriggered: root.copyPathsForItems(root.selectedItemsForBackend(), true, true)
+            }
         }
 
         StyledMenuSeparator {}
@@ -2583,8 +2940,7 @@ Window {
                         }
 
                         onDoubleClicked: {
-                            if (root.fileRowValue(row, "type") === "File folder")
-                                applySnapshot(backend.openItems(root.singleItemForBackend(row)))
+                            applySnapshot(backend.openItems(root.singleItemForBackend(row)))
                         }
 
                         Item {
@@ -4269,7 +4625,10 @@ Window {
                                         contentHeight: height
                                         boundsBehavior: Flickable.StopAtBounds
                                         flickableDirection: Flickable.HorizontalFlick
-                                        interactive: !root.tabDragActive && contentWidth > width
+
+                                        interactive: contentWidth > width
+                                        acceptedButtons: Qt.NoButton
+
                                         clip: true
 
                                         Item {
@@ -4287,34 +4646,35 @@ Window {
                                                     id: tabDelegate
                                                     property var rootWindow: root
                                                     required property int index
-                                                    required property var modelData
+                                                    required property string title
+                                                    required property string icon
 
                                                     property bool movedEnough: false
 
-                                                    x: index * (root.tabWidth + root.tabSpacing)
+                                                    x: tabDelegate.index * (rootWindow.tabWidth + rootWindow.tabSpacing)
                                                     y: 1
-                                                    width: root.tabWidth
+                                                    width: rootWindow.tabWidth
                                                     height: 32
                                                     radius: 9
-                                                    z: root.draggedTabIndex === index ? 100 : 1
+                                                    z: rootWindow.draggedTabIndex === tabDelegate.index ? 100 : 1
 
                                                     transform: Translate {
-                                                        x: root.draggedTabIndex === index ? root.draggedTabOffset : 0
+                                                        x: rootWindow.draggedTabIndex === tabDelegate.index ? rootWindow.draggedTabOffset : 0
                                                     }
 
-                                                    color: index === root.currentTab
+                                                    color: tabDelegate.index === rootWindow.currentTab
                                                            ? (tabMouse.pressed
-                                                                ? (root.darkTheme ? "#2a3342" : "#e7edf8")
+                                                                ? (rootWindow.darkTheme ? "#2a3342" : "#e7edf8")
                                                                 : tabMouse.containsMouse
-                                                                  ? (root.darkTheme ? "#242c3a" : "#f4f7fc")
-                                                                  : (root.darkTheme ? "#202633" : "#ffffff"))
+                                                                  ? (rootWindow.darkTheme ? "#242c3a" : "#f4f7fc")
+                                                                  : (rootWindow.darkTheme ? "#202633" : "#ffffff"))
                                                            : (tabMouse.pressed
-                                                                ? root.pressed
+                                                                ? rootWindow.pressed
                                                                 : tabMouse.containsMouse
-                                                                  ? root.hover
+                                                                  ? rootWindow.hover
                                                                   : "transparent")
 
-                                                    border.color: index === root.currentTab ? root.border : "transparent"
+                                                    border.color: tabDelegate.index === rootWindow.currentTab ? rootWindow.border : "transparent"
                                                     border.width: 1
 
                                                     DropArea {
@@ -4322,28 +4682,29 @@ Window {
                                                         z: 2
 
                                                         function maybeActivate() {
-                                                            if (root.draggedFileCount > 0 && root.currentTab !== tabDelegate.index) {
+                                                            if (tabDelegate.rootWindow.draggedFileCount > 0
+                                                                    && tabDelegate.rootWindow.currentTab !== tabDelegate.index) {
                                                                 tabDelegate.rootWindow.activateTabLocal(tabDelegate.index)
                                                                 tabDelegate.rootWindow.ensureTabVisible(tabDelegate.index)
                                                             }
                                                         }
 
                                                         onEntered: function(drag) {
-                                                            if (root.draggedFileCount > 0) {
+                                                            if (tabDelegate.rootWindow.draggedFileCount > 0) {
                                                                 drag.accepted = true
                                                                 maybeActivate()
                                                             }
                                                         }
 
                                                         onPositionChanged: function(drag) {
-                                                            if (root.draggedFileCount > 0) {
+                                                            if (tabDelegate.rootWindow.draggedFileCount > 0) {
                                                                 drag.accepted = true
                                                                 maybeActivate()
                                                             }
                                                         }
 
                                                         onDropped: function(drop) {
-                                                            if (root.draggedFileCount > 0) {
+                                                            if (tabDelegate.rootWindow.draggedFileCount > 0) {
                                                                 drop.accepted = true
                                                                 maybeActivate()
                                                             }
@@ -4355,26 +4716,26 @@ Window {
                                                         anchors.left: parent.left
                                                         anchors.leftMargin: 12
                                                         spacing: 8
-                                                        visible: root.editingTabIndex !== index
+                                                        visible: tabDelegate.rootWindow.editingTabIndex !== tabDelegate.index
 
                                                         AppIcon {
-                                                            name: modelData.icon
-                                                            darkTheme: root.darkTheme
+                                                            name: tabDelegate.icon || ""
+                                                            darkTheme: tabDelegate.rootWindow.darkTheme
                                                             iconSize: 15
                                                         }
 
                                                         Text {
-                                                            text: modelData.title || ""
-                                                            color: root.text
+                                                            text: tabDelegate.title || ""
+                                                            color: tabDelegate.rootWindow.text
                                                             font.pixelSize: 13
-                                                            font.bold: index === root.currentTab
+                                                            font.bold: tabDelegate.index === tabDelegate.rootWindow.currentTab
                                                             elide: Text.ElideRight
                                                             width: 140
                                                         }
                                                     }
 
                                                     TextField {
-                                                        visible: root.editingTabIndex === index
+                                                        visible: tabDelegate.rootWindow.editingTabIndex === tabDelegate.index
                                                         anchors.verticalCenter: parent.verticalCenter
                                                         anchors.left: parent.left
                                                         anchors.leftMargin: 12
@@ -4382,8 +4743,8 @@ Window {
                                                         anchors.rightMargin: 8
                                                         height: 24
 
-                                                        text: root.editingTabTitleDraft || ""
-                                                        color: root.text
+                                                        text: tabDelegate.rootWindow.editingTabTitleDraft || ""
+                                                        color: tabDelegate.rootWindow.text
                                                         font.pixelSize: 13
                                                         selectByMouse: true
                                                         leftPadding: 8
@@ -4393,8 +4754,8 @@ Window {
 
                                                         background: Rectangle {
                                                             radius: 6
-                                                            color: root.darkTheme ? "#1b2230" : "#ffffff"
-                                                            border.color: root.accent
+                                                            color: tabDelegate.rootWindow.darkTheme ? "#1b2230" : "#ffffff"
+                                                            border.color: tabDelegate.rootWindow.accent
                                                             border.width: 1
                                                         }
 
@@ -4407,17 +4768,17 @@ Window {
 
                                                         onTextChanged: {
                                                             if (visible)
-                                                                root.editingTabTitleDraft = text
+                                                                tabDelegate.rootWindow.editingTabTitleDraft = text
                                                         }
 
-                                                        onAccepted: root.commitRenameTab(index, text || "")
+                                                        onAccepted: tabDelegate.rootWindow.commitRenameTab(tabDelegate.index, text || "")
 
                                                         onActiveFocusChanged: {
                                                             if (!activeFocus && visible)
-                                                                root.commitRenameTab(index, text || "")
+                                                                tabDelegate.rootWindow.commitRenameTab(tabDelegate.index, text || "")
                                                         }
 
-                                                        Keys.onEscapePressed: root.cancelRenameTab()
+                                                        Keys.onEscapePressed: tabDelegate.rootWindow.cancelRenameTab()
                                                     }
 
                                                     Rectangle {
@@ -4428,14 +4789,14 @@ Window {
                                                         width: 18
                                                         height: 18
                                                         radius: 9
-                                                        color: closeMouse.containsMouse ? root.hover : "transparent"
+                                                        color: closeMouse.containsMouse ? tabDelegate.rootWindow.hover : "transparent"
                                                         z: 3
-                                                        visible: root.editingTabIndex !== index
+                                                        visible: tabDelegate.rootWindow.editingTabIndex !== tabDelegate.index
 
                                                         AppIcon {
                                                             anchors.centerIn: parent
                                                             name: "close"
-                                                            darkTheme: root.darkTheme
+                                                            darkTheme: tabDelegate.rootWindow.darkTheme
                                                             iconSize: 12
                                                             iconOpacity: 0.75
                                                         }
@@ -4448,7 +4809,7 @@ Window {
                                                             preventStealing: true
 
                                                             onClicked: function(mouse) {
-                                                                root.closeTab(index)
+                                                                tabDelegate.rootWindow.closeTab(tabDelegate.index)
                                                                 mouse.accepted = true
                                                             }
                                                         }
@@ -4458,79 +4819,94 @@ Window {
                                                         id: dragHandler
                                                         target: null
                                                         acceptedButtons: Qt.LeftButton
-                                                        enabled: tabDelegate.rootWindow.editingTabIndex !== index
+                                                        enabled: tabDelegate.rootWindow.editingTabIndex !== tabDelegate.index
                                                         xAxis.enabled: true
                                                         yAxis.enabled: false
+                                                        grabPermissions: PointerHandler.CanTakeOverFromAnything
 
                                                         onActiveChanged: {
                                                             tabDelegate.rootWindow.tabDragActive = active
 
                                                             if (active) {
-                                                                tabDelegate.rootWindow.currentTab = index
-                                                                tabDelegate.rootWindow.draggedTabIndex = index
-                                                                tabDelegate.rootWindow.draggedTabStartIndex = index
+                                                                tabDelegate.rootWindow.tabPressActive = true
+                                                                tabDelegate.rootWindow.currentTab = tabDelegate.index
+                                                                tabDelegate.rootWindow.draggedTabIndex = tabDelegate.index
+                                                                tabDelegate.rootWindow.draggedTabStartIndex = tabDelegate.index
+                                                                tabDelegate.rootWindow.draggedTabStartContentX = tabFlick.contentX
                                                                 tabDelegate.rootWindow.draggedTabOffset = 0
                                                                 tabDelegate.movedEnough = false
                                                                 tabDelegate.rootWindow.tabAutoScrollDirection = 0
                                                                 tabDelegate.rootWindow.tabAutoScrollTimerRef.start()
                                                             } else {
-                                                                if (tabDelegate.rootWindow.draggedTabStartIndex >= 0
-                                                                        && tabDelegate.rootWindow.draggedTabIndex >= 0
-                                                                        && tabDelegate.rootWindow.draggedTabStartIndex !== tabDelegate.rootWindow.draggedTabIndex) {
-                                                                    applySnapshot(
-                                                                        tabDelegate.rootWindow.backend.moveTab(
-                                                                            tabDelegate.rootWindow.draggedTabStartIndex,
-                                                                            tabDelegate.rootWindow.draggedTabIndex
-                                                                        ),
+                                                                var rw = tabDelegate.rootWindow
+                                                                var startIndex = rw.draggedTabStartIndex
+                                                                var endIndex = rw.draggedTabIndex
+
+                                                                rw.tabAutoScrollDirection = 0
+                                                                rw.tabAutoScrollTimerRef.stop()
+
+                                                                if (startIndex >= 0 && endIndex >= 0 && startIndex !== endIndex) {
+                                                                    var finalIndex = endIndex
+
+                                                                    rw.applySnapshot(
+                                                                        rw.backend.moveTab(startIndex, finalIndex),
                                                                         { preserveTabsOrder: true }
                                                                     )
+
+                                                                    rw.currentTab = finalIndex
+
+                                                                    if (rw.backend && rw.backend.activateTab) {
+                                                                        rw.applySnapshot(
+                                                                            rw.backend.activateTab(finalIndex),
+                                                                            { preserveTabsOrder: true }
+                                                                        )
+                                                                    }
+
+                                                                    Qt.callLater(function() {
+                                                                        rw.ensureTabVisible(finalIndex)
+                                                                    })
                                                                 }
 
-                                                                tabDelegate.rootWindow.tabAutoScrollDirection = 0
-                                                                tabDelegate.rootWindow.tabAutoScrollTimerRef.stop()
-                                                                tabDelegate.rootWindow.draggedTabIndex = -1
-                                                                tabDelegate.rootWindow.draggedTabStartIndex = -1
-                                                                tabDelegate.rootWindow.draggedTabOffset = 0
+                                                                rw.draggedTabIndex = -1
+                                                                rw.draggedTabStartIndex = -1
+                                                                rw.draggedTabStartContentX = 0
+                                                                rw.draggedTabOffset = 0
+                                                                rw.tabPressActive = false
                                                                 tabDelegate.movedEnough = false
                                                             }
                                                         }
 
                                                         onTranslationChanged: {
-                                                            if (tabDelegate.rootWindow.draggedTabIndex !== index)
+                                                            if (tabDelegate.rootWindow.draggedTabIndex < 0)
                                                                 return
 
                                                             if (Math.abs(translation.x) > 8)
                                                                 tabDelegate.movedEnough = true
 
                                                             var slotSize = tabDelegate.rootWindow.tabWidth + tabDelegate.rootWindow.tabSpacing
+                                                            var currentIndex = tabDelegate.rootWindow.draggedTabIndex
+                                                            var startIndex = tabDelegate.rootWindow.draggedTabStartIndex
+                                                            var scrollDelta = tabFlick.contentX - tabDelegate.rootWindow.draggedTabStartContentX
 
-                                                            var draggedCenterX =
-                                                                    tabDelegate.rootWindow.draggedTabStartIndex * slotSize
-                                                                    + translation.x
-                                                                    + tabDelegate.rootWindow.tabWidth / 2
+                                                            var draggedLeftX = startIndex * slotSize + translation.x + scrollDelta
+                                                            var draggedCenterX = draggedLeftX + tabDelegate.rootWindow.tabWidth / 2
 
                                                             var targetIndex = Math.floor(draggedCenterX / slotSize)
                                                             targetIndex = Math.max(0, Math.min(tabsModel.count - 1, targetIndex))
 
                                                             tabDelegate.rootWindow.draggedTabOffset =
-                                                                    draggedCenterX
-                                                                    - (index * slotSize + tabDelegate.rootWindow.tabWidth / 2)
+                                                                    draggedLeftX - currentIndex * slotSize
 
-                                                            if (targetIndex !== index) {
-                                                                tabDelegate.rootWindow.moveTab(index, targetIndex)
+                                                            if (targetIndex !== currentIndex) {
+                                                                tabDelegate.rootWindow.moveTabLocally(currentIndex, targetIndex)
                                                                 tabDelegate.rootWindow.draggedTabIndex = targetIndex
-                                                                tabDelegate.rootWindow.ensureTabVisible(targetIndex)
                                                             }
 
-                                                            var posInViewport = tabDelegate.mapToItem(
-                                                                tabViewport,
-                                                                tabDelegate.width / 2,
-                                                                tabDelegate.height / 2
-                                                            ).x + tabDelegate.rootWindow.draggedTabOffset
+                                                            var draggedCenterInViewport = draggedCenterX - tabFlick.contentX
 
-                                                            if (posInViewport < 36)
+                                                            if (draggedCenterInViewport < 36)
                                                                 tabDelegate.rootWindow.tabAutoScrollDirection = -1
-                                                            else if (posInViewport > tabViewport.width - 36)
+                                                            else if (draggedCenterInViewport > tabViewport.width - 36)
                                                                 tabDelegate.rootWindow.tabAutoScrollDirection = 1
                                                             else
                                                                 tabDelegate.rootWindow.tabAutoScrollDirection = 0
@@ -4543,22 +4919,39 @@ Window {
                                                         anchors.top: parent.top
                                                         anchors.bottom: parent.bottom
                                                         anchors.right: parent.right
-                                                        anchors.rightMargin: root.editingTabIndex === index ? 6 : 30
+                                                        anchors.rightMargin: tabDelegate.rootWindow.editingTabIndex === tabDelegate.index ? 6 : 30
                                                         hoverEnabled: true
                                                         acceptedButtons: Qt.LeftButton | Qt.RightButton
-                                                        enabled: root.editingTabIndex !== index
+                                                        enabled: tabDelegate.rootWindow.editingTabIndex !== tabDelegate.index
+                                                        preventStealing: false
 
                                                         onPressed: function(mouse) {
-                                                            if (root.editingTabIndex >= 0 && root.editingTabIndex !== index)
-                                                                root.commitRenameTab(root.editingTabIndex, root.editingTabTitleDraft)
+                                                            tabDelegate.rootWindow.tabPressActive = true
+
+                                                            if (tabDelegate.rootWindow.editingTabIndex >= 0
+                                                                    && tabDelegate.rootWindow.editingTabIndex !== tabDelegate.index) {
+                                                                tabDelegate.rootWindow.commitRenameTab(
+                                                                    tabDelegate.rootWindow.editingTabIndex,
+                                                                    tabDelegate.rootWindow.editingTabTitleDraft
+                                                                )
+                                                            }
 
                                                             if (mouse.button === Qt.RightButton) {
-                                                                root.showTabContextMenu(index)
+                                                                tabDelegate.rootWindow.showTabContextMenu(tabDelegate.index)
                                                                 return
                                                             }
 
                                                             if (mouse.button === Qt.LeftButton)
-                                                                root.currentTab = index
+                                                                tabDelegate.rootWindow.currentTab = tabDelegate.index
+                                                        }
+
+                                                        onReleased: {
+                                                            if (!dragHandler.active)
+                                                                tabDelegate.rootWindow.tabPressActive = false
+                                                        }
+
+                                                        onCanceled: {
+                                                            tabDelegate.rootWindow.tabPressActive = false
                                                         }
 
                                                         onClicked: function(mouse) {
@@ -4566,11 +4959,14 @@ Window {
                                                                 tabDelegate.rootWindow.activateTabLocal(tabDelegate.index)
                                                                 tabDelegate.rootWindow.ensureTabVisible(tabDelegate.index)
                                                             }
+
+                                                            if (!dragHandler.active)
+                                                                tabDelegate.rootWindow.tabPressActive = false
                                                         }
 
                                                         onDoubleClicked: {
                                                             if (!tabDelegate.movedEnough)
-                                                                root.beginRenameTab(index)
+                                                                tabDelegate.rootWindow.beginRenameTab(tabDelegate.index)
                                                         }
                                                     }
                                                 }
@@ -4863,10 +5259,21 @@ Window {
                                                         anchors.fill: parent
                                                         hoverEnabled: true
                                                         cursorShape: Qt.PointingHandCursor
-                                                        acceptedButtons: Qt.LeftButton
+                                                        acceptedButtons: Qt.LeftButton | Qt.RightButton
                                                         z: 1
 
-                                                        onClicked: root.setPathFromIndex(index)
+                                                        onPressed: function(mouse) {
+                                                            if (mouse.button === Qt.RightButton) {
+                                                                root.contextBreadcrumbIndex = index
+                                                                breadcrumbContextMenu.popup()
+                                                                mouse.accepted = true
+                                                            }
+                                                        }
+
+                                                        onClicked: function(mouse) {
+                                                            if (mouse.button === Qt.LeftButton)
+                                                                root.setPathFromIndex(index)
+                                                        }
 
                                                         onDoubleClicked: {
                                                             root.editingPath = true
@@ -5043,19 +5450,21 @@ Window {
                         iconName: "content-cut"
                         tooltipText: "Cut"
                         darkTheme: root.darkTheme
+                        onClicked: root.cutSelectedOrCurrent()
                     }
 
                     IconButton {
                         iconName: "content-copy"
                         tooltipText: "Copy"
                         darkTheme: root.darkTheme
-                        onClicked: root.addToastNotification("Copied successfully to clipboard", "success")
+                        onClicked: root.copySelectedOrCurrent()
                     }
 
                     IconButton {
                         iconName: "content-paste"
                         tooltipText: "Paste"
                         darkTheme: root.darkTheme
+                        onClicked: applySnapshot(backend.pasteItems())
                     }
 
                     IconButton {

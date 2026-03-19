@@ -10,6 +10,12 @@
 #include <QOperatingSystemVersion>
 #include <QRegularExpression>
 #include <QStringView>
+#include <QClipboard>
+#include <QDir>
+#include <QDirIterator>
+#include <QFileInfo>
+#include <QGuiApplication>
+#include <QStandardPaths>
 
 FileManagerBridge::FileManagerBridge(QObject* parent)
     : QObject(parent)
@@ -27,15 +33,20 @@ QVariantMap FileManagerBridge::makeSnapshot(const QString& message,
                                             const QString& messageKind) const
 {
     QVariantMap out;
-    out.insert("currentTab", m_sessionService->currentTabIndex());
-    out.insert("tabs", m_sessionService->tabs());
-    out.insert("path", m_navigationService->pathParts());
-    out.insert("pathText", m_navigationService->pathText());
-    out.insert("files", m_fileOpsService->files());
-    out.insert("drives", m_sidebarService->drives());
-    out.insert("sidebar", m_sidebarService->sidebarTree());
-    out.insert("message", message);
-    out.insert("messageKind", messageKind.isEmpty() ? QStringLiteral("info") : messageKind);
+    out.insert(QStringLiteral("currentTab"), m_sessionService->currentTabIndex());
+    out.insert(QStringLiteral("tabs"), m_sessionService->tabs());
+    out.insert(QStringLiteral("path"), m_navigationService->pathParts());
+    out.insert(QStringLiteral("pathText"), m_navigationService->pathText());
+    out.insert(QStringLiteral("files"), m_fileOpsService->files());
+    out.insert(QStringLiteral("drives"), m_sidebarService->drives());
+    out.insert(QStringLiteral("sidebar"), m_sidebarService->sidebarTree());
+
+    out.insert(QStringLiteral("previewEnabled"), m_previewEnabled);
+    out.insert(QStringLiteral("showHiddenFiles"), m_showHiddenFiles);
+
+    out.insert(QStringLiteral("message"), message);
+    out.insert(QStringLiteral("messageKind"),
+               messageKind.isEmpty() ? QStringLiteral("info") : messageKind);
     return out;
 }
 
@@ -299,16 +310,31 @@ QVariantMap FileManagerBridge::openItemsInNewTab(const QVariantList& items)
 {
     const QVariantList rows = rowsFromItems(items);
     if (rows.isEmpty())
-        return makeSnapshot(QStringLiteral("[Backend] No items to open in new tab"), QStringLiteral("info"));
+        return makeSnapshot(QStringLiteral("[Backend] No items to open in new tab"),
+                            QStringLiteral("info"));
 
     const int row = rows.first().toInt();
     const QVariantMap item = m_fileOpsService->fileAt(row);
+    if (item.isEmpty())
+        return makeSnapshot(QStringLiteral("[Backend] Invalid item for new tab"),
+                            QStringLiteral("error"));
+
     const QString title = item.value(QStringLiteral("name")).toString().isEmpty()
                               ? QStringLiteral("New Tab")
                               : item.value(QStringLiteral("name")).toString();
 
     m_sessionService->addTab(title);
-    return makeSnapshot(QStringLiteral("[Backend] Opened item in new tab"), QStringLiteral("success"));
+
+    const QString type = item.value(QStringLiteral("type")).toString();
+    if (type == QStringLiteral("File folder")) {
+        m_navigationService->appendPathSegment(item.value(QStringLiteral("name")).toString());
+        m_fileOpsService->reloadForPath(m_navigationService->pathText());
+        return makeSnapshot(QStringLiteral("[Backend] Opened folder in new tab"),
+                            QStringLiteral("success"));
+    }
+
+    return makeSnapshot(QStringLiteral("[Backend] Opened item in new tab"),
+                        QStringLiteral("success"));
 }
 
 QVariantMap FileManagerBridge::createFile()
@@ -453,13 +479,64 @@ QVariantMap FileManagerBridge::chooseOpenWithApp(const QVariantList& items)
                         QStringLiteral("info"));
 }
 
-QVariantMap FileManagerBridge::copyItemPaths(const QVariantList& items)
+QVariantMap FileManagerBridge::copyItemPaths(const QVariantList& items,
+                                             bool relativeToCurrentDir,
+                                             bool recursive)
 {
-    if (normalizeItems(items).isEmpty())
+    const QVariantList rows = rowsFromItems(items);
+    if (rows.isEmpty())
         return makeSnapshot(QStringLiteral("[Backend] No item paths to copy"), QStringLiteral("info"));
 
-    return makeSnapshot(QStringLiteral("[Backend] Copied path for ") + describeItemCount(items),
+    QStringList lines;
+    for (const QVariant& rowVar : rows) {
+        const QVariantMap item = m_fileOpsService->fileAt(rowVar.toInt());
+        const QString absolutePath = absolutePathForItem(item);
+        lines.append(collectedPathsForAbsolutePath(absolutePath,
+                                                   relativeToCurrentDir,
+                                                   recursive));
+    }
+
+    lines.removeDuplicates();
+
+    if (lines.isEmpty())
+        return makeSnapshot(QStringLiteral("[Backend] No item paths to copy"), QStringLiteral("info"));
+
+    copyTextToClipboard(lines.join(QLatin1Char('\n')));
+
+    const QString mode = relativeToCurrentDir
+                             ? QStringLiteral("relative")
+                             : QStringLiteral("full");
+    const QString recursion = recursive
+                                  ? QStringLiteral(" recursively")
+                                  : QString();
+
+    return makeSnapshot(QStringLiteral("[Backend] Copied %1 %2 paths%3")
+                            .arg(QString::number(lines.size()), mode, recursion),
                         QStringLiteral("success"));
+}
+
+QVariantMap FileManagerBridge::copySidebarPath(const QString& label, const QString& kind)
+{
+    const QString path = sidebarPathForLabel(label, kind);
+    if (path.isEmpty())
+        return makeSnapshot(QStringLiteral("[Backend] No sidebar path to copy"), QStringLiteral("info"));
+
+    copyTextToClipboard(path);
+    return makeSnapshot(QStringLiteral("[Backend] Copied sidebar path"), QStringLiteral("success"));
+}
+
+QVariantMap FileManagerBridge::copyBreadcrumbPath(int index)
+{
+    const QVariantList parts = m_navigationService->pathParts();
+    if (index < 0 || index >= parts.size())
+        return makeSnapshot(QStringLiteral("[Backend] Invalid breadcrumb path"), QStringLiteral("error"));
+
+    const QString path = pathFromParts(parts, index);
+    if (path.isEmpty())
+        return makeSnapshot(QStringLiteral("[Backend] No breadcrumb path to copy"), QStringLiteral("info"));
+
+    copyTextToClipboard(path);
+    return makeSnapshot(QStringLiteral("[Backend] Copied breadcrumb path"), QStringLiteral("success"));
 }
 
 QVariantMap FileManagerBridge::openItemsInTerminal(const QVariantList& items)
@@ -468,6 +545,27 @@ QVariantMap FileManagerBridge::openItemsInTerminal(const QVariantList& items)
         return makeSnapshot(QStringLiteral("[Backend] No item location to open in terminal"), QStringLiteral("info"));
 
     return makeSnapshot(QStringLiteral("[Backend] Opened terminal for ") + describeItemCount(items),
+                        QStringLiteral("info"));
+}
+
+QVariantMap FileManagerBridge::pinSidebarLocation(const QString& label, const QString& kind)
+{
+    Q_UNUSED(kind);
+
+    if (label.trimmed().isEmpty())
+        return makeSnapshot(QStringLiteral("[Backend] No sidebar location to pin"), QStringLiteral("info"));
+
+    return makeSnapshot(QStringLiteral("[Backend] Pinned ") + label, QStringLiteral("success"));
+}
+
+QVariantMap FileManagerBridge::showSidebarLocationProperties(const QString& label, const QString& kind)
+{
+    Q_UNUSED(kind);
+
+    if (label.trimmed().isEmpty())
+        return makeSnapshot(QStringLiteral("[Backend] No sidebar location for properties"), QStringLiteral("info"));
+
+    return makeSnapshot(QStringLiteral("[Backend] Opened properties for ") + label,
                         QStringLiteral("info"));
 }
 
@@ -731,6 +829,171 @@ QString FileManagerBridge::sanitizeFileOrFolderName(const QString& name) const
     return out;
 }
 
+QString FileManagerBridge::normalizedClipboardPath(const QString& path) const
+{
+    QString out = QDir::fromNativeSeparators(path.trimmed());
+    const bool isDriveRoot =
+        QRegularExpression(QStringLiteral(R"(^[A-Za-z]:/?$)")).match(out).hasMatch();
+
+    out = QDir::cleanPath(out);
+
+    if (isDriveRoot && !out.endsWith(QLatin1Char('/')))
+        out.append(QLatin1Char('/'));
+
+    return out;
+}
+
+QString FileManagerBridge::currentDirectoryPath() const
+{
+    return normalizedClipboardPath(m_navigationService->pathText());
+}
+
+QString FileManagerBridge::pathFromParts(const QVariantList& parts, int endIndexInclusive) const
+{
+    if (parts.isEmpty())
+        return QString();
+
+    const int lastIndex =
+        endIndexInclusive < 0 ? (parts.size() - 1)
+                              : qMin(endIndexInclusive, parts.size() - 1);
+
+    QStringList labels;
+    for (int i = 0; i <= lastIndex; ++i) {
+        const QVariantMap part = parts.at(i).toMap();
+        const QString label = part.value(QStringLiteral("label")).toString();
+        if (!label.isEmpty())
+            labels.append(label);
+    }
+
+    if (labels.isEmpty())
+        return QString();
+
+    const QString first = labels.first();
+    QString out;
+
+    if (QRegularExpression(QStringLiteral(R"(^[A-Za-z]:$)")).match(first).hasMatch()) {
+        out = first + QLatin1Char('/');
+        if (labels.size() > 1)
+            out += labels.mid(1).join(QLatin1Char('/'));
+    } else {
+        out = labels.join(QLatin1Char('/'));
+    }
+
+    return normalizedClipboardPath(out);
+}
+
+QString FileManagerBridge::absolutePathForItem(const QVariantMap& item) const
+{
+    QString explicitPath = item.value(QStringLiteral("fullPath")).toString();
+    if (explicitPath.isEmpty())
+        explicitPath = item.value(QStringLiteral("path")).toString();
+
+    if (!explicitPath.isEmpty())
+        return normalizedClipboardPath(explicitPath);
+
+    const QString base = currentDirectoryPath();
+    const QString name = item.value(QStringLiteral("name")).toString();
+
+    if (base.isEmpty())
+        return normalizedClipboardPath(name);
+
+    if (name.isEmpty())
+        return base;
+
+    return normalizedClipboardPath(QDir(base).filePath(name));
+}
+
+QString FileManagerBridge::relativePathFromCurrentDirectory(const QString& absolutePath) const
+{
+    const QString base = currentDirectoryPath();
+    if (base.isEmpty())
+        return normalizedClipboardPath(absolutePath);
+
+    return normalizedClipboardPath(QDir(base).relativeFilePath(absolutePath));
+}
+
+QString FileManagerBridge::sidebarPathForLabel(const QString& label, const QString& kind) const
+{
+    if (kind == QStringLiteral("drive")) {
+        const QRegularExpression rx(QStringLiteral(R"(\(([A-Za-z]:)\))"));
+        const QRegularExpressionMatch match = rx.match(label);
+        if (match.hasMatch())
+            return normalizedClipboardPath(match.captured(1) + QStringLiteral("/"));
+
+        if (QRegularExpression(QStringLiteral(R"(^[A-Za-z]:/?$)")).match(label).hasMatch())
+            return normalizedClipboardPath(label);
+
+        return normalizedClipboardPath(label);
+    }
+
+    if (kind == QStringLiteral("quick")) {
+        if (label == QStringLiteral("Home"))
+            return normalizedClipboardPath(QDir::homePath());
+        if (label == QStringLiteral("Desktop"))
+            return normalizedClipboardPath(QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+        if (label == QStringLiteral("Downloads"))
+            return normalizedClipboardPath(QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
+        if (label == QStringLiteral("Documents"))
+            return normalizedClipboardPath(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
+        if (label == QStringLiteral("Pictures"))
+            return normalizedClipboardPath(QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
+        if (label == QStringLiteral("Music"))
+            return normalizedClipboardPath(QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
+        if (label == QStringLiteral("Videos"))
+            return normalizedClipboardPath(QStandardPaths::writableLocation(QStandardPaths::MoviesLocation));
+        if (label == QStringLiteral("Recent")) {
+#if defined(Q_OS_WIN)
+            return normalizedClipboardPath(QDir::homePath()
+                                           + QStringLiteral("/AppData/Roaming/Microsoft/Windows/Recent"));
+#else
+            return normalizedClipboardPath(QDir::homePath());
+#endif
+        }
+    }
+
+    return normalizedClipboardPath(label);
+}
+
+QStringList FileManagerBridge::collectedPathsForAbsolutePath(const QString& absolutePath,
+                                                             bool relativeToCurrentDir,
+                                                             bool recursive) const
+{
+    QStringList out;
+    if (absolutePath.isEmpty())
+        return out;
+
+    const auto toRequestedForm = [&](const QString& path) {
+        return relativeToCurrentDir
+                   ? relativePathFromCurrentDirectory(path)
+                   : normalizedClipboardPath(path);
+    };
+
+    const QString normalizedAbsolute = normalizedClipboardPath(absolutePath);
+    out.append(toRequestedForm(normalizedAbsolute));
+
+    if (!recursive)
+        return out;
+
+    const QFileInfo info(normalizedAbsolute);
+    if (!info.exists() || !info.isDir())
+        return out;
+
+    QDirIterator it(normalizedAbsolute,
+                    QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System,
+                    QDirIterator::Subdirectories);
+
+    while (it.hasNext())
+        out.append(toRequestedForm(normalizedClipboardPath(it.next())));
+
+    return out;
+}
+
+void FileManagerBridge::copyTextToClipboard(const QString& text) const
+{
+    if (QClipboard* clipboard = QGuiApplication::clipboard())
+        clipboard->setText(text);
+}
+
 QVariantMap FileManagerBridge::buildMockPreviewForItem(const QVariantMap& item) const
 {
     QVariantMap preview;
@@ -914,20 +1177,29 @@ QVariantMap FileManagerBridge::buildMockPreviewForItem(const QVariantMap& item) 
 
 QVariantMap FileManagerBridge::previewItemByRow(int row)
 {
-    if (row < 0)
+    if (row < 0) {
+        m_currentFileRow = -1;
         return clearPreview();
+    }
 
     const QVariantMap item = m_fileOpsService->fileAt(row);
-    if (item.isEmpty())
+    if (item.isEmpty()) {
+        m_currentFileRow = -1;
         return clearPreview();
+    }
+
+    m_currentFileRow = row;
 
     QVariantMap out;
+    out.insert(QStringLiteral("previewEnabled"), m_previewEnabled);
     out.insert(QStringLiteral("preview"), buildMockPreviewForItem(item));
     return out;
 }
 
 QVariantMap FileManagerBridge::clearPreview()
 {
+    m_currentFileRow = -1;
+
     QVariantMap preview;
     preview.insert(QStringLiteral("visible"), false);
     preview.insert(QStringLiteral("name"), QString());
@@ -940,6 +1212,81 @@ QVariantMap FileManagerBridge::clearPreview()
     preview.insert(QStringLiteral("lines"), QVariantList{});
 
     QVariantMap out;
+    out.insert(QStringLiteral("previewEnabled"), m_previewEnabled);
     out.insert(QStringLiteral("preview"), preview);
     return out;
+}
+
+QVariantMap FileManagerBridge::openSidebarLocationInNewTab(const QString& label,
+                                                           const QString& icon,
+                                                           const QString& kind)
+{
+    Q_UNUSED(icon);
+
+    const QString tabTitle = label.trimmed().isEmpty()
+                                 ? QStringLiteral("New Tab")
+                                 : label.trimmed();
+
+    m_sessionService->addTab(tabTitle);
+    m_navigationService->openSidebarLocation(label, kind);
+    m_fileOpsService->reloadForPath(m_navigationService->pathText());
+
+    return makeSnapshot(QStringLiteral("[Backend] Opened %1 in a new tab").arg(tabTitle),
+                        QStringLiteral("success"));
+}
+
+QVariantMap FileManagerBridge::setPreviewEnabled(bool enabled)
+{
+    m_previewEnabled = enabled;
+
+    QVariantMap snapshot = makeSnapshot(
+        m_previewEnabled
+            ? QStringLiteral("[Backend] Preview enabled")
+            : QStringLiteral("[Backend] Preview disabled"),
+        QStringLiteral("info"));
+
+    if (!m_previewEnabled) {
+        QVariantMap preview;
+        preview.insert(QStringLiteral("visible"), false);
+        preview.insert(QStringLiteral("name"), QString());
+        preview.insert(QStringLiteral("type"), QString());
+        preview.insert(QStringLiteral("icon"), QStringLiteral("insert-drive-file"));
+        preview.insert(QStringLiteral("previewType"), QStringLiteral("none"));
+        preview.insert(QStringLiteral("size"), QString());
+        preview.insert(QStringLiteral("dateModified"), QString());
+        preview.insert(QStringLiteral("summary"), QString());
+        preview.insert(QStringLiteral("lines"), QVariantList{});
+        snapshot.insert(QStringLiteral("preview"), preview);
+        return snapshot;
+    }
+
+    if (m_currentFileRow >= 0) {
+        const QVariantMap previewSnapshot = previewItemByRow(m_currentFileRow);
+        if (previewSnapshot.contains(QStringLiteral("preview")))
+            snapshot.insert(QStringLiteral("preview"),
+                            previewSnapshot.value(QStringLiteral("preview")));
+    } else {
+        const QVariantMap clearSnapshot = clearPreview();
+        if (clearSnapshot.contains(QStringLiteral("preview")))
+            snapshot.insert(QStringLiteral("preview"),
+                            clearSnapshot.value(QStringLiteral("preview")));
+    }
+
+    return snapshot;
+}
+
+QVariantMap FileManagerBridge::setShowHiddenFiles(bool enabled)
+{
+    m_showHiddenFiles = enabled;
+
+    m_fileOpsService->reloadForPath(m_navigationService->pathText());
+
+    QVariantMap snapshot = makeSnapshot(
+        m_showHiddenFiles
+            ? QStringLiteral("[Backend] Hidden files are now visible")
+            : QStringLiteral("[Backend] Hidden files are now hidden"),
+        QStringLiteral("info"));
+
+    snapshot.insert(QStringLiteral("showHiddenFiles"), m_showHiddenFiles);
+    return snapshot;
 }
