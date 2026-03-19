@@ -1,3 +1,4 @@
+#include <gio/gio.h>
 #include <QtSystemDetection>
 
 #ifdef Q_OS_LINUX
@@ -6,8 +7,6 @@
 
 #include <QHash>
 #include <QList>
-
-#include <gio/gio.h>
 
 namespace
 {

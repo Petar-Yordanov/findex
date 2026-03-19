@@ -1,0 +1,447 @@
+name: Qt CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            qt_host: linux
+            qt_target: desktop
+            qt_arch: linux_gcc_64
+            artifact_name: app-linux
+            build_dir: build
+            package_dir: dist
+
+          - os: windows-latest
+            qt_host: windows
+            qt_target: desktop
+            qt_arch: win64_msvc2022_64
+            artifact_name: app-windows
+            build_dir: build
+            package_dir: dist
+
+          - os: macos-latest
+            qt_host: mac
+            qt_target: desktop
+            qt_arch: clang_64
+            artifact_name: app-macos
+            build_dir: build
+            package_dir: dist
+
+    env:
+      QT_VERSION: 6.10.2
+      BUILD_TYPE: Release
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup CMake
+        uses: lukka/get-cmake@latest
+
+      - name: Setup Ninja
+        uses: seanmiddleditch/gha-setup-ninja@v5
+
+      - name: Setup MSVC environment
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Install Linux system packages
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libglib2.0-dev \
+            libgl1-mesa-dev \
+            libxkbcommon-x11-0 \
+            libxkbcommon-dev \
+            libxcb-cursor0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-randr0 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-shm0 \
+            libxcb-sync1 \
+            libxcb-xfixes0 \
+            libxcb-xinerama0 \
+            libxcb1-dev \
+            libx11-xcb-dev \
+            libdbus-1-3 \
+            libfontconfig1 \
+            libfreetype6 \
+            libegl1 \
+            libopengl0
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: ${{ env.QT_VERSION }}
+          host: ${{ matrix.qt_host }}
+          target: ${{ matrix.qt_target }}
+          arch: ${{ matrix.qt_arch }}
+          cache: true
+          setup-python: true
+          install-deps: false
+
+      - name: Show Qt paths
+        shell: bash
+        run: |
+          echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+          find "$QT_ROOT_DIR" -maxdepth 4 -type d \( -name Qt6 -o -name cmake \) | head -50 || true
+
+      - name: Configure (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Remove-Item Env:CC -ErrorAction SilentlyContinue
+          Remove-Item Env:CXX -ErrorAction SilentlyContinue
+
+          cmake -S . -B "${{ matrix.build_dir }}" -G Ninja `
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} `
+            -DCMAKE_C_COMPILER=cl `
+            -DCMAKE_CXX_COMPILER=cl `
+            -DQt6_ROOT="$env:QT_ROOT_DIR"
+
+      - name: Configure (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          cmake -S . -B "${{ matrix.build_dir }}" -G Ninja \
+            -DCMAKE_BUILD_TYPE=${{ env.BUILD_TYPE }} \
+            -DQt6_ROOT="$QT_ROOT_DIR"
+
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: cmake --build "${{ matrix.build_dir }}" --config ${{ env.BUILD_TYPE }} --parallel
+
+      - name: Build (Linux/macOS)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: cmake --build "${{ matrix.build_dir }}" --config ${{ env.BUILD_TYPE }} --parallel
+
+      - name: Package app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          PREFIX="$(realpath -m "${{ github.workspace }}/${{ matrix.package_dir }}")"
+          mkdir -p "$PREFIX"
+
+          cmake --install "${{ matrix.build_dir }}" --prefix "$PREFIX"
+
+          echo "Packaged files:"
+          find "$PREFIX" -maxdepth 6 -print
+
+      - name: Smoke test packaged app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          WORKDIR="$(realpath -m "${{ github.workspace }}/${{ matrix.package_dir }}")"
+          EXE="$(find "$WORKDIR" -maxdepth 6 -type f -name Findex | head -n 1)"
+
+          if [ -z "$EXE" ]; then
+            echo "=== packaged files ==="
+            find "$WORKDIR" -maxdepth 8 -print || true
+            exit 1
+          fi
+
+          echo "=== ldd ==="
+          ldd "$EXE" || true
+
+          STDOUT_LOG="$WORKDIR/startup-stdout.txt"
+          STDERR_LOG="$WORKDIR/startup-stderr.txt"
+          rm -f "$STDOUT_LOG" "$STDERR_LOG"
+
+          export QT_DEBUG_PLUGINS=1
+          export QML_IMPORT_TRACE=1
+          export QT_QPA_PLATFORM=offscreen
+
+          "$EXE" >"$STDOUT_LOG" 2>"$STDERR_LOG" &
+          PID=$!
+
+          sleep 8
+
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "=== startup-stdout.txt ==="
+            cat "$STDOUT_LOG" || true
+            echo "=== startup-stderr.txt ==="
+            cat "$STDERR_LOG" || true
+            echo "=== ldd ==="
+            ldd "$EXE" || true
+            echo "=== packaged files ==="
+            find "$WORKDIR" -maxdepth 8 -print || true
+            wait "$PID" || true
+            exit 1
+          fi
+
+          kill "$PID" || true
+          wait "$PID" || true
+
+      - name: Package app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "${{ matrix.package_dir }}"
+
+          APP_BUNDLE=$(find "${{ matrix.build_dir }}" -maxdepth 3 -name "Findex.app" | head -n 1)
+          if [ -z "$APP_BUNDLE" ]; then
+            echo "Findex.app not found"
+            exit 1
+          fi
+
+          cp -R "$APP_BUNDLE" "${{ matrix.package_dir }}/"
+
+          MACDEPLOYQT=$(find "$QT_ROOT_DIR" -name macdeployqt | head -n 1)
+          if [ -z "$MACDEPLOYQT" ]; then
+            echo "macdeployqt not found"
+            exit 1
+          fi
+
+          "$MACDEPLOYQT" "${{ matrix.package_dir }}/Findex.app" \
+            -qmldir="$GITHUB_WORKSPACE" \
+            -verbose=2
+
+          rm -rf "${{ matrix.package_dir }}/Findex.app/Contents/PlugIns/sqldrivers" || true
+
+          codesign --force --deep --sign - "${{ matrix.package_dir }}/Findex.app"
+
+          echo "Packaged files:"
+          find "${{ matrix.package_dir }}" -maxdepth 6 -print
+
+      - name: Smoke test packaged app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          WORKDIR="$(realpath "${{ matrix.package_dir }}")"
+          APP_BUNDLE="$WORKDIR/Findex.app"
+
+          if [ ! -d "$APP_BUNDLE" ]; then
+            echo "=== packaged files ==="
+            find "$WORKDIR" -maxdepth 6 -print || true
+            exit 1
+          fi
+
+          EXE="$APP_BUNDLE/Contents/MacOS/Findex"
+          if [ ! -x "$EXE" ]; then
+            echo "Executable not found: $EXE"
+            find "$APP_BUNDLE" -maxdepth 6 -print || true
+            exit 1
+          fi
+
+          STDOUT_LOG="$WORKDIR/startup-stdout.txt"
+          STDERR_LOG="$WORKDIR/startup-stderr.txt"
+          rm -f "$STDOUT_LOG" "$STDERR_LOG"
+
+          export QT_DEBUG_PLUGINS=1
+          export QML_IMPORT_TRACE=1
+
+          "$EXE" >"$STDOUT_LOG" 2>"$STDERR_LOG" &
+          PID=$!
+
+          sleep 8
+
+          if ! kill -0 "$PID" 2>/dev/null; then
+            echo "=== startup-stdout.txt ==="
+            cat "$STDOUT_LOG" || true
+            echo "=== startup-stderr.txt ==="
+            cat "$STDERR_LOG" || true
+            echo "=== otool app binary ==="
+            otool -L "$EXE" || true
+            echo "=== packaged files ==="
+            find "$APP_BUNDLE" -maxdepth 6 -print || true
+            wait "$PID" || true
+            exit 1
+          fi
+
+          kill "$PID" || true
+          wait "$PID" || true
+
+      - name: Package app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          New-Item -ItemType Directory -Force -Path "${{ matrix.package_dir }}" | Out-Null
+
+          $exe = Get-ChildItem -Path "${{ matrix.build_dir }}" -Recurse -Filter "Findex.exe" |
+            Select-Object -First 1
+
+          if (-not $exe) {
+            Write-Host "=== build contents ==="
+            Get-ChildItem -Recurse "${{ matrix.build_dir }}" |
+              Select-Object FullName |
+              Format-Table -AutoSize |
+              Out-String -Width 4096 |
+              Write-Host
+
+            throw "Findex.exe not found in build output"
+          }
+
+          Copy-Item $exe.FullName "${{ matrix.package_dir }}\" -Force
+
+          if (-not (Test-Path "${{ matrix.package_dir }}\Findex.exe")) {
+            throw "Copy to dist failed"
+          }
+
+          $deployTool = Get-ChildItem -Path $env:QT_ROOT_DIR -Recurse -Filter "windeployqt.exe" |
+            Select-Object -First 1
+
+          if (-not $deployTool) {
+            throw "windeployqt.exe not found under QT_ROOT_DIR=$env:QT_ROOT_DIR"
+          }
+
+          & $deployTool.FullName `
+            --release `
+            --compiler-runtime `
+            --qmldir "$env:GITHUB_WORKSPACE" `
+            --dir "${{ matrix.package_dir }}" `
+            "${{ matrix.package_dir }}\Findex.exe"
+
+          if (-not (Test-Path "${{ matrix.package_dir }}\platforms\qwindows.dll")) {
+            throw "qwindows.dll was not deployed"
+          }
+
+          Write-Host "=== dist contents after windeployqt ==="
+          Get-ChildItem -Recurse "${{ matrix.package_dir }}" |
+            Select-Object FullName |
+            Format-Table -AutoSize |
+            Out-String -Width 4096 |
+            Write-Host
+
+      - name: Smoke test packaged app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+
+          $workDir = (Resolve-Path "${{ matrix.package_dir }}").Path
+
+          $exe = Get-ChildItem -Path $workDir -Recurse -Filter "Findex.exe" |
+            Select-Object -First 1
+
+          if (-not $exe) {
+            Write-Host "=== dist contents ==="
+            Get-ChildItem -Recurse $workDir |
+              Select-Object FullName |
+              Format-Table -AutoSize |
+              Out-String -Width 4096 |
+              Write-Host
+
+            throw "Findex.exe not found under $workDir"
+          }
+
+          $exePath = $exe.FullName
+          $stdoutLog = Join-Path $workDir "startup-stdout.txt"
+          $stderrLog = Join-Path $workDir "startup-stderr.txt"
+
+          Remove-Item $stdoutLog -ErrorAction SilentlyContinue
+          Remove-Item $stderrLog -ErrorAction SilentlyContinue
+
+          $env:QT_DEBUG_PLUGINS = "1"
+          $env:QML_IMPORT_TRACE = "1"
+
+          $proc = Start-Process `
+            -FilePath $exePath `
+            -WorkingDirectory $workDir `
+            -RedirectStandardOutput $stdoutLog `
+            -RedirectStandardError $stderrLog `
+            -PassThru
+
+          Start-Sleep -Seconds 8
+
+          if ($proc.HasExited) {
+            Write-Host "=== startup-stdout.txt ==="
+            if (Test-Path $stdoutLog) {
+              Get-Content $stdoutLog -Raw | Write-Host
+            } else {
+              Write-Host "No stdout log was produced."
+            }
+
+            Write-Host "=== startup-stderr.txt ==="
+            if (Test-Path $stderrLog) {
+              Get-Content $stderrLog -Raw | Write-Host
+            } else {
+              Write-Host "No stderr log was produced."
+            }
+
+            Write-Host "=== packaged files ==="
+            Get-ChildItem -Recurse $workDir |
+              Select-Object FullName |
+              Format-Table -AutoSize |
+              Out-String -Width 4096 |
+              Write-Host
+
+            throw "Findex.exe exited immediately with code $($proc.ExitCode)"
+          }
+
+          Stop-Process -Id $proc.Id -Force
+
+      - name: Zip app (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ matrix.package_dir }}"
+          tar -czf "../${{ matrix.artifact_name }}.tar.gz" .
+
+      - name: Zip app (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "${{ matrix.package_dir }}\*" -DestinationPath "${{ matrix.artifact_name }}.zip" -Force
+
+      - name: Zip app (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ matrix.package_dir }}"
+          ditto -c -k --sequesterRsrc --keepParent "Findex.app" "app-macos.zip"
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.zip
+          if-no-files-found: error
+
+      - name: Upload artifact (Linux)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.artifact_name }}.tar.gz
+          if-no-files-found: error
+
+      - name: Upload artifact (macOS)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: ${{ matrix.package_dir }}/app-macos.zip
+          if-no-files-found: error

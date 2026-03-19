@@ -1,7 +1,6 @@
 <RCC>
     <qresource prefix="/">
         <file>Main.qml</file>
-        <file>AppIcon.qml</file>
         <file>assets/icons/add.svg</file>
         <file>assets/icons/arrow-back.svg</file>
         <file>assets/icons/arrow-forward.svg</file>
@@ -40,5 +39,17 @@
         <file>assets/icons/usb.svg</file>
         <file>assets/icons/view-list.svg</file>
         <file>assets/icons/view-list-alt.svg</file>
+        <file>qml/components/AppIcon.qml</file>
+        <file>qml/components/StyledMenu.qml</file>
+        <file>qml/components/StyledMenuItem.qml</file>
+        <file>qml/components/StyledMenuSeparator.qml</file>
+        <file>qml/components/IconButton.qml</file>
+        <file>qml/components/WindowButton.qml</file>
+        <file>qml/components/ThinProgressBar.qml</file>
+        <file>qml/components/NotificationCard.qml</file>
+        <file>qml/components/ExplorerScrollbarV.qml</file>
+        <file>qml/components/ExplorerScrollbarH.qml</file>
+        <file>qml/components/SelectionBand.qml</file>
+        <file>qml/components/InlineRenameField.qml</file>
     </qresource>
 </RCC>

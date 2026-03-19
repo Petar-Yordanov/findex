@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Findex
+Exec=findex
+Icon=findex-plain
+Categories=Utility;FileManager;
+Terminal=false
