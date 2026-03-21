@@ -7,6 +7,10 @@ import Qt.labs.qmlmodels as Labs
 import "components/foundation"
 import "components/theme" as Theme
 import "features/files"
+import "features/breadcrumb"
+import "features/sidebar"
+import "features/tabs"
+import "features/views"
 
 Window {
     id: root
@@ -48,7 +52,7 @@ Window {
     property string selectedSidebarLabel: "Local Disk (C:)"
     property string selectedSidebarKind: "drive"
 
-    property int resizeMargin: visibility === Window.Maximized ? 0 : 6
+    property int resizeMargin: visibility === Window.Maximized ? 0 : Theme.Metrics.spacingSm
 
     property int detailsNameWidth: 430
     property int detailsDateWidth: 220
@@ -73,7 +77,7 @@ Window {
     property int contextBreadcrumbIndex: -1
 
     property int tabWidth: 210
-    property int tabSpacing: 6
+    property int tabSpacing: Theme.Metrics.spacingSm
     property int tabAutoScrollDirection: 0 // -1 left, 1 right, 0 none
     property int draggedTabIndex: -1
     property real draggedTabOffset: 0
@@ -595,7 +599,7 @@ Window {
     BaseTooltip {
         id: buttonTooltip
         text: root.tooltipText
-        darkTheme: root.darkTheme
+        darkTheme: Theme.AppTheme.isDark
         shown: false
     }
 
@@ -1712,9 +1716,9 @@ Window {
 
         background: Rectangle {
             radius: 14
-            color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+            color: Theme.AppTheme.popupBg
             border.color: Theme.AppTheme.border
-            border.width: 1
+            border.width: Theme.Metrics.borderWidth
         }
 
         contentItem: Column {
@@ -1732,7 +1736,7 @@ Window {
                     anchors.leftMargin: 18
                     text: root.confirmDialogTitle
                     color: Theme.AppTheme.text
-                    font.pixelSize: 15
+                    font.pixelSize: Theme.Typography.titleSm
                     font.bold: true
                 }
             }
@@ -1752,7 +1756,7 @@ Window {
                     anchors.margins: 18
                     text: root.confirmDialogMessage
                     color: Theme.AppTheme.text
-                    font.pixelSize: 13
+                    font.pixelSize: Theme.Typography.bodyLg
                     wrapMode: Text.Wrap
                     verticalAlignment: Text.AlignVCenter
                 }
@@ -1767,7 +1771,7 @@ Window {
             Row {
                 width: parent ? parent.width : 340
                 height: 48
-                spacing: 10
+                spacing: Theme.Metrics.spacingLg
 
                 Item { width: 18; height: 1 }
 
@@ -1786,7 +1790,7 @@ Window {
                         anchors.centerIn: parent
                         text: "Yes"
                         color: "#ffffff"
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.Typography.body
                         font.bold: true
                     }
 
@@ -1818,13 +1822,13 @@ Window {
                              ? Theme.AppTheme.hover
                              : "transparent"
                     border.color: Theme.AppTheme.border
-                    border.width: 1
+                    border.width: Theme.Metrics.borderWidth
 
                     Text {
                         anchors.centerIn: parent
                         text: "No"
                         color: Theme.AppTheme.text
-                        font.pixelSize: 12
+                        font.pixelSize: Theme.Typography.body
                         font.bold: true
                     }
 
@@ -1845,7 +1849,7 @@ Window {
         id: notificationsPopup
         width: 340
         height: 320
-        padding: 8
+        padding: Theme.Metrics.spacingMd
         modal: false
         focus: true
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
@@ -1853,20 +1857,20 @@ Window {
         background: Rectangle {
             implicitWidth: notificationsPopup.width
             implicitHeight: notificationsPopup.height
-            radius: 12
-            color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+            radius: Theme.Metrics.radiusXl
+            color: Theme.AppTheme.popupBg
             border.color: Theme.AppTheme.border
-            border.width: 1
+            border.width: Theme.Metrics.borderWidth
         }
 
         Column {
             anchors.fill: parent
-            spacing: 8
+            spacing: Theme.Metrics.spacingMd
 
             Text {
                 text: "Notifications"
                 color: Theme.AppTheme.text
-                font.pixelSize: 13
+                font.pixelSize: Theme.Typography.bodyLg
                 font.bold: true
                 leftPadding: 4
             }
@@ -1881,7 +1885,7 @@ Window {
                 Column {
                     id: trayColumn
                     width: parent.width
-                    spacing: 8
+                    spacing: Theme.Metrics.spacingMd
 
                     Repeater {
                         model: notificationsModel
@@ -1890,38 +1894,38 @@ Window {
                             required property var modelData
                             width: notificationsPopup.width - 16
                             height: modelData.progress >= 0 ? 78 : 54
-                            radius: 10
-                            color: Theme.AppTheme.isDark ? "#232c3a" : "#f8fafc"
+                            radius: Theme.Metrics.radiusLg
+                            color: Theme.AppTheme.popupBg
                             border.color: Theme.AppTheme.borderSoft
-                            border.width: 1
+                            border.width: Theme.Metrics.borderWidth
 
                             Column {
                                 anchors.fill: parent
                                 anchors.margins: 10
-                                spacing: 6
+                                spacing: Theme.Metrics.spacingSm
 
                                 Row {
                                     width: parent.width
-                                    spacing: 8
+                                    spacing: Theme.Metrics.spacingMd
 
                                     Text {
                                         width: parent.width - 30
                                         text: modelData.title
                                         color: Theme.AppTheme.text
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.Typography.body
                                         elide: Text.ElideRight
                                     }
 
                                     Rectangle {
                                         width: 20
                                         height: 20
-                                        radius: 10
+                                        radius: Theme.Metrics.radiusLg
                                         color: trayCloseMouse.containsMouse ? Theme.AppTheme.hover : "transparent"
 
                                         AppIcon {
                                             name: "close"
                                             darkTheme: Theme.AppTheme.isDark
-                                            iconSize: 12
+                                            iconSize: Theme.Metrics.iconXs
                                             iconOpacity: 0.75
                                         }
 
@@ -1938,13 +1942,13 @@ Window {
                                     visible: modelData.progress >= 0
                                     width: parent.width
                                     height: 6
-                                    radius: 3
+                                    radius: Theme.Metrics.radiusXs
                                     color: Theme.AppTheme.driveFree
 
                                     Rectangle {
                                         width: parent.width * Math.max(0, Math.min(1, modelData.progress / 100))
                                         height: parent.height
-                                        radius: 3
+                                        radius: Theme.Metrics.radiusXs
                                         color: modelData.done ? Theme.AppTheme.driveUsedBlue : Theme.AppTheme.accent
                                     }
                                 }
@@ -1966,20 +1970,20 @@ Window {
         closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
         background: Rectangle {
-            radius: 12
+            radius: Theme.Metrics.radiusXl
             color: Theme.AppTheme.isDark ? "#1b2230" : "#fcfcfd"
             border.color: Theme.AppTheme.border
-            border.width: 1
+            border.width: Theme.Metrics.borderWidth
         }
 
         Column {
             anchors.fill: parent
-            spacing: 4
+            spacing: Theme.Metrics.spacingXs
 
             Rectangle {
                 width: parent.width
                 height: 40
-                radius: 8
+                radius: Theme.Metrics.radiusMd
                 color: folderMouse.pressed
                        ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
                        : folderMouse.containsMouse
@@ -1994,7 +1998,7 @@ Window {
                     anchors.centerIn: parent
                     name: "folder"
                     darkTheme: Theme.AppTheme.isDark
-                    iconSize: 16
+                    iconSize: Theme.Metrics.iconMd
                 }
 
                 MouseArea {
@@ -2012,7 +2016,7 @@ Window {
             Rectangle {
                 width: parent.width
                 height: 40
-                radius: 8
+                radius: Theme.Metrics.radiusMd
                 color: driveMouse.pressed
                        ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
                        : driveMouse.containsMouse
@@ -2027,7 +2031,7 @@ Window {
                     anchors.centerIn: parent
                     name: "hard-drive"
                     darkTheme: Theme.AppTheme.isDark
-                    iconSize: 16
+                    iconSize: Theme.Metrics.iconMd
                 }
 
                 MouseArea {
@@ -2173,1823 +2177,53 @@ Window {
                 applySnapshot(backend.setTheme("Light"))
             }
         }
-        StyledMenuItem {
-            text: "System"
-            darkTheme: Theme.AppTheme.isDark
-            onTriggered: {
-                root.themeMode = "System"
-                applySnapshot(backend.setTheme("System"))
-            }
-        }
     }
 
     Component {
         id: detailsViewComponent
 
-        Item {
-            id: detailsRoot
-            anchors.margins: 10
-            clip: true
-
-            function relayout() {
-                fileTable.forceLayout()
-            }
-
-            function clampX(x) {
-                return Math.max(0, Math.min(width, x))
-            }
-
-            function clampY(y) {
-                return Math.max(0, Math.min(height, y))
-            }
-
-            TableView {
-                id: fileTable
-                anchors.fill: parent
-                anchors.leftMargin: 10
-                anchors.rightMargin: 10
-                anchors.topMargin: 6
-                anchors.bottomMargin: 6
-                clip: true
-                boundsBehavior: Flickable.StopAtBounds
-                rowSpacing: 1
-                columnSpacing: 0
-                model: filesModel
-
-                onWidthChanged: forceLayout()
-                Component.onCompleted: forceLayout()
-
-                columnWidthProvider: function(column) {
-                    switch (column) {
-                    case 0: return root.detailsNameWidth
-                    case 1: return root.detailsDateWidth
-                    case 2: return root.detailsTypeWidth
-                    case 3: return Math.max(
-                                root.detailsSizeWidth,
-                                fileTable.width - (root.detailsNameWidth + root.detailsDateWidth + root.detailsTypeWidth)
-                            )
-                    case 4: return 0
-                    default: return 120
-                    }
-                }
-
-                rowHeightProvider: function(row) {
-                    return root.detailsRowHeight
-                }
-
-                ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
-                ScrollBar.horizontal: ExplorerScrollbarH { darkTheme: Theme.AppTheme.isDark }
-
-                delegate: Rectangle {
-                    id: rowDelegate
-                    required property bool selected
-                    required property bool current
-                    required property int row
-                    required property int column
-                    required property bool editing
-
-                    readonly property bool isFolderTarget: root.fileRowValue(row, "type") === "File folder"
-                    readonly property bool sameAsDragged: root.isDraggedRow(row)
-
-                    clip: false
-                    z: column === 0 ? 50 : 1
-
-                    color: root.detailsDropHoverRow === row && isFolderTarget && !sameAsDragged
-                           ? Theme.AppTheme.selectedSoft
-                           : root.isFileRowSelected(row)
-                             ? Theme.AppTheme.selected
-                             : cellMouse.containsMouse ? Theme.AppTheme.selectedSoft : "transparent"
-
-                    Row {
-                        anchors.fill: parent
-                        anchors.leftMargin: 14
-                        anchors.rightMargin: 14
-                        spacing: 8
-
-                        AppIcon {
-                            visible: column === 0
-                            name: root.fileRowValue(row, "icon")
-                            darkTheme: Theme.AppTheme.isDark
-                            iconSize: 16
-                            anchors.verticalCenter: parent.verticalCenter
-                        }
-
-                        Text {
-                            visible: !(column === 0 && root.editingFileRow === row)
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: {
-                                if (column === 0) return root.fileRowValue(row, "name")
-                                if (column === 1) return root.fileRowValue(row, "dateModified")
-                                if (column === 2) return root.fileRowValue(row, "type")
-                                if (column === 3) return root.fileRowValue(row, "size")
-                                return ""
-                            }
-                            color: column === 0 ? Theme.AppTheme.text : Theme.AppTheme.muted
-                            font.pixelSize: 13
-                            elide: Text.ElideRight
-                            width: parent.width - (column === 0 ? 28 : 0)
-                            horizontalAlignment: Text.AlignLeft
-                        }
-
-                        TextField {
-                            id: renameField
-                            visible: column === 0 && root.editingFileRow === row
-                            width: parent.width - 28
-                            height: 24
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: root.editingFileNameDraft
-                            color: Theme.AppTheme.text
-                            font.pixelSize: 13
-                            selectByMouse: true
-                            leftPadding: 8
-                            rightPadding: 8
-                            topPadding: 0
-                            bottomPadding: 0
-
-                            property var validation: root.validateNameDraft(text)
-                            property bool showValidation: visible && text.length > 0 && !validation.ok
-
-                            background: Rectangle {
-                                radius: 6
-                                color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
-                                border.color: renameField.showValidation ? "#df5c5c" : Theme.AppTheme.accent
-                                border.width: 1
-                            }
-
-                            onVisibleChanged: {
-                                if (visible) {
-                                    forceActiveFocus()
-                                    selectAll()
-                                }
-                            }
-
-                            onTextChanged: {
-                                if (visible)
-                                    root.editingFileNameDraft = text
-                            }
-
-                            onAccepted: {
-                                if (validation.ok)
-                                    root.commitRenameRow(row, text)
-                            }
-
-                            onActiveFocusChanged: {
-                                if (!activeFocus && visible) {
-                                    if (validation.ok)
-                                        root.commitRenameRow(row, text)
-                                }
-                            }
-
-                            Keys.onEscapePressed: root.cancelRenameRow()
-                        }
-
-                        Rectangle {
-                            visible: column === 0 && root.editingFileRow === row && renameField.showValidation
-                            z: 300
-                            x: 22
-                            y: parent.height + 4
-                            width: Math.min(360, fileTable.width - 40)
-                            height: validationText.implicitHeight + 12
-                            radius: 6
-                            color: Theme.AppTheme.isDark ? "#2a1618" : "#fff1f1"
-                            border.color: "#df5c5c"
-                            border.width: 1
-
-                            Text {
-                                id: validationText
-                                anchors.fill: parent
-                                anchors.margins: 6
-                                text: renameField.validation.message
-                                color: Theme.AppTheme.isDark ? "#ffb3b3" : "#b42318"
-                                font.pixelSize: 12
-                                wrapMode: Text.Wrap
-                            }
-                        }
-                    }
-
-                    DropArea {
-                        id: rowDropArea
-
-                        enabled: column === 0
-                        x: 0
-                        y: 0
-                        width: fileTable.width
-                        height: parent.height
-                        z: 100
-
-                        onEntered: function(drag) {
-                            var ok = rowDelegate.isFolderTarget && !rowDelegate.sameAsDragged
-                            drag.accepted = ok
-                            if (ok)
-                                root.detailsDropHoverRow = row
-                        }
-
-                        onExited: function(drag) {
-                            if (root.detailsDropHoverRow === row)
-                                root.detailsDropHoverRow = -1
-                        }
-
-                        onDropped: function(drop) {
-                            if (rowDelegate.isFolderTarget && !rowDelegate.sameAsDragged) {
-                                drop.accepted = true
-                                root.handleDroppedItem(root.fileRowValue(row, "name"), "folder")
-                            }
-
-                            if (root.detailsDropHoverRow === row)
-                                root.detailsDropHoverRow = -1
-                        }
-                    }
-
-                    MouseArea {
-                        id: cellMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        preventStealing: true
-
-                        drag.target: column === 0 ? dragProxy : null
-                        drag.axis: Drag.XAndYAxis
-                        drag.smoothed: false
-
-                        onClicked: function(mouse) {
-                            mouse.accepted = true
-                        }
-
-                        onPressed: function(mouse) {
-                            if (root.editingFileRow >= 0 && root.editingFileRow !== row) {
-                                root.commitRenameRow(root.editingFileRow, root.editingFileNameDraft)
-                            }
-
-                            var ctrl = (mouse.modifiers & Qt.ControlModifier) !== 0
-                            var shift = (mouse.modifiers & Qt.ShiftModifier) !== 0
-                            var alreadySelected = root.isFileRowSelected(row)
-
-                            if (mouse.button === Qt.RightButton) {
-                                if (!alreadySelected)
-                                    root.selectOnlyFileRow(row)
-
-                                root.contextFileRow = row
-
-                                if (root.selectedFileCount() > 1)
-                                    multiFileContextMenu.popup()
-                                else
-                                    fileRowContextMenu.popup()
-
-                                return
-                            }
-
-                            if (mouse.button === Qt.LeftButton) {
-                                if (shift) {
-                                    var anchor = root.selectionAnchorRow >= 0 ? root.selectionAnchorRow : row
-                                    root.selectFileRange(anchor, row, true)
-                                } else if (ctrl) {
-                                    root.toggleFileRowSelection(row)
-                                } else {
-                                    if (!alreadySelected)
-                                        root.selectOnlyFileRow(row)
-                                }
-
-                                if (column === 0) {
-                                    if (!alreadySelected && !ctrl && !shift)
-                                        root.beginFileDrag(row)
-                                    else if (alreadySelected && !ctrl && !shift)
-                                        root.beginFileDrag(row)
-                                    else if (root.isFileRowSelected(row))
-                                        root.beginFileDrag(row)
-                                }
-                            }
-                        }
-
-                        onDoubleClicked: {
-                            applySnapshot(backend.openItems(root.singleItemForBackend(row)))
-                        }
-
-                        Item {
-                            id: dragProxy
-                            x: 0
-                            y: 0
-                            width: 24
-                            height: 24
-                            opacity: 0.01
-
-                            Drag.active: column === 0 && cellMouse.drag.active
-                            Drag.dragType: Drag.Automatic
-                            Drag.supportedActions: Qt.MoveAction
-                            Drag.source: rowDelegate
-                            Drag.hotSpot.x: 18
-                            Drag.hotSpot.y: 18
-                            Drag.imageSource: root.dragPreviewReady ? root.draggedFilePreviewUrl : ""
-                            Drag.mimeData: ({
-                                "application/x-fileexplorer-item": JSON.stringify({
-                                    row: row,
-                                    rows: root.selectedFileRowsArray(),
-                                    count: root.draggedFileCount,
-                                    name: root.draggedFileName,
-                                    type: root.draggedFileType,
-                                    icon: root.draggedFileIcon
-                                })
-                            })
-
-                            Drag.onDragFinished: function(dropAction) {
-                                dragProxy.x = 0
-                                dragProxy.y = 0
-                                root.detailsDropHoverRow = -1
-                                root.clearFileDrag()
-                            }
-                        }
-                    }
-                }
-            }
-
-            FontMetrics {
-                id: detailsFontMetrics
-                font.pixelSize: 13
-            }
-
-            MouseArea {
-                id: detailsEmptyAreaMouse
-                anchors.fill: parent
-                z: 0
-                acceptedButtons: Qt.LeftButton | Qt.RightButton
-                preventStealing: true
-
-                property bool bandSelecting: false
-                property bool pendingEmptyContextMenu: false
-
-                function rowAtY(yInContent) {
-                    var step = root.detailsRowHeight + fileTable.rowSpacing
-                    if (step <= 0)
-                        return -1
-
-                    var row = Math.floor(yInContent / step)
-                    if (row < 0 || row >= filesModel.rows.length)
-                        return -1
-
-                    var rowTop = row * step
-                    var rowBottom = rowTop + root.detailsRowHeight
-                    if (yInContent < rowTop || yInContent > rowBottom)
-                        return -1
-
-                    return row
-                }
-
-                function pointHitsRowContent(xInContent, yInContent) {
-                    var row = rowAtY(yInContent)
-                    if (row < 0)
-                        return false
-
-                    var firstColumnWidth = root.detailsNameWidth
-                    if (xInContent < 0 || xInContent > firstColumnWidth)
-                        return false
-
-                    var leftInset = 14
-                    var iconWidth = 16
-                    var gapAfterIcon = 8
-                    var rightPadding = 14
-                    var textAvailableWidth = Math.max(0, firstColumnWidth - leftInset - iconWidth - gapAfterIcon - rightPadding)
-                    var textWidth = Math.min(
-                        textAvailableWidth,
-                        detailsFontMetrics.advanceWidth(root.fileRowValue(row, "name"))
-                    )
-
-                    var contentLeft = leftInset
-                    var contentRight = leftInset + iconWidth + gapAfterIcon + textWidth + 10
-
-                    return xInContent >= contentLeft && xInContent <= contentRight
-                }
-
-                onPressed: function(mouse) {
-                    if (root.editingFileRow >= 0) {
-                        root.commitRenameRow(root.editingFileRow, root.editingFileNameDraft)
-                    }
-
-                    var xInContent = mouse.x + fileTable.contentX
-                    var yInContent = mouse.y + fileTable.contentY
-
-                    var overRealItemContent = pointHitsRowContent(xInContent, yInContent)
-                    var row = rowAtY(yInContent)
-
-                    var clickedEmptyArea =
-                            row < 0
-                            || xInContent < 0
-                            || xInContent > fileTable.contentWidth
-                            || yInContent > fileTable.contentHeight
-                            || !overRealItemContent
-
-                    var bothButtons =
-                            (detailsEmptyAreaMouse.pressedButtons & Qt.LeftButton)
-                            && (detailsEmptyAreaMouse.pressedButtons & Qt.RightButton)
-
-                    bandSelecting = bothButtons || (mouse.button === Qt.LeftButton && clickedEmptyArea)
-                    pendingEmptyContextMenu = (mouse.button === Qt.RightButton && clickedEmptyArea && !bothButtons)
-
-                    if (bandSelecting) {
-                        root.detailsSelectionActive = true
-                        root.detailsSelectionMoved = false
-                        root.detailsSelectionStartX = detailsRoot.clampX(mouse.x)
-                        root.detailsSelectionStartY = detailsRoot.clampY(mouse.y)
-                        root.detailsSelectionCurrentX = root.detailsSelectionStartX
-                        root.detailsSelectionCurrentY = root.detailsSelectionStartY
-                        root.clearFileSelection()
-                        root.contextFileRow = -1
-                        mouse.accepted = true
-                        return
-                    }
-
-                    if (pendingEmptyContextMenu) {
-                        root.clearFileSelection()
-                        mouse.accepted = true
-                        return
-                    }
-
-                    mouse.accepted = false
-                }
-
-                onPositionChanged: function(mouse) {
-                    if (!bandSelecting || !root.detailsSelectionActive)
-                        return
-
-                    root.detailsSelectionCurrentX = detailsRoot.clampX(mouse.x)
-                    root.detailsSelectionCurrentY = detailsRoot.clampY(mouse.y)
-
-                    if (Math.abs(root.detailsSelectionCurrentX - root.detailsSelectionStartX) > 2
-                            || Math.abs(root.detailsSelectionCurrentY - root.detailsSelectionStartY) > 2) {
-                        root.detailsSelectionMoved = true
-                    }
-
-                    root.updateDetailsBandSelection(fileTable)
-                }
-
-                onReleased: function(mouse) {
-                    if (pendingEmptyContextMenu && !root.detailsSelectionMoved) {
-                        root.contextFileRow = -1
-                        emptyAreaContextMenu.popup()
-                    }
-
-                    bandSelecting = false
-                    pendingEmptyContextMenu = false
-                    root.detailsSelectionActive = false
-                    root.detailsSelectionMoved = false
-                }
-
-                onCanceled: {
-                    bandSelecting = false
-                    pendingEmptyContextMenu = false
-                    root.detailsSelectionActive = false
-                    root.detailsSelectionMoved = false
-                }
-            }
-
-            Rectangle {
-                visible: root.detailsSelectionActive && root.detailsSelectionMoved
-                z: 999
-
-                x: Math.min(root.detailsSelectionStartX, root.detailsSelectionCurrentX)
-                y: Math.min(root.detailsSelectionStartY, root.detailsSelectionCurrentY)
-                width: Math.abs(root.detailsSelectionCurrentX - root.detailsSelectionStartX)
-                height: Math.abs(root.detailsSelectionCurrentY - root.detailsSelectionStartY)
-
-                color: Qt.rgba(76 / 255, 130 / 255, 247 / 255, 0.18)
-                border.color: Theme.AppTheme.accent
-                border.width: 1
-            }
+        DetailsFileView {
+            rootWindow: root
+            filesTableModel: filesModel
+            rowContextMenu: fileRowContextMenu
+            multiSelectionContextMenu: multiFileContextMenu
+            emptyContextMenu: emptyAreaContextMenu
         }
     }
 
     Component {
         id: tilesViewComponent
 
-        Item {
-            id: tilesRoot
-
-            property bool selectionActive: false
-            property bool selectionMoved: false
-            property real selectionStartX: 0
-            property real selectionStartY: 0
-            property real selectionCurrentX: 0
-            property real selectionCurrentY: 0
-
-            FontMetrics {
-                id: tilesFontMetrics
-                font.pixelSize: 14
-            }
-
-            function tileHitWidthForName(name) {
-                return Math.min(
-                    Math.max(220, tilesFontMetrics.advanceWidth(name || "") + 110),
-                    360
-                )
-            }
-
-            function tileHitRectForRow(row) {
-                return {
-                    x: 14,
-                    y: row * (82 + tilesView.spacing) + 10,
-                    w: tileHitWidthForName(filesModel.rows[row].name),
-                    h: 62
-                }
-            }
-
-            function tileSelectionRectForRow(row) {
-                return {
-                    x: 0,
-                    y: row * (82 + tilesView.spacing),
-                    w: tilesView.width,
-                    h: 82
-                }
-            }
-
-            function clampX(x) {
-                return Math.max(0, Math.min(width, x))
-            }
-
-            function clampY(y) {
-                return Math.max(0, Math.min(height, y))
-            }
-
-            function updateBandSelection() {
-                var left = Math.min(selectionStartX, selectionCurrentX)
-                var right = Math.max(selectionStartX, selectionCurrentX)
-                var top = Math.min(selectionStartY, selectionCurrentY) + tilesView.contentY
-                var bottom = Math.max(selectionStartY, selectionCurrentY) + tilesView.contentY
-
-                var next = {}
-
-                for (var i = 0; i < filesModel.rows.length; ++i) {
-                    var r = tileSelectionRectForRow(i)
-
-                    if (right >= r.x && left <= (r.x + r.w)
-                            && bottom >= r.y && top <= (r.y + r.h)) {
-                        next[i] = true
-                    }
-                }
-
-                root.selectedFileRows = next
-
-                var first = -1
-                for (var k in next) {
-                    first = parseInt(k, 10)
-                    break
-                }
-                root.currentFileRow = first
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 12
-                radius: 10
-                color: "transparent"
-
-                ListView {
-                    id: tilesView
-                    anchors.fill: parent
-                    clip: true
-                    spacing: 2
-                    model: filesModel.rows
-                    interactive: !tilesRoot.selectionActive
-                    boundsBehavior: Flickable.StopAtBounds
-                    pixelAligned: true
-                    maximumFlickVelocity: 2200
-                    flickDeceleration: 9000
-
-                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
-                    ScrollBar.horizontal: null
-
-                    delegate: Item {
-                        id: tileDelegate
-                        required property int index
-                        required property var modelData
-
-                        width: ListView.view.width
-                        height: 82
-
-                        readonly property bool isFolderTarget: modelData.type === "File folder"
-                        readonly property bool sameAsDragged: root.isDraggedRow(index)
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 8
-                            color: root.detailsDropHoverRow === index && tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged
-                                   ? Theme.AppTheme.selectedSoft
-                                   : root.isFileRowSelected(index)
-                                     ? Theme.AppTheme.selected
-                                     : tileMouse.containsMouse ? Theme.AppTheme.selectedSoft : "transparent"
-                            border.color: root.detailsDropHoverRow === index && tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged
-                                          ? Theme.AppTheme.accent
-                                          : "transparent"
-                            border.width: root.detailsDropHoverRow === index && tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged ? 1 : 0
-                        }
-
-                        Rectangle {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.bottom: parent.bottom
-                            height: 1
-                            color: Theme.AppTheme.borderSoft
-                            opacity: 0.9
-                        }
-
-                        Row {
-                            anchors.fill: parent
-                            anchors.leftMargin: 14
-                            anchors.rightMargin: 18
-                            anchors.topMargin: 10
-                            anchors.bottomMargin: 10
-                            spacing: 14
-
-                            AppIcon {
-                                anchors.verticalCenter: parent.verticalCenter
-                                name: modelData.icon
-                                darkTheme: Theme.AppTheme.isDark
-                                iconSize: 34
-                            }
-
-                            Column {
-                                width: Math.max(220, parent.width - 420)
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 4
-
-                                Text {
-                                    visible: root.editingFileRow !== index
-                                    text: modelData.name
-                                    color: Theme.AppTheme.text
-                                    font.pixelSize: 14
-                                    elide: Text.ElideRight
-                                    width: parent.width
-                                }
-
-                                TextField {
-                                    visible: root.editingFileRow === index
-                                    width: parent.width
-                                    height: 26
-                                    text: root.editingFileNameDraft
-                                    color: Theme.AppTheme.text
-                                    font.pixelSize: 14
-                                    selectByMouse: true
-                                    leftPadding: 8
-                                    rightPadding: 8
-                                    topPadding: 0
-                                    bottomPadding: 0
-
-                                    background: Rectangle {
-                                        radius: 6
-                                        color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
-                                        border.color: Theme.AppTheme.accent
-                                        border.width: 1
-                                    }
-
-                                    onVisibleChanged: {
-                                        if (visible) {
-                                            forceActiveFocus()
-                                            selectAll()
-                                        }
-                                    }
-
-                                    onTextChanged: {
-                                        if (visible)
-                                            root.editingFileNameDraft = text
-                                    }
-
-                                    onAccepted: root.commitRenameRow(index, root.editingFileNameDraft)
-
-                                    onActiveFocusChanged: {
-                                        if (!activeFocus && visible)
-                                            root.commitRenameRow(index, root.editingFileNameDraft)
-                                    }
-
-                                    Keys.onEscapePressed: root.cancelRenameRow()
-                                }
-
-                                Text {
-                                    text: "Type: " + (modelData.type || "")
-                                    color: Theme.AppTheme.muted
-                                    font.pixelSize: 11
-                                    elide: Text.ElideRight
-                                    width: parent.width
-                                }
-                            }
-
-                            Item { width: 1; height: 1 }
-
-                            Column {
-                                width: 280
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 4
-
-                                Text {
-                                    text: "Date modified: " + (modelData.dateModified || "")
-                                    color: Theme.AppTheme.text
-                                    font.pixelSize: 11
-                                    elide: Text.ElideRight
-                                    width: parent.width
-                                }
-
-                                Text {
-                                    text: "Size: " + ((modelData.size && modelData.size !== "") ? modelData.size : "—")
-                                    color: Theme.AppTheme.text
-                                    font.pixelSize: 11
-                                    elide: Text.ElideRight
-                                    width: parent.width
-                                }
-                            }
-                        }
-
-                        DropArea {
-                            anchors.fill: parent
-
-                            onEntered: function(drag) {
-                                var ok = tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged
-                                drag.accepted = ok
-                                if (ok)
-                                    root.detailsDropHoverRow = index
-                            }
-
-                            onExited: function(drag) {
-                                if (root.detailsDropHoverRow === index)
-                                    root.detailsDropHoverRow = -1
-                            }
-
-                            onDropped: function(drop) {
-                                if (tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged) {
-                                    drop.accepted = true
-                                    root.handleDroppedItem(modelData.name, "folder")
-                                }
-
-                                if (root.detailsDropHoverRow === index)
-                                    root.detailsDropHoverRow = -1
-                            }
-                        }
-
-                        MouseArea {
-                            id: tileMouse
-                            x: 14
-                            y: 10
-                            width: tilesRoot.tileHitWidthForName(modelData.name)
-                            height: 62
-                            hoverEnabled: true
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            preventStealing: true
-
-                            drag.target: dragProxy
-                            drag.axis: Drag.XAndYAxis
-                            drag.smoothed: false
-
-                            onClicked: function(mouse) {
-                                mouse.accepted = true
-                            }
-
-                            onPressed: function(mouse) {
-                                if (root.editingFileRow >= 0 && root.editingFileRow !== index)
-                                    root.commitRenameRow(root.editingFileRow, root.editingFileNameDraft)
-
-                                var ctrl = (mouse.modifiers & Qt.ControlModifier) !== 0
-                                var shift = (mouse.modifiers & Qt.ShiftModifier) !== 0
-                                var alreadySelected = root.isFileRowSelected(index)
-
-                                if (mouse.button === Qt.RightButton) {
-                                    if (!alreadySelected)
-                                        root.selectOnlyFileRow(index)
-
-                                    root.contextFileRow = index
-
-                                    if (root.selectedFileCount() > 1)
-                                        multiFileContextMenu.popup()
-                                    else
-                                        fileRowContextMenu.popup()
-
-                                    return
-                                }
-
-                                if (mouse.button === Qt.LeftButton) {
-                                    if (shift) {
-                                        var anchor = root.selectionAnchorRow >= 0 ? root.selectionAnchorRow : index
-                                        root.selectFileRange(anchor, index, true)
-                                    } else if (ctrl) {
-                                        root.toggleFileRowSelection(index)
-                                    } else {
-                                        if (!alreadySelected)
-                                            root.selectOnlyFileRow(index)
-                                    }
-
-                                    if (!ctrl && !shift && root.isFileRowSelected(index))
-                                        root.beginFileDrag(index)
-                                }
-                            }
-
-                            onDoubleClicked: {
-                                applySnapshot(backend.openItems(root.singleItemForBackend(index)))
-                            }
-
-                            Item {
-                                id: dragProxy
-                                x: 0
-                                y: 0
-                                width: 24
-                                height: 24
-                                opacity: 0.01
-
-                                Drag.active: tileMouse.drag.active
-                                Drag.dragType: Drag.Automatic
-                                Drag.supportedActions: Qt.MoveAction
-                                Drag.source: tileDelegate
-                                Drag.hotSpot.x: 18
-                                Drag.hotSpot.y: 18
-                                Drag.imageSource: root.dragPreviewReady ? root.draggedFilePreviewUrl : ""
-                                Drag.mimeData: ({
-                                    "application/x-fileexplorer-item": JSON.stringify({
-                                        row: index,
-                                        rows: root.selectedFileRowsArray(),
-                                        count: root.draggedFileCount,
-                                        name: root.draggedFileName,
-                                        type: root.draggedFileType,
-                                        icon: root.draggedFileIcon
-                                    })
-                                })
-
-                                Drag.onDragFinished: function(dropAction) {
-                                    dragProxy.x = 0
-                                    dragProxy.y = 0
-                                    root.detailsDropHoverRow = -1
-                                    root.clearFileDrag()
-                                }
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        id: tilesOverlayMouse
-                        anchors.fill: parent
-                        z: 0
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        hoverEnabled: false
-                        preventStealing: true
-
-                        property bool bandSelecting: false
-                        property bool pendingEmptyContextMenu: false
-
-                        function pointHitsRealTile(xInView, yInView) {
-                            var yInContent = yInView + tilesView.contentY
-                            var rowStep = 82 + tilesView.spacing
-                            var row = Math.floor(yInContent / rowStep)
-
-                            if (row < 0 || row >= filesModel.rows.length)
-                                return false
-
-                            var r = tilesRoot.tileHitRectForRow(row)
-
-                            return xInView >= r.x
-                                && xInView <= (r.x + r.w)
-                                && yInContent >= r.y
-                                && yInContent <= (r.y + r.h)
-                        }
-
-                        onPressed: function(mouse) {
-                            if (root.editingFileRow >= 0)
-                                root.commitRenameRow(root.editingFileRow, root.editingFileNameDraft)
-
-                            var overItem = pointHitsRealTile(mouse.x, mouse.y)
-
-                            var bothButtons =
-                                    (tilesOverlayMouse.pressedButtons & Qt.LeftButton)
-                                    && (tilesOverlayMouse.pressedButtons & Qt.RightButton)
-
-                            bandSelecting = bothButtons || (mouse.button === Qt.LeftButton && !overItem)
-                            pendingEmptyContextMenu = (mouse.button === Qt.RightButton && !overItem && !bothButtons)
-
-                            if (bandSelecting) {
-                                tilesRoot.selectionActive = true
-                                tilesRoot.selectionMoved = false
-                                tilesRoot.selectionStartX = tilesRoot.clampX(mouse.x)
-                                tilesRoot.selectionStartY = tilesRoot.clampY(mouse.y)
-                                tilesRoot.selectionCurrentX = tilesRoot.selectionStartX
-                                tilesRoot.selectionCurrentY = tilesRoot.selectionStartY
-                                root.clearFileSelection()
-                                root.contextFileRow = -1
-                                mouse.accepted = true
-                                return
-                            }
-
-                            if (pendingEmptyContextMenu) {
-                                root.clearFileSelection()
-                                mouse.accepted = true
-                                return
-                            }
-
-                            mouse.accepted = false
-                        }
-
-                        onPositionChanged: function(mouse) {
-                            if (!bandSelecting || !tilesRoot.selectionActive)
-                                return
-
-                            tilesRoot.selectionCurrentX = tilesRoot.clampX(mouse.x)
-                            tilesRoot.selectionCurrentY = tilesRoot.clampY(mouse.y)
-
-                            if (Math.abs(tilesRoot.selectionCurrentX - tilesRoot.selectionStartX) > 2
-                                    || Math.abs(tilesRoot.selectionCurrentY - tilesRoot.selectionStartY) > 2) {
-                                tilesRoot.selectionMoved = true
-                            }
-
-                            tilesRoot.updateBandSelection()
-                        }
-
-                        onReleased: function(mouse) {
-                            if (pendingEmptyContextMenu && !tilesRoot.selectionMoved) {
-                                root.contextFileRow = -1
-                                emptyAreaContextMenu.popup()
-                            }
-
-                            bandSelecting = false
-                            pendingEmptyContextMenu = false
-                            tilesRoot.selectionActive = false
-                            tilesRoot.selectionMoved = false
-                        }
-
-                        onCanceled: {
-                            bandSelecting = false
-                            pendingEmptyContextMenu = false
-                            tilesRoot.selectionActive = false
-                            tilesRoot.selectionMoved = false
-                        }
-                    }
-
-                    Rectangle {
-                        visible: tilesRoot.selectionActive && tilesRoot.selectionMoved
-                        z: 1001
-
-                        x: Math.min(tilesRoot.selectionStartX, tilesRoot.selectionCurrentX)
-                        y: Math.min(tilesRoot.selectionStartY, tilesRoot.selectionCurrentY)
-                        width: Math.abs(tilesRoot.selectionCurrentX - tilesRoot.selectionStartX)
-                        height: Math.abs(tilesRoot.selectionCurrentY - tilesRoot.selectionStartY)
-
-                        color: Qt.rgba(76 / 255, 130 / 255, 247 / 255, 0.18)
-                        border.color: Theme.AppTheme.accent
-                        border.width: 1
-                    }
-                }
-            }
+        TilesFileView {
+            rootWindow: root
+            filesTableModel: filesModel
+            rowContextMenu: fileRowContextMenu
+            multiSelectionContextMenu: multiFileContextMenu
+            emptyContextMenu: emptyAreaContextMenu
         }
     }
 
     Component {
         id: compactViewComponent
 
-        Item {
-            id: compactRoot
-
-            property bool selectionActive: false
-            property bool selectionMoved: false
-            property real selectionStartX: 0
-            property real selectionStartY: 0
-            property real selectionCurrentX: 0
-            property real selectionCurrentY: 0
-
-            FontMetrics {
-                id: compactFontMetrics
-                font.pixelSize: 13
-            }
-
-            function compactContentWidthForName(name) {
-                return Math.min(
-                    Math.max(110, compactFontMetrics.advanceWidth(name || "") + 34),
-                    Math.max(110, compactView.width - 24)
-                )
-            }
-
-            function compactHitRectForRow(row) {
-                return {
-                    x: 12,
-                    y: row * (30 + compactView.spacing) + 4,
-                    w: compactContentWidthForName(filesModel.rows[row].name),
-                    h: 22
-                }
-            }
-
-            function compactSelectionRectForRow(row) {
-                return {
-                    x: 0,
-                    y: row * (30 + compactView.spacing),
-                    w: compactView.width,
-                    h: 30
-                }
-            }
-
-            function clampX(x) {
-                return Math.max(0, Math.min(width, x))
-            }
-
-            function clampY(y) {
-                return Math.max(0, Math.min(height, y))
-            }
-
-            function updateBandSelection() {
-                var left = Math.min(selectionStartX, selectionCurrentX)
-                var right = Math.max(selectionStartX, selectionCurrentX)
-                var top = Math.min(selectionStartY, selectionCurrentY) + compactView.contentY
-                var bottom = Math.max(selectionStartY, selectionCurrentY) + compactView.contentY
-
-                var next = {}
-
-                for (var i = 0; i < filesModel.rows.length; ++i) {
-                    var r = compactSelectionRectForRow(i)
-
-                    var horizontallyHit = right >= r.x && left <= (r.x + r.w)
-                    var verticallyHit = bottom >= r.y && top <= (r.y + r.h)
-
-                    if (horizontallyHit && verticallyHit)
-                        next[i] = true
-                }
-
-                root.selectedFileRows = next
-
-                var first = -1
-                for (var k in next) {
-                    first = parseInt(k, 10)
-                    break
-                }
-                root.currentFileRow = first
-            }
-
-            Rectangle {
-                anchors.fill: parent
-                anchors.margins: 12
-                radius: 10
-                color: "transparent"
-
-                ListView {
-                    id: compactView
-                    anchors.fill: parent
-                    clip: true
-                    spacing: 1
-                    model: filesModel.rows
-                    interactive: !compactRoot.selectionActive
-                    boundsBehavior: Flickable.StopAtBounds
-                    pixelAligned: true
-                    maximumFlickVelocity: 2200
-                    flickDeceleration: 9000
-
-                    ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
-                    ScrollBar.horizontal: null
-
-                    delegate: Item {
-                        id: compactDelegate
-                        required property int index
-                        required property var modelData
-
-                        width: ListView.view.width
-                        height: 30
-
-                        readonly property bool isFolderTarget: modelData.type === "File folder"
-                        readonly property bool sameAsDragged: root.isDraggedRow(index)
-
-                        Rectangle {
-                            anchors.fill: parent
-                            radius: 6
-                            color: root.detailsDropHoverRow === index && compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged
-                                   ? Theme.AppTheme.selectedSoft
-                                   : root.isFileRowSelected(index)
-                                     ? Theme.AppTheme.selected
-                                     : compactMouse.containsMouse ? Theme.AppTheme.selectedSoft : "transparent"
-                            border.color: root.detailsDropHoverRow === index && compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged
-                                          ? Theme.AppTheme.accent
-                                          : "transparent"
-                            border.width: root.detailsDropHoverRow === index && compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged ? 1 : 0
-                        }
-
-                        Row {
-                            anchors.left: parent.left
-                            anchors.right: parent.right
-                            anchors.verticalCenter: parent.verticalCenter
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 12
-                            spacing: 8
-
-                            AppIcon {
-                                name: modelData.icon
-                                darkTheme: Theme.AppTheme.isDark
-                                iconSize: 14
-                                anchors.verticalCenter: parent.verticalCenter
-                            }
-
-                            Text {
-                                visible: root.editingFileRow !== index
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: modelData.name
-                                color: Theme.AppTheme.text
-                                font.pixelSize: 13
-                                elide: Text.ElideRight
-                                width: parent.width - 24
-                            }
-
-                            TextField {
-                                visible: root.editingFileRow === index
-                                width: parent.width - 24
-                                height: 24
-                                anchors.verticalCenter: parent.verticalCenter
-                                text: root.editingFileNameDraft
-                                color: Theme.AppTheme.text
-                                font.pixelSize: 13
-                                selectByMouse: true
-                                leftPadding: 8
-                                rightPadding: 8
-                                topPadding: 0
-                                bottomPadding: 0
-
-                                background: Rectangle {
-                                    radius: 6
-                                    color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
-                                    border.color: Theme.AppTheme.accent
-                                    border.width: 1
-                                }
-
-                                onVisibleChanged: {
-                                    if (visible) {
-                                        forceActiveFocus()
-                                        selectAll()
-                                    }
-                                }
-
-                                onTextChanged: {
-                                    if (visible)
-                                        root.editingFileNameDraft = text
-                                }
-
-                                onAccepted: root.commitRenameRow(index, root.editingFileNameDraft)
-
-                                onActiveFocusChanged: {
-                                    if (!activeFocus && visible)
-                                        root.commitRenameRow(index, root.editingFileNameDraft)
-                                }
-
-                                Keys.onEscapePressed: root.cancelRenameRow()
-                            }
-                        }
-
-                        DropArea {
-                            anchors.fill: parent
-
-                            onEntered: function(drag) {
-                                var ok = compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged
-                                drag.accepted = ok
-                                if (ok)
-                                    root.detailsDropHoverRow = index
-                            }
-
-                            onExited: function(drag) {
-                                if (root.detailsDropHoverRow === index)
-                                    root.detailsDropHoverRow = -1
-                            }
-
-                            onDropped: function(drop) {
-                                if (compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged) {
-                                    drop.accepted = true
-                                    root.handleDroppedItem(modelData.name, "folder")
-                                }
-
-                                if (root.detailsDropHoverRow === index)
-                                    root.detailsDropHoverRow = -1
-                            }
-                        }
-
-                        MouseArea {
-                            id: compactMouse
-                            x: 12
-                            y: 4
-                            width: compactRoot.compactContentWidthForName(modelData.name)
-                            height: 22
-                            hoverEnabled: true
-                            acceptedButtons: Qt.LeftButton | Qt.RightButton
-                            preventStealing: true
-
-                            drag.target: dragProxy
-                            drag.axis: Drag.XAndYAxis
-                            drag.smoothed: false
-
-                            onClicked: function(mouse) {
-                                mouse.accepted = true
-                            }
-
-                            onPressed: function(mouse) {
-                                if (root.editingFileRow >= 0 && root.editingFileRow !== index)
-                                    root.commitRenameRow(root.editingFileRow, root.editingFileNameDraft)
-
-                                var ctrl = (mouse.modifiers & Qt.ControlModifier) !== 0
-                                var shift = (mouse.modifiers & Qt.ShiftModifier) !== 0
-                                var alreadySelected = root.isFileRowSelected(index)
-
-                                if (mouse.button === Qt.RightButton) {
-                                    if (!alreadySelected)
-                                        root.selectOnlyFileRow(index)
-
-                                    root.contextFileRow = index
-
-                                    if (root.selectedFileCount() > 1)
-                                        multiFileContextMenu.popup()
-                                    else
-                                        fileRowContextMenu.popup()
-
-                                    return
-                                }
-
-                                if (mouse.button === Qt.LeftButton) {
-                                    if (shift) {
-                                        var anchor = root.selectionAnchorRow >= 0 ? root.selectionAnchorRow : index
-                                        root.selectFileRange(anchor, index, true)
-                                    } else if (ctrl) {
-                                        root.toggleFileRowSelection(index)
-                                    } else {
-                                        if (!alreadySelected)
-                                            root.selectOnlyFileRow(index)
-                                    }
-
-                                    if (root.isFileRowSelected(index))
-                                        root.beginFileDrag(index)
-                                }
-                            }
-
-                            onDoubleClicked: {
-                                applySnapshot(backend.openItems(root.singleItemForBackend(index)))
-                            }
-
-                            Item {
-                                id: dragProxy
-                                x: 0
-                                y: 0
-                                width: 24
-                                height: 24
-                                opacity: 0.01
-
-                                Drag.active: compactMouse.drag.active
-                                Drag.dragType: Drag.Automatic
-                                Drag.supportedActions: Qt.MoveAction
-                                Drag.source: compactDelegate
-                                Drag.hotSpot.x: 18
-                                Drag.hotSpot.y: 18
-                                Drag.imageSource: root.dragPreviewReady ? root.draggedFilePreviewUrl : ""
-                                Drag.mimeData: ({
-                                    "application/x-fileexplorer-item": JSON.stringify({
-                                        row: index,
-                                        rows: root.selectedFileRowsArray(),
-                                        count: root.draggedFileCount,
-                                        name: root.draggedFileName,
-                                        type: root.draggedFileType,
-                                        icon: root.draggedFileIcon
-                                    })
-                                })
-
-                                Drag.onDragFinished: function(dropAction) {
-                                    dragProxy.x = 0
-                                    dragProxy.y = 0
-                                    root.detailsDropHoverRow = -1
-                                    root.clearFileDrag()
-                                }
-                            }
-                        }
-                    }
-
-                    MouseArea {
-                        id: compactOverlayMouse
-                        anchors.fill: parent
-                        z: 0
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        hoverEnabled: false
-                        preventStealing: true
-
-                        property bool bandSelecting: false
-                        property bool pendingEmptyContextMenu: false
-
-                        function pointHitsRealItem(xInView, yInView) {
-                            var yInContent = yInView + compactView.contentY
-                            var rowStep = 30 + compactView.spacing
-                            var row = Math.floor(yInContent / rowStep)
-
-                            if (row < 0 || row >= filesModel.rows.length)
-                                return false
-
-                            var r = compactRoot.compactHitRectForRow(row)
-
-                            return xInView >= r.x
-                                && xInView <= (r.x + r.w)
-                                && yInContent >= r.y
-                                && yInContent <= (r.y + r.h)
-                        }
-
-                        onPressed: function(mouse) {
-                            if (root.editingFileRow >= 0)
-                                root.commitRenameRow(root.editingFileRow, root.editingFileNameDraft)
-
-                            var overItem = pointHitsRealItem(mouse.x, mouse.y)
-
-                            var bothButtons =
-                                    (compactOverlayMouse.pressedButtons & Qt.LeftButton)
-                                    && (compactOverlayMouse.pressedButtons & Qt.RightButton)
-
-                            bandSelecting = bothButtons || (mouse.button === Qt.LeftButton && !overItem)
-                            pendingEmptyContextMenu = (mouse.button === Qt.RightButton && !overItem && !bothButtons)
-
-                            if (bandSelecting) {
-                                compactRoot.selectionActive = true
-                                compactRoot.selectionMoved = false
-                                compactRoot.selectionStartX = compactRoot.clampX(mouse.x)
-                                compactRoot.selectionStartY = compactRoot.clampY(mouse.y)
-                                compactRoot.selectionCurrentX = compactRoot.selectionStartX
-                                compactRoot.selectionCurrentY = compactRoot.selectionStartY
-                                root.clearFileSelection()
-                                root.contextFileRow = -1
-                                mouse.accepted = true
-                                return
-                            }
-
-                            if (pendingEmptyContextMenu) {
-                                root.clearFileSelection()
-                                mouse.accepted = true
-                                return
-                            }
-
-                            mouse.accepted = false
-                        }
-
-                        onPositionChanged: function(mouse) {
-                            if (!bandSelecting || !compactRoot.selectionActive)
-                                return
-
-                            compactRoot.selectionCurrentX = compactRoot.clampX(mouse.x)
-                            compactRoot.selectionCurrentY = compactRoot.clampY(mouse.y)
-
-                            if (Math.abs(compactRoot.selectionCurrentX - compactRoot.selectionStartX) > 2
-                                    || Math.abs(compactRoot.selectionCurrentY - compactRoot.selectionStartY) > 2) {
-                                compactRoot.selectionMoved = true
-                            }
-
-                            compactRoot.updateBandSelection()
-                        }
-
-                        onReleased: function(mouse) {
-                            if (pendingEmptyContextMenu && !compactRoot.selectionMoved) {
-                                root.contextFileRow = -1
-                                emptyAreaContextMenu.popup()
-                            }
-
-                            bandSelecting = false
-                            pendingEmptyContextMenu = false
-                            compactRoot.selectionActive = false
-                            compactRoot.selectionMoved = false
-                        }
-
-                        onCanceled: {
-                            bandSelecting = false
-                            pendingEmptyContextMenu = false
-                            compactRoot.selectionActive = false
-                            compactRoot.selectionMoved = false
-                        }
-                    }
-
-                    Rectangle {
-                        visible: compactRoot.selectionActive && compactRoot.selectionMoved
-                        z: 1001
-
-                        x: Math.min(compactRoot.selectionStartX, compactRoot.selectionCurrentX)
-                        y: Math.min(compactRoot.selectionStartY, compactRoot.selectionCurrentY)
-                        width: Math.abs(compactRoot.selectionCurrentX - compactRoot.selectionStartX)
-                        height: Math.abs(compactRoot.selectionCurrentY - compactRoot.selectionStartY)
-
-                        color: Qt.rgba(76 / 255, 130 / 255, 247 / 255, 0.18)
-                        border.color: Theme.AppTheme.accent
-                        border.width: 1
-                    }
-                }
-            }
+        CompactFileView {
+            rootWindow: root
+            filesTableModel: filesModel
+            rowContextMenu: fileRowContextMenu
+            multiSelectionContextMenu: multiFileContextMenu
+            emptyContextMenu: emptyAreaContextMenu
         }
     }
 
     Component {
         id: largeIconsViewComponent
 
-        Item {
-            id: largeIconsRoot
-
-            property bool selectionActive: false
-            property bool selectionMoved: false
-            property real selectionStartX: 0
-            property real selectionStartY: 0
-            property real selectionCurrentX: 0
-            property real selectionCurrentY: 0
-
-            readonly property int delegateWidth: 104
-            readonly property int delegateHeight: 92
-
-            function clampX(x) {
-                return Math.max(0, Math.min(width, x))
-            }
-
-            function clampY(y) {
-                return Math.max(0, Math.min(height, y))
-            }
-
-            function columnCount() {
-                return Math.max(1, Math.floor(gridView.width / gridView.cellWidth))
-            }
-
-            function itemRectFor(index) {
-                var cols = columnCount()
-                var col = index % cols
-                var row = Math.floor(index / cols)
-
-                var x = col * gridView.cellWidth + Math.floor((gridView.cellWidth - delegateWidth) / 2)
-                var y = row * gridView.cellHeight + Math.floor((gridView.cellHeight - delegateHeight) / 2)
-
-                return {
-                    x: x,
-                    y: y,
-                    w: delegateWidth,
-                    h: delegateHeight
-                }
-            }
-
-            function contentHitRectFor(index) {
-                var r = itemRectFor(index)
-
-                return {
-                    x: r.x + 8,
-                    y: r.y + 6,
-                    w: r.w - 16,
-                    h: r.h - 12
-                }
-            }
-
-            function updateBandSelection() {
-                var left = Math.min(selectionStartX, selectionCurrentX) + gridView.contentX
-                var right = Math.max(selectionStartX, selectionCurrentX) + gridView.contentX
-                var top = Math.min(selectionStartY, selectionCurrentY) + gridView.contentY
-                var bottom = Math.max(selectionStartY, selectionCurrentY) + gridView.contentY
-
-                var next = {}
-
-                for (var i = 0; i < filesModel.rows.length; ++i) {
-                    var r = itemRectFor(i)
-                    var itemLeft = r.x
-                    var itemRight = r.x + r.w
-                    var itemTop = r.y
-                    var itemBottom = r.y + r.h
-
-                    if (right >= itemLeft && left <= itemRight
-                            && bottom >= itemTop && top <= itemBottom) {
-                        next[i] = true
-                    }
-                }
-
-                root.selectedFileRows = next
-
-                var first = -1
-                for (var k in next) {
-                    first = parseInt(k, 10)
-                    break
-                }
-                root.currentFileRow = first
-            }
-
-            GridView {
-                id: gridView
-                anchors.fill: parent
-                anchors.leftMargin: 12
-                anchors.rightMargin: 12
-                anchors.topMargin: 12
-                anchors.bottomMargin: 12
-                clip: true
-                model: filesModel.rows
-                cellWidth: 118
-                cellHeight: 102
-                interactive: !largeIconsRoot.selectionActive
-                boundsBehavior: Flickable.StopAtBounds
-                pixelAligned: true
-                maximumFlickVelocity: 2200
-                flickDeceleration: 9000
-
-                ScrollBar.vertical: ExplorerScrollbarV { darkTheme: Theme.AppTheme.isDark }
-                ScrollBar.horizontal: null
-
-                MouseArea {
-                    id: gridOverlayMouse
-                    anchors.fill: parent
-                    z: 0
-                    acceptedButtons: Qt.LeftButton | Qt.RightButton
-                    hoverEnabled: false
-                    preventStealing: true
-
-                    property bool bandSelecting: false
-                    property bool pendingEmptyContextMenu: false
-
-                    function pointHitsRealItem(xInView, yInView) {
-                        var xInContent = xInView + gridView.contentX
-                        var yInContent = yInView + gridView.contentY
-
-                        for (var i = 0; i < filesModel.rows.length; ++i) {
-                            var r = largeIconsRoot.contentHitRectFor(i)
-                            if (xInContent >= r.x && xInContent <= (r.x + r.w)
-                                    && yInContent >= r.y && yInContent <= (r.y + r.h)) {
-                                return true
-                            }
-                        }
-
-                        return false
-                    }
-
-                    onPressed: function(mouse) {
-                        if (root.editingFileRow >= 0)
-                            root.commitRenameRow(root.editingFileRow, root.editingFileNameDraft)
-
-                        var overItem = pointHitsRealItem(mouse.x, mouse.y)
-
-                        var bothButtons =
-                                (gridOverlayMouse.pressedButtons & Qt.LeftButton)
-                                && (gridOverlayMouse.pressedButtons & Qt.RightButton)
-
-                        bandSelecting = bothButtons || (mouse.button === Qt.LeftButton && !overItem)
-                        pendingEmptyContextMenu = (mouse.button === Qt.RightButton && !overItem && !bothButtons)
-
-                        if (bandSelecting) {
-                            largeIconsRoot.selectionActive = true
-                            largeIconsRoot.selectionMoved = false
-                            largeIconsRoot.selectionStartX = largeIconsRoot.clampX(mouse.x)
-                            largeIconsRoot.selectionStartY = largeIconsRoot.clampY(mouse.y)
-                            largeIconsRoot.selectionCurrentX = largeIconsRoot.selectionStartX
-                            largeIconsRoot.selectionCurrentY = largeIconsRoot.selectionStartY
-                            root.clearFileSelection()
-                            root.contextFileRow = -1
-                            mouse.accepted = true
-                            return
-                        }
-
-                        if (pendingEmptyContextMenu) {
-                            root.clearFileSelection()
-                            mouse.accepted = true
-                            return
-                        }
-
-                        mouse.accepted = false
-                    }
-
-                    onPositionChanged: function(mouse) {
-                        if (!bandSelecting || !largeIconsRoot.selectionActive)
-                            return
-
-                        largeIconsRoot.selectionCurrentX = largeIconsRoot.clampX(mouse.x)
-                        largeIconsRoot.selectionCurrentY = largeIconsRoot.clampY(mouse.y)
-
-                        if (Math.abs(largeIconsRoot.selectionCurrentX - largeIconsRoot.selectionStartX) > 2
-                                || Math.abs(largeIconsRoot.selectionCurrentY - largeIconsRoot.selectionStartY) > 2) {
-                            largeIconsRoot.selectionMoved = true
-                        }
-
-                        largeIconsRoot.updateBandSelection()
-                    }
-
-                    onReleased: function(mouse) {
-                        if (pendingEmptyContextMenu && !largeIconsRoot.selectionMoved) {
-                            root.contextFileRow = -1
-                            emptyAreaContextMenu.popup()
-                        }
-
-                        bandSelecting = false
-                        pendingEmptyContextMenu = false
-                        largeIconsRoot.selectionActive = false
-                        largeIconsRoot.selectionMoved = false
-                    }
-
-                    onCanceled: {
-                        bandSelecting = false
-                        pendingEmptyContextMenu = false
-                        largeIconsRoot.selectionActive = false
-                        largeIconsRoot.selectionMoved = false
-                    }
-                }
-
-                delegate: Rectangle {
-                    id: gridDelegate
-                    required property int index
-                    required property var modelData
-
-                    property real pressX: 0
-                    property real pressY: 0
-                    property bool dragStarted: false
-
-                    width: 104
-                    height: 92
-                    radius: 10
-
-                    readonly property bool isFolderTarget: modelData.type === "File folder"
-                    readonly property bool sameAsDragged: root.isDraggedRow(index)
-
-                    color: root.detailsDropHoverRow === index && gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged
-                           ? Theme.AppTheme.selectedSoft
-                           : root.isFileRowSelected(index)
-                             ? Theme.AppTheme.selected
-                             : gridMouse.containsMouse ? Theme.AppTheme.selectedSoft : "transparent"
-                    border.color: root.detailsDropHoverRow === index && gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged
-                                  ? Theme.AppTheme.accent
-                                  : "transparent"
-                    border.width: root.detailsDropHoverRow === index && gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged ? 1 : 0
-
-                    Column {
-                        anchors.centerIn: parent
-                        spacing: 8
-
-                        AppIcon {
-                            anchors.horizontalCenter: parent.horizontalCenter
-                            name: modelData.icon
-                            darkTheme: Theme.AppTheme.isDark
-                            iconSize: 28
-                        }
-
-                        Text {
-                            visible: root.editingFileRow !== index
-                            width: 88
-                            horizontalAlignment: Text.AlignHCenter
-                            wrapMode: Text.Wrap
-                            maximumLineCount: 2
-                            elide: Text.ElideRight
-                            text: modelData.name
-                            color: Theme.AppTheme.text
-                            font.pixelSize: 12
-                        }
-
-                        TextField {
-                            visible: root.editingFileRow === index
-                            width: 88
-                            height: 24
-                            text: root.editingFileNameDraft
-                            color: Theme.AppTheme.text
-                            font.pixelSize: 12
-                            horizontalAlignment: TextInput.AlignHCenter
-                            selectByMouse: true
-                            leftPadding: 6
-                            rightPadding: 6
-                            topPadding: 0
-                            bottomPadding: 0
-
-                            background: Rectangle {
-                                radius: 6
-                                color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
-                                border.color: Theme.AppTheme.accent
-                                border.width: 1
-                            }
-
-                            onVisibleChanged: {
-                                if (visible) {
-                                    forceActiveFocus()
-                                    selectAll()
-                                }
-                            }
-
-                            onTextChanged: {
-                                if (visible)
-                                    root.editingFileNameDraft = text
-                            }
-
-                            onAccepted: root.commitRenameRow(index, root.editingFileNameDraft)
-
-                            onActiveFocusChanged: {
-                                if (!activeFocus && visible)
-                                    root.commitRenameRow(index, root.editingFileNameDraft)
-                            }
-
-                            Keys.onEscapePressed: root.cancelRenameRow()
-                        }
-                    }
-
-                    DropArea {
-                        anchors.fill: parent
-
-                        onEntered: function(drag) {
-                            var ok = gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged
-                            drag.accepted = ok
-                            if (ok)
-                                root.detailsDropHoverRow = index
-                        }
-
-                        onExited: function(drag) {
-                            if (root.detailsDropHoverRow === index)
-                                root.detailsDropHoverRow = -1
-                        }
-
-                        onDropped: function(drop) {
-                            if (gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged) {
-                                drop.accepted = true
-                                root.handleDroppedItem(modelData.name, "folder")
-                            }
-
-                            if (root.detailsDropHoverRow === index)
-                                root.detailsDropHoverRow = -1
-                        }
-                    }
-
-                    MouseArea {
-                        id: gridMouse
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        acceptedButtons: Qt.LeftButton | Qt.RightButton
-                        preventStealing: true
-
-                        drag.target: dragProxy
-                        drag.axis: Drag.XAndYAxis
-                        drag.smoothed: false
-
-                        onClicked: function(mouse) {
-                            mouse.accepted = true
-                        }
-
-                        onPressed: function(mouse) {
-                            if (root.editingFileRow >= 0 && root.editingFileRow !== index)
-                                root.commitRenameRow(root.editingFileRow, root.editingFileNameDraft)
-
-                            var ctrl = (mouse.modifiers & Qt.ControlModifier) !== 0
-                            var shift = (mouse.modifiers & Qt.ShiftModifier) !== 0
-                            var alreadySelected = root.isFileRowSelected(index)
-
-                            if (mouse.button === Qt.RightButton) {
-                                if (!alreadySelected)
-                                    root.selectOnlyFileRow(index)
-
-                                root.contextFileRow = index
-
-                                if (root.selectedFileCount() > 1)
-                                    multiFileContextMenu.popup()
-                                else
-                                    fileRowContextMenu.popup()
-
-                                return
-                            }
-
-                            if (mouse.button === Qt.LeftButton) {
-                                if (shift) {
-                                    var anchor = root.selectionAnchorRow >= 0 ? root.selectionAnchorRow : index
-                                    root.selectFileRange(anchor, index, true)
-                                } else if (ctrl) {
-                                    root.toggleFileRowSelection(index)
-                                } else {
-                                    if (!alreadySelected)
-                                        root.selectOnlyFileRow(index)
-                                }
-
-                                if (!ctrl && !shift && root.isFileRowSelected(index))
-                                    root.beginFileDrag(index)
-                            }
-                        }
-
-                        onDoubleClicked: {
-                            applySnapshot(backend.openItems(root.singleItemForBackend(index)))
-                        }
-
-                        Item {
-                            id: dragProxy
-                            x: 0
-                            y: 0
-                            width: 24
-                            height: 24
-                            opacity: 0.01
-
-                            Drag.active: gridMouse.drag.active
-                            Drag.dragType: Drag.Automatic
-                            Drag.supportedActions: Qt.MoveAction
-                            Drag.source: gridDelegate
-                            Drag.hotSpot.x: 18
-                            Drag.hotSpot.y: 18
-                            Drag.imageSource: root.dragPreviewReady ? root.draggedFilePreviewUrl : ""
-                            Drag.mimeData: ({
-                                "application/x-fileexplorer-item": JSON.stringify({
-                                    row: index,
-                                    rows: root.selectedFileRowsArray(),
-                                    count: root.draggedFileCount,
-                                    name: root.draggedFileName,
-                                    type: root.draggedFileType,
-                                    icon: root.draggedFileIcon
-                                })
-                            })
-
-                            Drag.onDragFinished: function(dropAction) {
-                                dragProxy.x = 0
-                                dragProxy.y = 0
-                                root.detailsDropHoverRow = -1
-                                root.clearFileDrag()
-                            }
-                        }
-                    }
-                }
-
-                Rectangle {
-                    visible: largeIconsRoot.selectionActive && largeIconsRoot.selectionMoved
-                    z: 1001
-
-                    x: Math.min(largeIconsRoot.selectionStartX, largeIconsRoot.selectionCurrentX)
-                    y: Math.min(largeIconsRoot.selectionStartY, largeIconsRoot.selectionCurrentY)
-                    width: Math.abs(largeIconsRoot.selectionCurrentX - largeIconsRoot.selectionStartX)
-                    height: Math.abs(largeIconsRoot.selectionCurrentY - largeIconsRoot.selectionStartY)
-
-                    color: Qt.rgba(76 / 255, 130 / 255, 247 / 255, 0.18)
-                    border.color: Theme.AppTheme.accent
-                    border.width: 1
-                }
-            }
+        LargeIconsFileView {
+            rootWindow: root
+            filesTableModel: filesModel
+            rowContextMenu: fileRowContextMenu
+            multiSelectionContextMenu: multiFileContextMenu
+            emptyContextMenu: emptyAreaContextMenu
         }
     }
 
@@ -4011,13 +2245,13 @@ Window {
                 Layout.preferredHeight: 46
                 color: Theme.AppTheme.titleBg
                 border.color: Theme.AppTheme.borderSoft
-                border.width: 1
+                border.width: Theme.Metrics.borderWidth
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 10
+                    anchors.leftMargin: Theme.Metrics.spacingLg
                     anchors.rightMargin: 6
-                    spacing: 8
+                    spacing: Theme.Metrics.spacingMd
 
                     Item {
                         id: tabsArea
@@ -4046,7 +2280,7 @@ Window {
                             anchors.right: parent.right
                             anchors.verticalCenter: parent.verticalCenter
                             height: 34
-                            spacing: 6
+                            spacing: Theme.Metrics.spacingSm
                             z: 2
                             readonly property bool overflowing: tabsContent.width > Math.max(0, tabsRow.width - addTabButton.width - tabsRow.spacing)
 
@@ -4054,7 +2288,7 @@ Window {
                                 id: scrollLeftButton
                                 width: 26
                                 height: 26
-                                radius: 8
+                                radius: Theme.Metrics.radiusMd
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: tabsRow.overflowing
                                 color: leftScrollMouse.pressed
@@ -4068,7 +2302,7 @@ Window {
                                     anchors.centerIn: parent
                                     name: "chevron-left"
                                     darkTheme: Theme.AppTheme.isDark
-                                    iconSize: 14
+                                    iconSize: Theme.Metrics.iconSm
                                 }
 
                                 MouseArea {
@@ -4106,7 +2340,7 @@ Window {
                                         id: addTabButton
                                         width: 28
                                         height: 28
-                                        radius: 8
+                                        radius: Theme.Metrics.radiusMd
                                         anchors.verticalCenter: parent.verticalCenter
                                         color: addTabMouse.containsMouse ? Theme.AppTheme.hover : "transparent"
 
@@ -4114,7 +2348,7 @@ Window {
                                             anchors.centerIn: parent
                                             name: "add"
                                             darkTheme: Theme.AppTheme.isDark
-                                            iconSize: 16
+                                            iconSize: Theme.Metrics.iconMd
                                         }
 
                                         MouseArea {
@@ -4196,7 +2430,7 @@ Window {
                                                                   : "transparent")
 
                                                     border.color: tabDelegate.index === rootWindow.currentTab ? Theme.AppTheme.border : "transparent"
-                                                    border.width: 1
+                                                    border.width: Theme.Metrics.borderWidth
 
                                                     DropArea {
                                                         anchors.fill: parent
@@ -4235,8 +2469,8 @@ Window {
                                                     Row {
                                                         anchors.verticalCenter: parent.verticalCenter
                                                         anchors.left: parent.left
-                                                        anchors.leftMargin: 12
-                                                        spacing: 8
+                                                        anchors.leftMargin: Theme.Metrics.spacingXl
+                                                        spacing: Theme.Metrics.spacingMd
                                                         visible: tabDelegate.rootWindow.editingTabIndex !== tabDelegate.index
 
                                                         AppIcon {
@@ -4248,7 +2482,7 @@ Window {
                                                         Text {
                                                             text: tabDelegate.title || ""
                                                             color: Theme.AppTheme.text
-                                                            font.pixelSize: 13
+                                                            font.pixelSize: Theme.Typography.bodyLg
                                                             font.bold: tabDelegate.index === tabDelegate.rootWindow.currentTab
                                                             elide: Text.ElideRight
                                                             width: 140
@@ -4259,25 +2493,25 @@ Window {
                                                         visible: tabDelegate.rootWindow.editingTabIndex === tabDelegate.index
                                                         anchors.verticalCenter: parent.verticalCenter
                                                         anchors.left: parent.left
-                                                        anchors.leftMargin: 12
+                                                        anchors.leftMargin: Theme.Metrics.spacingXl
                                                         anchors.right: closeButton.left
-                                                        anchors.rightMargin: 8
+                                                        anchors.rightMargin: Theme.Metrics.spacingMd
                                                         height: 24
 
                                                         text: tabDelegate.rootWindow.editingTabTitleDraft || ""
                                                         color: Theme.AppTheme.text
-                                                        font.pixelSize: 13
+                                                        font.pixelSize: Theme.Typography.bodyLg
                                                         selectByMouse: true
-                                                        leftPadding: 8
-                                                        rightPadding: 8
+                                                        leftPadding: Theme.Metrics.spacingMd
+                                                        rightPadding: Theme.Metrics.spacingMd
                                                         topPadding: 0
                                                         bottomPadding: 0
 
                                                         background: Rectangle {
-                                                            radius: 6
-                                                            color: tabDelegate.Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+                                                            radius: Theme.Metrics.radiusSm
+                                                            color: Theme.AppTheme.popupBg
                                                             border.color: Theme.AppTheme.accent
-                                                            border.width: 1
+                                                            border.width: Theme.Metrics.borderWidth
                                                         }
 
                                                         onVisibleChanged: {
@@ -4318,7 +2552,7 @@ Window {
                                                             anchors.centerIn: parent
                                                             name: "close"
                                                             darkTheme: tabDelegate.Theme.AppTheme.isDark
-                                                            iconSize: 12
+                                                            iconSize: Theme.Metrics.iconXs
                                                             iconOpacity: 0.75
                                                         }
 
@@ -4532,7 +2766,7 @@ Window {
                                 id: scrollRightButton
                                 width: 26
                                 height: 26
-                                radius: 8
+                                radius: Theme.Metrics.radiusMd
                                 anchors.verticalCenter: parent.verticalCenter
                                 visible: tabsRow.overflowing
                                 color: rightScrollMouse.pressed
@@ -4546,7 +2780,7 @@ Window {
                                     anchors.centerIn: parent
                                     name: "chevron-right"
                                     darkTheme: Theme.AppTheme.isDark
-                                    iconSize: 14
+                                    iconSize: Theme.Metrics.iconSm
                                 }
 
                                 MouseArea {
@@ -4628,13 +2862,13 @@ Window {
                 Layout.preferredHeight: 54
                 color: Theme.AppTheme.surface
                 border.color: Theme.AppTheme.borderSoft
-                border.width: 1
+                border.width: Theme.Metrics.borderWidth
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    spacing: 10
+                    anchors.leftMargin: Theme.Metrics.spacingXl
+                    anchors.rightMargin: Theme.Metrics.spacingXl
+                    spacing: Theme.Metrics.spacingLg
 
                     IconButton {
                         iconName: "arrow-back"
@@ -4668,10 +2902,10 @@ Window {
                         id: pathBar
                         Layout.fillWidth: true
                         Layout.preferredHeight: 38
-                        radius: 10
+                        radius: Theme.Metrics.radiusLg
                         color: Theme.AppTheme.isDark ? "#1b2230" : "#fcfcfd"
                         border.color: root.editingPath ? Theme.AppTheme.accent : Theme.AppTheme.border
-                        border.width: 1
+                        border.width: Theme.Metrics.borderWidth
 
                         StackLayout {
                             anchors.fill: parent
@@ -4683,8 +2917,8 @@ Window {
                                 Flickable {
                                     id: breadcrumbFlick
                                     anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
+                                    anchors.leftMargin: Theme.Metrics.spacingXl
+                                    anchors.rightMargin: Theme.Metrics.spacingXl
                                     contentWidth: Math.max(width, breadcrumbRow.width)
                                     contentHeight: height
                                     clip: true
@@ -4694,7 +2928,7 @@ Window {
                                     Row {
                                         id: breadcrumbRow
                                         anchors.verticalCenter: parent.verticalCenter
-                                        spacing: 6
+                                        spacing: Theme.Metrics.spacingSm
 
                                         Repeater {
                                             model: pathModel
@@ -4703,14 +2937,14 @@ Window {
                                                 id: breadcrumbDelegate
                                                 required property int index
                                                 required property var modelData
-                                                spacing: 6
+                                                spacing: Theme.Metrics.spacingSm
 
                                                 readonly property bool dropHovered: root.breadcrumbDropHoverIndex === index
 
                                                 Rectangle {
                                                     id: crumbPill
                                                     height: 28
-                                                    radius: 8
+                                                    radius: Theme.Metrics.radiusMd
                                                     color: dropHovered
                                                            ? Theme.AppTheme.selectedSoft
                                                            : crumbMouse.pressed
@@ -4753,8 +2987,8 @@ Window {
                                                         id: crumbContent
                                                         anchors.verticalCenter: parent.verticalCenter
                                                         anchors.left: parent.left
-                                                        anchors.leftMargin: 8
-                                                        spacing: 6
+                                                        anchors.leftMargin: Theme.Metrics.spacingMd
+                                                        spacing: Theme.Metrics.spacingSm
 
                                                         AppIcon {
                                                             anchors.verticalCenter: parent.verticalCenter
@@ -4769,7 +3003,7 @@ Window {
                                                             anchors.verticalCenter: parent.verticalCenter
                                                             text: modelData.label
                                                             color: Theme.AppTheme.text
-                                                            font.pixelSize: 13
+                                                            font.pixelSize: Theme.Typography.bodyLg
                                                             elide: Text.ElideRight
                                                             width: Math.min(140, implicitWidth)
                                                         }
@@ -4809,7 +3043,7 @@ Window {
                                                     anchors.verticalCenter: parent.verticalCenter
                                                     name: "chevron-right"
                                                     darkTheme: Theme.AppTheme.isDark
-                                                    iconSize: 12
+                                                    iconSize: Theme.Metrics.iconXs
                                                     iconOpacity: 0.65
                                                 }
                                             }
@@ -4837,7 +3071,7 @@ Window {
                             TextField {
                                 id: pathField
                                 color: Theme.AppTheme.text
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.Typography.bodyLg
                                 leftPadding: 12
                                 rightPadding: 12
                                 topPadding: 0
@@ -4858,22 +3092,22 @@ Window {
                     Rectangle {
                         Layout.preferredWidth: 300
                         Layout.preferredHeight: 38
-                        radius: 10
+                        radius: Theme.Metrics.radiusLg
                         color: Theme.AppTheme.isDark ? "#1b2230" : "#fcfcfd"
                         border.color: searchField.activeFocus ? Theme.AppTheme.accent : Theme.AppTheme.border
-                        border.width: 1
+                        border.width: Theme.Metrics.borderWidth
 
                         RowLayout {
                             anchors.fill: parent
-                            anchors.leftMargin: 8
-                            anchors.rightMargin: 10
-                            spacing: 8
+                            anchors.leftMargin: Theme.Metrics.spacingMd
+                            anchors.rightMargin: Theme.Metrics.spacingLg
+                            spacing: Theme.Metrics.spacingMd
 
                             Rectangle {
                                 id: searchScopeButton
                                 Layout.preferredWidth: 42
                                 Layout.preferredHeight: 28
-                                radius: 8
+                                radius: Theme.Metrics.radiusMd
                                 color: searchScopeMouse.pressed
                                        ? Theme.AppTheme.pressed
                                        : searchScopeMouse.containsMouse
@@ -4887,7 +3121,7 @@ Window {
                                     AppIcon {
                                         name: root.searchScope === "global" ? "hard-drive" : "folder"
                                         darkTheme: Theme.AppTheme.isDark
-                                        iconSize: 14
+                                        iconSize: Theme.Metrics.iconSm
                                     }
 
                                     AppIcon {
@@ -4915,7 +3149,7 @@ Window {
                             AppIcon {
                                 name: "search"
                                 darkTheme: Theme.AppTheme.isDark
-                                iconSize: 14
+                                iconSize: Theme.Metrics.iconSm
                                 iconOpacity: 0.65
                             }
 
@@ -4929,7 +3163,7 @@ Window {
                                 placeholderTextColor: Theme.AppTheme.muted
                                 text: root.currentSearch
                                 color: Theme.AppTheme.text
-                                font.pixelSize: 13
+                                font.pixelSize: Theme.Typography.bodyLg
                                 topPadding: 0
                                 bottomPadding: 0
                                 leftPadding: 0
@@ -4951,13 +3185,13 @@ Window {
                 Layout.preferredHeight: 46
                 color: Theme.AppTheme.surface2
                 border.color: Theme.AppTheme.borderSoft
-                border.width: 1
+                border.width: Theme.Metrics.borderWidth
 
                 RowLayout {
                     anchors.fill: parent
-                    anchors.leftMargin: 12
-                    anchors.rightMargin: 12
-                    spacing: 8
+                    anchors.leftMargin: Theme.Metrics.spacingXl
+                    anchors.rightMargin: Theme.Metrics.spacingXl
+                    spacing: Theme.Metrics.spacingMd
 
                     IconButton {
                         id: createButton
@@ -5070,22 +3304,22 @@ Window {
                                       ? (Theme.AppTheme.isDark ? "#2d3748" : "#dce8fb")
                                       : (Theme.AppTheme.isDark ? "#1d2431" : "#fafbfc"))
                         border.color: root.previewEnabled ? Theme.AppTheme.accent : Theme.AppTheme.border
-                        border.width: 1
+                        border.width: Theme.Metrics.borderWidth
 
                         Row {
                             anchors.centerIn: parent
-                            spacing: 8
+                            spacing: Theme.Metrics.spacingMd
 
                             AppIcon {
                                 name: "preview"
                                 darkTheme: Theme.AppTheme.isDark
-                                iconSize: 14
+                                iconSize: Theme.Metrics.iconSm
                             }
 
                             Text {
                                 text: "Preview"
                                 color: Theme.AppTheme.text
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.Typography.body
                                 font.bold: root.previewEnabled
                             }
                         }
@@ -5110,11 +3344,11 @@ Window {
                                  ? (Theme.AppTheme.isDark ? "#2d3748" : "#dce8fb")
                                  : (Theme.AppTheme.isDark ? "#1d2431" : "#fafbfc")
                         border.color: Theme.AppTheme.border
-                        border.width: 1
+                        border.width: Theme.Metrics.borderWidth
 
                         Row {
                             anchors.centerIn: parent
-                            spacing: 8
+                            spacing: Theme.Metrics.spacingMd
 
                             AppIcon {
                                 name: root.themeMode === "Dark"
@@ -5123,13 +3357,13 @@ Window {
                                         ? "sun"
                                         : "computer"
                                 darkTheme: Theme.AppTheme.isDark
-                                iconSize: 14
+                                iconSize: Theme.Metrics.iconSm
                             }
 
                             Text {
                                 text: root.themeMode
                                 color: Theme.AppTheme.text
-                                font.pixelSize: 12
+                                font.pixelSize: Theme.Typography.body
                             }
                         }
 
@@ -5171,17 +3405,17 @@ Window {
                         height: parent.height
                         color: Theme.AppTheme.isDark ? "#121820" : "#f4f6f8"
                         border.color: Theme.AppTheme.borderSoft
-                        border.width: 1
+                        border.width: Theme.Metrics.borderWidth
 
                         ColumnLayout {
                             anchors.fill: parent
-                            anchors.margins: 8
-                            spacing: 10
+                            anchors.margins: Theme.Metrics.spacingMd
+                            spacing: Theme.Metrics.spacingLg
 
                             Rectangle {
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
-                                radius: 10
+                                radius: Theme.Metrics.radiusLg
                                 color: "transparent"
 
                                 TreeView {
@@ -5223,7 +3457,7 @@ Window {
 
                                         Rectangle {
                                             anchors.fill: parent
-                                            radius: 8
+                                            radius: Theme.Metrics.radiusMd
                                             color: itemSection ? "transparent"
                                                                : dropHovered
                                                                  ? Theme.AppTheme.selectedSoft
@@ -5244,15 +3478,15 @@ Window {
 
                                         Item {
                                             anchors.fill: parent
-                                            anchors.leftMargin: 8 + depth * 14
-                                            anchors.rightMargin: 10
+                                            anchors.leftMargin: Theme.Metrics.spacingMd + depth * 14
+                                            anchors.rightMargin: Theme.Metrics.spacingLg
 
                                             Row {
                                                 anchors.left: parent.left
                                                 anchors.right: parent.right
                                                 anchors.top: parent.top
                                                 anchors.topMargin: itemSection ? 6 : 8
-                                                spacing: 6
+                                                spacing: Theme.Metrics.spacingSm
 
                                                 Item {
                                                     width: 12
@@ -5267,7 +3501,7 @@ Window {
                                                             visible: hasChildren
                                                             name: expanded ? "keyboard-arrow-down" : "chevron-right"
                                                             darkTheme: Theme.AppTheme.isDark
-                                                            iconSize: 12
+                                                            iconSize: Theme.Metrics.iconXs
                                                             iconOpacity: 0.65
                                                         }
 
@@ -5368,10 +3602,10 @@ Window {
                                 Layout.fillWidth: true
                                 Layout.preferredHeight: 20 + 22 + (drivesModel.count * 48) + Math.max(0, drivesModel.count - 1) * 1 + 20
                                 Layout.minimumHeight: 120
-                                radius: 12
+                                radius: Theme.Metrics.radiusXl
                                 color: Theme.AppTheme.isDark ? "#171d27" : "#fbfcfd"
                                 border.color: Theme.AppTheme.borderSoft
-                                border.width: 1
+                                border.width: Theme.Metrics.borderWidth
 
                                 ColumnLayout {
                                     anchors.fill: parent
@@ -5381,7 +3615,7 @@ Window {
                                     Text {
                                         text: "Drives"
                                         color: Theme.AppTheme.text
-                                        font.pixelSize: 12
+                                        font.pixelSize: Theme.Typography.body
                                         font.bold: true
                                     }
 
@@ -5395,7 +3629,7 @@ Window {
                                             Layout.fillWidth: true
                                             width: parent ? parent.width : 240
                                             height: 48
-                                            radius: 8
+                                            radius: Theme.Metrics.radiusMd
 
                                             readonly property real usedPct: modelData.total > 0 ? (modelData.used / modelData.total) : 0
                                             readonly property color usedColor: usedPct >= 0.85 ? Theme.AppTheme.driveUsedRed : Theme.AppTheme.driveUsedBlue
@@ -5421,25 +3655,25 @@ Window {
 
                                             Column {
                                                 anchors.fill: parent
-                                                anchors.leftMargin: 8
-                                                anchors.rightMargin: 8
-                                                anchors.topMargin: 4
+                                                anchors.leftMargin: Theme.Metrics.spacingMd
+                                                anchors.rightMargin: Theme.Metrics.spacingMd
+                                                anchors.topMargin: Theme.Metrics.spacingXs
                                                 anchors.bottomMargin: 4
                                                 spacing: 2
 
                                                 Row {
-                                                    spacing: 6
+                                                    spacing: Theme.Metrics.spacingSm
 
                                                     AppIcon {
                                                         name: modelData.icon
                                                         darkTheme: Theme.AppTheme.isDark
-                                                        iconSize: 14
+                                                        iconSize: Theme.Metrics.iconSm
                                                     }
 
                                                     Text {
                                                         text: modelData.label
                                                         color: Theme.AppTheme.text
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: Theme.Typography.body
                                                         font.bold: true
                                                     }
                                                 }
@@ -5447,13 +3681,13 @@ Window {
                                                 Rectangle {
                                                     width: parent.width
                                                     height: 5
-                                                    radius: 3
+                                                    radius: Theme.Metrics.radiusXs
                                                     color: Theme.AppTheme.driveFree
 
                                                     Rectangle {
                                                         width: parent.width * Math.max(0, Math.min(1, usedPct))
                                                         height: parent.height
-                                                        radius: 3
+                                                        radius: Theme.Metrics.radiusXs
                                                         color: usedColor
                                                     }
                                                 }
@@ -5571,7 +3805,7 @@ Window {
                         height: parent.height
                         color: Theme.AppTheme.surface3
                         border.color: Theme.AppTheme.borderSoft
-                        border.width: 1
+                        border.width: Theme.Metrics.borderWidth
 
                         ColumnLayout {
                             anchors.fill: parent
@@ -5594,12 +3828,12 @@ Window {
                                         visible: root.currentViewMode === "Details"
                                         color: Theme.AppTheme.isDark ? "#171d27" : "#f6f7f9"
                                         border.color: Theme.AppTheme.borderSoft
-                                        border.width: 1
+                                        border.width: Theme.Metrics.borderWidth
 
                                         Item {
                                             anchors.fill: parent
-                                            anchors.leftMargin: 10
-                                            anchors.rightMargin: 10
+                                            anchors.leftMargin: Theme.Metrics.spacingLg
+                                            anchors.rightMargin: Theme.Metrics.spacingLg
 
                                             Rectangle {
                                                 id: nameHeader
@@ -5621,12 +3855,12 @@ Window {
                                                     anchors.verticalCenter: parent.verticalCenter
                                                     anchors.left: parent.left
                                                     anchors.leftMargin: 16
-                                                    spacing: 6
+                                                    spacing: Theme.Metrics.spacingSm
 
                                                     Text {
                                                         text: "Name"
                                                         color: Theme.AppTheme.text
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: Theme.Typography.body
                                                         font.bold: true
                                                     }
 
@@ -5634,7 +3868,7 @@ Window {
                                                         visible: root.sortColumn === 0
                                                         name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
                                                         darkTheme: Theme.AppTheme.isDark
-                                                        iconSize: 12
+                                                        iconSize: Theme.Metrics.iconXs
                                                     }
                                                 }
 
@@ -5702,12 +3936,12 @@ Window {
                                                     anchors.verticalCenter: parent.verticalCenter
                                                     anchors.left: parent.left
                                                     anchors.leftMargin: 16
-                                                    spacing: 6
+                                                    spacing: Theme.Metrics.spacingSm
 
                                                     Text {
                                                         text: "Date modified"
                                                         color: Theme.AppTheme.text
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: Theme.Typography.body
                                                         font.bold: true
                                                     }
 
@@ -5715,7 +3949,7 @@ Window {
                                                         visible: root.sortColumn === 1
                                                         name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
                                                         darkTheme: Theme.AppTheme.isDark
-                                                        iconSize: 12
+                                                        iconSize: Theme.Metrics.iconXs
                                                     }
                                                 }
 
@@ -5783,12 +4017,12 @@ Window {
                                                     anchors.verticalCenter: parent.verticalCenter
                                                     anchors.left: parent.left
                                                     anchors.leftMargin: 16
-                                                    spacing: 6
+                                                    spacing: Theme.Metrics.spacingSm
 
                                                     Text {
                                                         text: "Type"
                                                         color: Theme.AppTheme.text
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: Theme.Typography.body
                                                         font.bold: true
                                                     }
 
@@ -5796,7 +4030,7 @@ Window {
                                                         visible: root.sortColumn === 2
                                                         name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
                                                         darkTheme: Theme.AppTheme.isDark
-                                                        iconSize: 12
+                                                        iconSize: Theme.Metrics.iconXs
                                                     }
                                                 }
 
@@ -5864,12 +4098,12 @@ Window {
                                                     anchors.verticalCenter: parent.verticalCenter
                                                     anchors.left: parent.left
                                                     anchors.leftMargin: 16
-                                                    spacing: 6
+                                                    spacing: Theme.Metrics.spacingSm
 
                                                     Text {
                                                         text: "Size"
                                                         color: Theme.AppTheme.text
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: Theme.Typography.body
                                                         font.bold: true
                                                     }
 
@@ -5877,7 +4111,7 @@ Window {
                                                         visible: root.sortColumn === 3
                                                         name: root.sortAscending ? "keyboard-arrow-up" : "keyboard-arrow-down"
                                                         darkTheme: Theme.AppTheme.isDark
-                                                        iconSize: 12
+                                                        iconSize: Theme.Metrics.iconXs
                                                     }
                                                 }
 
@@ -5984,12 +4218,12 @@ Window {
                                     Layout.fillHeight: true
                                     color: Theme.AppTheme.isDark ? "#141920" : "#fbfcfd"
                                     border.color: Theme.AppTheme.borderSoft
-                                    border.width: 1
+                                    border.width: Theme.Metrics.borderWidth
 
                                     Flickable {
                                         id: previewFlick
                                         anchors.fill: parent
-                                        anchors.leftMargin: 12
+                                        anchors.leftMargin: Theme.Metrics.spacingXl
                                         anchors.topMargin: 12
                                         anchors.bottomMargin: 12
                                         anchors.rightMargin: 6
@@ -6002,53 +4236,53 @@ Window {
                                         Column {
                                             id: previewColumn
                                             width: Math.max(0, previewFlick.width - 20)
-                                            spacing: 12
+                                            spacing: Theme.Metrics.spacingXl
 
                                             Text {
                                                 text: "Preview"
                                                 color: Theme.AppTheme.text
-                                                font.pixelSize: 13
+                                                font.pixelSize: Theme.Typography.bodyLg
                                                 font.bold: true
                                             }
 
                                             Rectangle {
                                                 width: parent.width
                                                 height: 180
-                                                radius: 12
+                                                radius: Theme.Metrics.radiusXl
                                                 color: Theme.AppTheme.isDark ? "#1b2230" : "#f4f7fb"
                                                 border.color: Theme.AppTheme.borderSoft
-                                                border.width: 1
+                                                border.width: Theme.Metrics.borderWidth
 
                                                 Column {
                                                     anchors.centerIn: parent
-                                                    spacing: 8
+                                                    spacing: Theme.Metrics.spacingMd
                                                     visible: !root.previewData.visible
 
                                                     AppIcon {
                                                         anchors.horizontalCenter: parent.horizontalCenter
                                                         name: "preview"
                                                         darkTheme: Theme.AppTheme.isDark
-                                                        iconSize: 42
+                                                        iconSize: Theme.Metrics.icon3xl
                                                         iconOpacity: 0.55
                                                     }
 
                                                     Text {
                                                         text: "Select an item to preview"
                                                         color: Theme.AppTheme.muted
-                                                        font.pixelSize: 12
+                                                        font.pixelSize: Theme.Typography.body
                                                     }
                                                 }
 
                                                 Column {
                                                     anchors.centerIn: parent
-                                                    spacing: 8
+                                                    spacing: Theme.Metrics.spacingMd
                                                     visible: root.previewData.visible
 
                                                     AppIcon {
                                                         anchors.horizontalCenter: parent.horizontalCenter
                                                         name: root.previewData.icon || "insert-drive-file"
                                                         darkTheme: Theme.AppTheme.isDark
-                                                        iconSize: 52
+                                                        iconSize: Theme.Metrics.icon4xl
                                                     }
 
                                                     Text {
@@ -6071,7 +4305,7 @@ Window {
                                                                             ? "Mock folder preview"
                                                                             : "Mock file preview"
                                                         color: Theme.AppTheme.text
-                                                        font.pixelSize: 13
+                                                        font.pixelSize: Theme.Typography.bodyLg
                                                         font.bold: true
                                                     }
 
@@ -6079,7 +4313,7 @@ Window {
                                                         anchors.horizontalCenter: parent.horizontalCenter
                                                         text: "Backend-driven placeholder"
                                                         color: Theme.AppTheme.muted
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: Theme.Typography.caption
                                                     }
                                                 }
                                             }
@@ -6089,7 +4323,7 @@ Window {
                                                 width: parent.width
                                                 text: root.previewData.name || ""
                                                 color: Theme.AppTheme.text
-                                                font.pixelSize: 14
+                                                font.pixelSize: Theme.Typography.subtitle
                                                 font.bold: true
                                                 wrapMode: Text.Wrap
                                             }
@@ -6099,7 +4333,7 @@ Window {
                                                 width: parent.width
                                                 text: root.previewData.type || ""
                                                 color: Theme.AppTheme.muted
-                                                font.pixelSize: 12
+                                                font.pixelSize: Theme.Typography.body
                                                 wrapMode: Text.Wrap
                                             }
 
@@ -6108,7 +4342,7 @@ Window {
                                                 width: parent.width
                                                 text: root.previewData.summary || ""
                                                 color: Theme.AppTheme.text
-                                                font.pixelSize: 12
+                                                font.pixelSize: Theme.Typography.body
                                                 wrapMode: Text.Wrap
                                             }
 
@@ -6122,46 +4356,46 @@ Window {
                                             Column {
                                                 visible: root.previewData.visible
                                                 width: parent.width
-                                                spacing: 6
+                                                spacing: Theme.Metrics.spacingSm
 
                                                 Text {
                                                     text: "Details"
                                                     color: Theme.AppTheme.text
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: Theme.Typography.body
                                                     font.bold: true
                                                 }
 
                                                 Row {
-                                                    spacing: 6
+                                                    spacing: Theme.Metrics.spacingSm
 
                                                     Text {
                                                         text: "Modified:"
                                                         color: Theme.AppTheme.muted
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: Theme.Typography.caption
                                                         font.bold: true
                                                     }
 
                                                     Text {
                                                         text: root.previewData.dateModified || "—"
                                                         color: Theme.AppTheme.text
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: Theme.Typography.caption
                                                     }
                                                 }
 
                                                 Row {
-                                                    spacing: 6
+                                                    spacing: Theme.Metrics.spacingSm
 
                                                     Text {
                                                         text: "Size:"
                                                         color: Theme.AppTheme.muted
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: Theme.Typography.caption
                                                         font.bold: true
                                                     }
 
                                                     Text {
                                                         text: root.previewData.size || "—"
                                                         color: Theme.AppTheme.text
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: Theme.Typography.caption
                                                     }
                                                 }
                                             }
@@ -6169,12 +4403,12 @@ Window {
                                             Column {
                                                 visible: root.previewData.visible
                                                 width: parent.width
-                                                spacing: 6
+                                                spacing: Theme.Metrics.spacingSm
 
                                                 Text {
                                                     text: "Mock content"
                                                     color: Theme.AppTheme.text
-                                                    font.pixelSize: 12
+                                                    font.pixelSize: Theme.Typography.body
                                                     font.bold: true
                                                 }
 
@@ -6186,7 +4420,7 @@ Window {
                                                         width: previewColumn.width
                                                         text: "• " + modelData
                                                         color: Theme.AppTheme.muted
-                                                        font.pixelSize: 11
+                                                        font.pixelSize: Theme.Typography.caption
                                                         wrapMode: Text.Wrap
                                                     }
                                                 }
@@ -6201,19 +4435,19 @@ Window {
                                 Layout.preferredHeight: 30
                                 color: Theme.AppTheme.isDark ? "#141920" : "#f6f7f9"
                                 border.color: Theme.AppTheme.borderSoft
-                                border.width: 1
+                                border.width: Theme.Metrics.borderWidth
 
                                 RowLayout {
                                     anchors.fill: parent
-                                    anchors.leftMargin: 12
-                                    anchors.rightMargin: 12
+                                    anchors.leftMargin: Theme.Metrics.spacingXl
+                                    anchors.rightMargin: Theme.Metrics.spacingXl
 
                                     Text {
                                         text: root.selectedFileCount() > 0
                                               ? (filesModel.rowCount + " items   " + root.selectedFileCount() + " selected")
                                               : (filesModel.rowCount + " items")
                                         color: Theme.AppTheme.muted
-                                        font.pixelSize: 11
+                                        font.pixelSize: Theme.Typography.caption
                                     }
 
                                     Item { Layout.fillWidth: true }
@@ -6231,7 +4465,7 @@ Window {
                                         border.color: bottomViewMouse.containsMouse || bottomViewMouse.pressed
                                                     ? Theme.AppTheme.border
                                                     : Theme.AppTheme.borderSoft
-                                        border.width: 1
+                                        border.width: Theme.Metrics.borderWidth
 
                                         AppIcon {
                                             anchors.centerIn: parent
@@ -6275,7 +4509,7 @@ Window {
                                         border.color: notificationsMouse.containsMouse || notificationsMouse.pressed
                                                     ? Theme.AppTheme.border
                                                     : Theme.AppTheme.borderSoft
-                                        border.width: 1
+                                        border.width: Theme.Metrics.borderWidth
 
                                         AppIcon {
                                             anchors.centerIn: parent
@@ -6337,7 +4571,7 @@ Window {
                 id: toastColumn
                 anchors.right: parent.right
                 anchors.bottom: parent.bottom
-                spacing: 10
+                spacing: Theme.Metrics.spacingLg
 
                 Repeater {
                     id: toastRepeater
@@ -6455,23 +4689,23 @@ Window {
 
         Rectangle {
             anchors.fill: parent
-            radius: 10
-            color: Theme.AppTheme.isDark ? "#1b2230" : "#ffffff"
+            radius: Theme.Metrics.radiusLg
+            color: Theme.AppTheme.popupBg
             border.color: Theme.AppTheme.border
-            border.width: 1
+            border.width: Theme.Metrics.borderWidth
         }
 
         Row {
             id: previewContent
             anchors.verticalCenter: parent.verticalCenter
             anchors.left: parent.left
-            anchors.leftMargin: 10
-            spacing: 8
+            anchors.leftMargin: Theme.Metrics.spacingLg
+            spacing: Theme.Metrics.spacingMd
 
             AppIcon {
                 name: root.draggedFileIcon !== "" ? root.draggedFileIcon : "insert-drive-file"
                 darkTheme: Theme.AppTheme.isDark
-                iconSize: 20
+                iconSize: Theme.Metrics.icon2xl
             }
 
             Text {
@@ -6479,7 +4713,7 @@ Window {
                       ? (root.draggedFileCount + " items")
                       : root.draggedFileName
                 color: Theme.AppTheme.text
-                font.pixelSize: 13
+                font.pixelSize: Theme.Typography.bodyLg
                 font.bold: true
                 elide: Text.ElideRight
                 width: 210
@@ -6548,5 +4782,3 @@ Window {
         }
     }
 }
-
-

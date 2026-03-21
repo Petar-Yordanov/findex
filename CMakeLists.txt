@@ -63,9 +63,25 @@ qt_add_qml_module(Findex
         qml/components/foundation/StyledMenuSeparator.qml
         qml/components/foundation/ThinProgressBar.qml
         qml/components/foundation/WindowButton.qml
+        qml/components/foundation/BaseTooltip.qml
+
         qml/components/theme/AppTheme.qml
         qml/components/theme/Metrics.qml
         qml/components/theme/Typography.qml
+
+        qml/shared/menus/ViewModeMenu.qml
+        qml/shared/menus/ThemeMenu.qml
+        qml/shared/menus/OpenWithMenu.qml
+        qml/shared/menus/CopyPathsMenu.qml
+        qml/shared/menus/SortByMenu.qml
+        qml/shared/menus/CreateMenu.qml
+
+        qml/features/files/FileContextMenu.qml
+        qml/features/files/MultiFileContextMenu.qml
+        qml/features/files/EmptyAreaContextMenu.qml
+        qml/features/sidebar/SidebarContextMenu.qml
+        qml/features/tabs/TabContextMenu.qml
+        qml/features/breadcrumb/BreadcrumbContextMenu.qml
 
     RESOURCES
         assets/icons/light/add.png
@@ -206,19 +222,10 @@ qt_add_qml_module(Findex
         RESOURCES assets/icons/findex-color.png assets/icons/findex-plain.png
         RESOURCES appicon.rc
         RESOURCES findex.desktop
-        QML_FILES qml/shared/menus/ViewModeMenu.qml
-        QML_FILES qml/shared/menus/ThemeMenu.qml
-        QML_FILES qml/shared/menus/OpenWithMenu.qml
-        QML_FILES qml/shared/menus/CopyPathsMenu.qml
-        QML_FILES qml/shared/menus/SortByMenu.qml
-        QML_FILES qml/shared/menus/CreateMenu.qml
-        QML_FILES qml/features/files/FileContextMenu.qml
-        QML_FILES qml/features/files/MultiFileContextMenu.qml
-        QML_FILES qml/features/files/EmptyAreaContextMenu.qml
-        QML_FILES qml/features/files/SidebarContextMenu.qml
-        QML_FILES qml/features/files/TabContextMenu.qml
-        QML_FILES qml/features/files/BreadcrumbContextMenu.qml
-        QML_FILES qml/components/foundation/BaseTooltip.qml
+        QML_FILES qml/features/views/DetailsFileView.qml
+        QML_FILES qml/features/views/TilesFileView.qml
+        QML_FILES qml/features/views/CompactFileView.qml
+        QML_FILES qml/features/views/LargeIconsFileView.qml
 )
 
 set_target_properties(Findex PROPERTIES
