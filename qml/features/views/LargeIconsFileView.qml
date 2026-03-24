@@ -238,7 +238,7 @@ Item {
             border.color: rootWindow.detailsDropHoverRow === index && gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged
                           ? Theme.AppTheme.accent
                           : "transparent"
-            border.width: rootWindow.detailsDropHoverRow === index && gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged ? 1 : 0
+            border.width: rootWindow.detailsDropHoverRow === index && gridDelegate.isFolderTarget && !gridDelegate.sameAsDragged ? Theme.Metrics.borderWidth : 0
 
             Column {
                 anchors.centerIn: parent

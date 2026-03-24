@@ -3,49 +3,47 @@ import "../../components/foundation"
 import "../../components/theme" as Theme
 
 StyledMenu {
-    id: menu
+    id: openWithMenu
 
-    required property bool enabledForSelection
-    signal appSelected(string appName)
-    signal chooseAnotherApp()
+    property var rootWindow
 
     title: "Open with..."
     darkTheme: Theme.AppTheme.isDark
 
     StyledMenuItem {
         text: "Notepad"
-        enabled: menu.enabledForSelection
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.appSelected("Notepad")
+        enabled: openWithMenu.rootWindow && openWithMenu.rootWindow.hasSelectedOrCurrentItems()
+        onTriggered: openWithMenu.rootWindow.openSelectedOrCurrentWith("Notepad")
     }
 
     StyledMenuItem {
         text: "Visual Studio Code"
-        enabled: menu.enabledForSelection
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.appSelected("Visual Studio Code")
+        enabled: openWithMenu.rootWindow && openWithMenu.rootWindow.hasSelectedOrCurrentItems()
+        onTriggered: openWithMenu.rootWindow.openSelectedOrCurrentWith("Visual Studio Code")
     }
 
     StyledMenuItem {
         text: "Qt Creator"
-        enabled: menu.enabledForSelection
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.appSelected("Qt Creator")
+        enabled: openWithMenu.rootWindow && openWithMenu.rootWindow.hasSelectedOrCurrentItems()
+        onTriggered: openWithMenu.rootWindow.openSelectedOrCurrentWith("Qt Creator")
     }
 
     StyledMenuItem {
         text: "Windows Media Player"
-        enabled: menu.enabledForSelection
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.appSelected("Windows Media Player")
+        enabled: openWithMenu.rootWindow && openWithMenu.rootWindow.hasSelectedOrCurrentItems()
+        onTriggered: openWithMenu.rootWindow.openSelectedOrCurrentWith("Windows Media Player")
     }
 
     StyledMenuSeparator {}
 
     StyledMenuItem {
         text: "Choose another app..."
-        enabled: menu.enabledForSelection
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.chooseAnotherApp()
+        enabled: openWithMenu.rootWindow && openWithMenu.rootWindow.hasSelectedOrCurrentItems()
+        onTriggered: openWithMenu.rootWindow.chooseOpenWithForSelectedOrCurrent()
     }
 }

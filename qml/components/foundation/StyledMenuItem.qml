@@ -8,7 +8,7 @@ MenuItem {
     property bool darkTheme: Theme.AppTheme.isDark
 
     implicitWidth: Theme.Metrics.menuWidth
-    implicitHeight: 40
+    implicitHeight: Theme.Metrics.controlHeightXl
 
     leftPadding: 16
     rightPadding: control.subMenu ? 36 : 16
@@ -42,10 +42,10 @@ MenuItem {
     }
 
     background: Rectangle {
-        x: 6
-        y: 4
-        width: control.width - 12
-        height: control.height - 8
+        x: Theme.Metrics.spacingSm
+        y: Theme.Metrics.spacingXs
+        width: control.width - Theme.Metrics.spacingXl
+        height: control.height - Theme.Metrics.spacingMd
         radius: Theme.Metrics.radiusSm
 
         color: control.highlighted ? Theme.AppTheme.menuHighlight : "transparent"

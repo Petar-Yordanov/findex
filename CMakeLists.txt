@@ -226,6 +226,31 @@ qt_add_qml_module(Findex
         QML_FILES qml/features/views/TilesFileView.qml
         QML_FILES qml/features/views/CompactFileView.qml
         QML_FILES qml/features/views/LargeIconsFileView.qml
+        QML_FILES qml/shared/menus/MoreActionsMenu.qml
+        QML_FILES qml/shared/popups/NotificationsPopup.qml
+        QML_FILES qml/shared/dialogs/ConfirmDialog.qml
+        QML_FILES qml/shared/cards/DriveCard.qml
+        QML_FILES qml/features/sidebar/DriveListPane.qml
+        QML_FILES qml/features/sidebar/SidebarItem.qml
+        QML_FILES qml/features/sidebar/SidebarTreePane.qml
+        QML_FILES qml/features/breadcrumb/BreadcrumbItem.qml
+        QML_FILES qml/features/breadcrumb/BreadcrumbBar.qml
+        QML_FILES qml/shared/headers/ResizableHeaderCell.qml
+        QML_FILES qml/shared/headers/DetailsHeaderBar.qml
+        QML_FILES qml/shared/panels/PreviewPane.qml
+        QML_FILES qml/features/files/FileDragPreview.qml
+        QML_FILES qml/features/tabs/TabButton.qml
+        QML_FILES qml/features/tabs/TabStrip.qml
+        QML_FILES qml/shared/popups/SearchScopePopup.qml
+        QML_FILES qml/shared/headers/AppTitleBar.qml
+        QML_FILES qml/shared/headers/NavigationBar.qml
+        QML_FILES qml/shared/headers/CommandBar.qml
+        QML_FILES qml/shared/panels/WorkspaceArea.qml
+        QML_FILES qml/features/files/FileAreaContextMenu.qml
+        QML_FILES qml/shared/layout/TitleBar.qml
+        QML_FILES qml/shared/layout/NavigationBar.qml
+        QML_FILES qml/shared/layout/CommandBar.qml
+        QML_FILES qml/shared/layout/SplitWorkspace.qml
 )
 
 set_target_properties(Findex PROPERTIES

@@ -3,28 +3,31 @@ import "../../components/foundation"
 import "../../components/theme" as Theme
 
 StyledMenu {
-    id: menu
+    id: themeMenu
 
-    required property string currentThemeMode
-    signal themeSelected(string mode)
+    required property var rootWindow
 
     darkTheme: Theme.AppTheme.isDark
 
     StyledMenuItem {
         text: "Dark"
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.themeSelected("Dark")
+        onTriggered: {
+            themeMenu.rootWindow.themeMode = "Dark"
+            themeMenu.rootWindow.applySnapshot(
+                themeMenu.rootWindow.backend.setTheme("Dark")
+            )
+        }
     }
 
     StyledMenuItem {
         text: "Light"
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.themeSelected("Light")
-    }
-
-    StyledMenuItem {
-        text: "System"
-        darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.themeSelected("System")
+        onTriggered: {
+            themeMenu.rootWindow.themeMode = "Light"
+            themeMenu.rootWindow.applySnapshot(
+                themeMenu.rootWindow.backend.setTheme("Light")
+            )
+        }
     }
 }

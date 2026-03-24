@@ -134,7 +134,7 @@ Item {
                     border.color: rootWindow.detailsDropHoverRow === index && tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged
                                   ? Theme.AppTheme.accent
                                   : "transparent"
-                    border.width: rootWindow.detailsDropHoverRow === index && tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged ? 1 : 0
+                    border.width: rootWindow.detailsDropHoverRow === index && tileDelegate.isFolderTarget && !tileDelegate.sameAsDragged ? Theme.Metrics.borderWidth : 0
                 }
 
                 Rectangle {

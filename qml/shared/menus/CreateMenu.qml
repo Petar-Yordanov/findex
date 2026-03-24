@@ -3,25 +3,21 @@ import "../../components/foundation"
 import "../../components/theme" as Theme
 
 StyledMenu {
-    id: menu
+    id: createMenu
 
-    property string folderText: "New folder"
-    property string fileText: "New file"
-
-    signal newFolderRequested()
-    signal newFileRequested()
+    required property var rootWindow
 
     darkTheme: Theme.AppTheme.isDark
 
     StyledMenuItem {
-        text: menu.folderText
+        text: "New folder"
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.newFolderRequested()
+        onTriggered: createMenu.rootWindow.addNewFolder()
     }
 
     StyledMenuItem {
-        text: menu.fileText
+        text: "New file"
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.newFileRequested()
+        onTriggered: createMenu.rootWindow.addNewFile()
     }
 }

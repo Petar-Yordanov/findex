@@ -8,10 +8,10 @@ Menu {
     property bool darkTheme: Theme.AppTheme.isDark
 
     implicitWidth: Theme.Metrics.menuWidth
-    leftPadding: 8
-    rightPadding: 8
-    topPadding: 8
-    bottomPadding: 8
+    leftPadding: Theme.Metrics.spacingMd
+    rightPadding: Theme.Metrics.spacingMd
+    topPadding: Theme.Metrics.spacingMd
+    bottomPadding: Theme.Metrics.spacingMd
     overlap: 2
 
     background: Rectangle {

@@ -135,7 +135,7 @@ Item {
                     border.color: rootWindow.detailsDropHoverRow === index && compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged
                                   ? Theme.AppTheme.accent
                                   : "transparent"
-                    border.width: rootWindow.detailsDropHoverRow === index && compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged ? 1 : 0
+                    border.width: rootWindow.detailsDropHoverRow === index && compactDelegate.isFolderTarget && !compactDelegate.sameAsDragged ? Theme.Metrics.borderWidth : 0
                 }
 
                 Row {
