@@ -5,6 +5,7 @@
 #include <QStorageInfo>
 #include <QTimer>
 #include <QHash>
+#include <QFutureWatcher>
 
 class FileManagerSidebarService final : public QObject
 {
@@ -46,14 +47,20 @@ private:
         }
     };
 
-    void reloadDrives();
-    QHash<QString, DriveSnapshot> captureDriveSnapshot() const;
+    struct ScanResult {
+        QVariantList drives;
+        QHash<QString, DriveSnapshot> snapshot;
+    };
+
+    void startDriveScan();
+    static ScanResult scanDrives();
     QString formatDriveLabel(const QStorageInfo& storage) const;
-    QString formatStorageAmount(qint64 bytes) const;
+    static QString formatStorageAmount(qint64 bytes);
 
 private:
     QVariantList m_drives;
     QVariantList m_sidebarTree;
     QHash<QString, DriveSnapshot> m_lastSnapshot;
     QTimer m_drivePollTimer;
+    QFutureWatcher<ScanResult> m_scanWatcher;
 };

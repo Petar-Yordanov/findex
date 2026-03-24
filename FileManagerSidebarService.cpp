@@ -1,26 +1,12 @@
 #include "FileManagerSidebarService.h"
 
 #include <QVariantMap>
-#include <QString>
 #include <QStringList>
+#include <QtConcurrent/QtConcurrentRun>
 
 FileManagerSidebarService::FileManagerSidebarService(QObject* parent)
     : QObject(parent)
 {
-    reloadDrives();
-    m_lastSnapshot = captureDriveSnapshot();
-
-    connect(&m_drivePollTimer, &QTimer::timeout, this, [this]() {
-        const auto currentSnapshot = captureDriveSnapshot();
-        if (currentSnapshot != m_lastSnapshot) {
-            m_lastSnapshot = currentSnapshot;
-            reloadDrives();
-            emit drivesChanged();
-        }
-    });
-
-    m_drivePollTimer.start(3000);
-
     m_sidebarTree = {
         QVariantMap{
             {"label", "Quick Access"},
@@ -39,37 +25,36 @@ FileManagerSidebarService::FileManagerSidebarService(QObject* parent)
                      }}
         }
     };
+
+    connect(&m_scanWatcher, &QFutureWatcher<ScanResult>::finished, this, [this]() {
+        const ScanResult result = m_scanWatcher.result();
+
+        if (result.snapshot != m_lastSnapshot) {
+            m_lastSnapshot = result.snapshot;
+            m_drives = result.drives;
+            emit drivesChanged();
+        }
+    });
+
+    connect(&m_drivePollTimer, &QTimer::timeout, this, [this]() {
+        startDriveScan();
+    });
+
+    m_drivePollTimer.start(5000); // a bit less aggressive
+    startDriveScan();             // initial load
 }
 
-QHash<QString, FileManagerSidebarService::DriveSnapshot> FileManagerSidebarService::captureDriveSnapshot() const
+void FileManagerSidebarService::startDriveScan()
 {
-    QHash<QString, DriveSnapshot> snapshot;
+    if (m_scanWatcher.isRunning())
+        return;
 
-    for (const QStorageInfo& storage : QStorageInfo::mountedVolumes()) {
-        if (!storage.isValid() || !storage.isReady())
-            continue;
-
-        const qint64 total = storage.bytesTotal();
-        if (total <= 0)
-            continue;
-
-        DriveSnapshot item;
-        item.rootPath = storage.rootPath();
-        item.displayName = storage.displayName().trimmed();
-        item.name = storage.name().trimmed();
-        item.fileSystemType = QString::fromUtf8(storage.fileSystemType()).trimmed();
-        item.bytesTotal = storage.bytesTotal();
-        item.bytesAvailable = storage.bytesAvailable();
-
-        snapshot.insert(item.rootPath, item);
-    }
-
-    return snapshot;
+    m_scanWatcher.setFuture(QtConcurrent::run(&FileManagerSidebarService::scanDrives));
 }
 
-void FileManagerSidebarService::reloadDrives()
+FileManagerSidebarService::ScanResult FileManagerSidebarService::scanDrives()
 {
-    QVariantList drives;
+    ScanResult result;
 
     for (const QStorageInfo& storage : QStorageInfo::mountedVolumes()) {
         if (!storage.isValid() || !storage.isReady())
@@ -77,13 +62,37 @@ void FileManagerSidebarService::reloadDrives()
 
         const qint64 total = storage.bytesTotal();
         const qint64 free = storage.bytesAvailable();
-        const qint64 used = total - free;
 
         if (total <= 0)
             continue;
 
+        const qint64 used = total - free;
+
+        DriveSnapshot item;
+        item.rootPath = storage.rootPath();
+        item.displayName = storage.displayName().trimmed();
+        item.name = storage.name().trimmed();
+        item.fileSystemType = QString::fromUtf8(storage.fileSystemType()).trimmed();
+        item.bytesTotal = total;
+        item.bytesAvailable = free;
+        result.snapshot.insert(item.rootPath, item);
+
+        QString root = storage.rootPath();
+        QString driveId = root;
+        driveId.remove('/');
+
+        QString displayName = storage.displayName().trimmed();
+        QString fsType = QString::fromUtf8(storage.fileSystemType()).trimmed();
+
+        QString baseLabel;
+        if (displayName.isEmpty() || displayName == root || displayName == driveId)
+            baseLabel = driveId;
+        else
+            baseLabel = QString("%1 (%2)").arg(displayName, driveId);
+
         QVariantMap drive;
-        drive["label"] = formatDriveLabel(storage);
+        drive["label"] = fsType.isEmpty() ? baseLabel
+                                          : QString("%1 [%2]").arg(baseLabel, fsType);
         drive["icon"] = storage.isReadOnly() ? "lock" : "hard-drive";
         drive["used"] = double(used) / double(total);
         drive["total"] = 1.0;
@@ -91,10 +100,10 @@ void FileManagerSidebarService::reloadDrives()
                                 .arg(formatStorageAmount(free))
                                 .arg(formatStorageAmount(total));
 
-        drives.append(drive);
+        result.drives.append(drive);
     }
 
-    m_drives = drives;
+    return result;
 }
 
 QString FileManagerSidebarService::formatDriveLabel(const QStorageInfo& storage) const
@@ -118,11 +127,11 @@ QString FileManagerSidebarService::formatDriveLabel(const QStorageInfo& storage)
     return QString("%1 [%2]").arg(baseLabel, fsType);
 }
 
-QString FileManagerSidebarService::formatStorageAmount(qint64 bytes) const
+QString FileManagerSidebarService::formatStorageAmount(qint64 bytes)
 {
     const double gb = bytes / 1024.0 / 1024.0 / 1024.0;
     if (gb < 1024.0)
-        return QString("%1 GB").arg(gb, 0, 'f', 1);
+        return QString("%1 GB").arg(gb, 0, 'f', 0);
 
     const double tb = gb / 1024.0;
     return QString("%1 TB").arg(tb, 0, 'f', 2);
