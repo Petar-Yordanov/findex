@@ -2,7 +2,7 @@
 
 #include "FileManagerSessionService.h"
 #include "FileManagerNavigationService.h"
-#include "FileOperationsService.h"
+#include "FileManagerFileOpsService.h"
 #include "FileManagerSearchService.h"
 #include "FileManagerSidebarService.h"
 

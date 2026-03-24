@@ -22,6 +22,7 @@ Window {
     minimumHeight: 480
 
     property var backend: fileManagerBridge
+    property var sidebarBackend: fileManagerSidebarService
 
     onThemeModeChanged: Theme.AppTheme.mode = themeMode
 
@@ -187,7 +188,7 @@ Window {
 
     function pathFieldRef() {
         var nav = navigationBarRef()
-        return nav && nav.pathFieldRef ? nav.pathFieldRef : nullf
+        return nav && nav.pathFieldRef ? nav.pathFieldRef : null
     }
 
     function pathBarRef() {
@@ -1599,11 +1600,24 @@ Window {
         var snapshot = backend.bootstrap()
         applySnapshot(snapshot)
 
+        if (sidebarBackend) {
+            sidebarModel.rows = toJsArray(sidebarBackend.sidebarTree)
+            replaceListModel(drivesModel, toJsArray(sidebarBackend.drives))
+        }
+
         var pf = pathFieldRef()
         if (pf && (!pf.text || pf.text === ""))
             syncPathField()
 
         refreshPreviewSelection()
+    }
+
+    Connections {
+        target: sidebarBackend
+
+        function onDrivesChanged() {
+            root.replaceListModel(root.drivesModel, root.toJsArray(sidebarBackend.drives))
+        }
     }
 
     MouseArea {

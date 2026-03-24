@@ -26,8 +26,8 @@ qt_add_executable(Findex
     FileManagerSessionService.h
     FileManagerNavigationService.cpp
     FileManagerNavigationService.h
-    FileOperationsService.cpp
-    FileOperationsService.h
+    FileManagerFileOpsService.cpp
+    FileManagerFileOpsService.h
     FileManagerSearchService.cpp
     FileManagerSearchService.h
     FileManagerSidebarService.cpp
@@ -215,7 +215,7 @@ qt_add_qml_module(Findex
         SOURCES FileManagerBridge.h FileManagerBridge.cpp
         SOURCES FileManagerSessionService.h FileManagerSessionService.cpp
         SOURCES FileManagerNavigationService.h FileManagerNavigationService.cpp
-        SOURCES FileOperationsService.h FileOperationsService.cpp
+        SOURCES FileManagerFileOpsService.h FileManagerFileOpsService.cpp
         SOURCES FileManagerSearchService.h FileManagerSearchService.cpp
         SOURCES FileManagerSidebarService.h FileManagerSidebarService.cpp
         RESOURCES qml/components/theme/qmldir

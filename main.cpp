@@ -5,6 +5,7 @@
 #include <QQuickStyle>
 #include "FileAssociationService.h"
 #include "FileManagerBridge.h"
+#include "FileManagerSidebarService.h"
 #include <QQmlContext>
 #include <QIcon>
 #include <QFile>
@@ -48,8 +49,11 @@ int main(int argc, char *argv[])
 
     QQmlApplicationEngine engine;
 
-    auto* fileManagerBridge = new FileManagerBridge(&engine);
-    engine.rootContext()->setContextProperty("fileManagerBridge", fileManagerBridge);
+    FileManagerBridge fileManagerBridge;
+    FileManagerSidebarService fileManagerSidebarService;
+
+    engine.rootContext()->setContextProperty("fileManagerBridge", &fileManagerBridge);
+    engine.rootContext()->setContextProperty("fileManagerSidebarService", &fileManagerSidebarService);
 
     QObject::connect(
         &engine,
