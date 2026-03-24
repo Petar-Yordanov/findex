@@ -4,10 +4,14 @@ import QtQuick
 QtObject {
     id: theme
 
-    property string mode: "Light"   // Dark | Light | System
+    property string mode: "Dark"   // Dark | Light | System
     property bool systemDark: false
 
     readonly property bool isDark: mode === "Dark" || (mode === "System" && systemDark)
+
+    Component.onCompleted: {
+        console.log("AppTheme loaded, mode =", mode, "isDark =", isDark)
+    }
 
     // Base surfaces
     readonly property color bg: isDark ? "#0f1115" : "#f3f4f6"

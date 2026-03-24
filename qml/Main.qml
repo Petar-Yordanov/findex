@@ -21,7 +21,6 @@ Window {
     minimumWidth: 640
     minimumHeight: 480
 
-    property string themeMode: "Light" // Dark | Light | System
     property var backend: fileManagerBridge
 
     onThemeModeChanged: Theme.AppTheme.mode = themeMode
@@ -74,8 +73,12 @@ Window {
     property int currentFileRow: 0
     property bool editingPath: false
     property string currentSearch: ""
-    property string currentViewMode: "Details"
-    property string searchScope: "folder" // folder | global
+
+    property string themeMode: backend && backend.savedTheme ? backend.savedTheme() : "Light"
+    property string searchScope: backend && backend.savedSearchScope ? backend.savedSearchScope() : "folder"
+    property string currentViewMode: backend && backend.savedViewMode ? backend.savedViewMode() : "Details"
+    property bool previewEnabled: backend && backend.savedPreviewEnabled ? backend.savedPreviewEnabled() : true
+    property bool showHiddenFiles: backend && backend.savedShowHiddenFiles ? backend.savedShowHiddenFiles() : false
 
     property int contextTabIndex: -1
     property int contextFileRow: -1
@@ -126,7 +129,6 @@ Window {
     property string navDropHoverLabel: ""
     property string navDropHoverKind: ""
     property int breadcrumbDropHoverIndex: -1
-    property bool showHiddenFiles: false
 
     property int detailsRowHeight: 34
 
@@ -150,7 +152,6 @@ Window {
     property int editingTabIndex: -1
     property string editingTabTitleDraft: ""
 
-    property bool previewEnabled: false
     property int previewPaneWidth: 320
     property int previewPaneMinWidth: 220
     property int previewPaneMaxWidth: Math.max(420, Math.floor(width * 0.45))
@@ -1590,22 +1591,12 @@ Window {
     }
 
     Component.onCompleted: {
-        Theme.AppTheme.mode = root.themeMode
-
         console.log("before bootstrap:",
                     "tabs=", tabsModel ? tabsModel.count : "undef",
                     "drives=", drivesModel ? drivesModel.count : "undef",
                     "files=", (filesModel && filesModel.rows) ? filesModel.rows.length : "undef")
 
         var snapshot = backend.bootstrap()
-
-        console.log("bootstrap snapshot:",
-                    "tabs=", snapshot && snapshot.tabs !== undefined ? snapshot.tabs.length : "undef",
-                    "path=", snapshot && snapshot.path !== undefined ? snapshot.path.length : "undef",
-                    "drives=", snapshot && snapshot.drives !== undefined ? snapshot.drives.length : "undef",
-                    "files=", snapshot && snapshot.files !== undefined ? snapshot.files.length : "undef",
-                    "sidebar=", snapshot && snapshot.sidebar !== undefined ? snapshot.sidebar.length : "undef")
-
         applySnapshot(snapshot)
 
         var pf = pathFieldRef()

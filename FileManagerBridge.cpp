@@ -2,7 +2,7 @@
 
 #include "FileManagerSessionService.h"
 #include "FileManagerNavigationService.h"
-#include "FileManagerFileOpsService.h"
+#include "FileOperationsService.h"
 #include "FileManagerSearchService.h"
 #include "FileManagerSidebarService.h"
 
@@ -25,6 +25,13 @@ FileManagerBridge::FileManagerBridge(QObject* parent)
     , m_searchService(new FileManagerSearchService(this))
     , m_sidebarService(new FileManagerSidebarService(this))
 {
+    qDebug() << "Run on startup";
+
+    m_previewEnabled = m_appSettings.previewEnabled();
+    m_showHiddenFiles = m_appSettings.showHiddenFiles();
+    m_currentFileRow = -1;
+
+    m_fileOpsService->reloadForPath(m_navigationService->pathText());
 }
 
 FileManagerBridge::~FileManagerBridge() = default;
@@ -41,6 +48,9 @@ QVariantMap FileManagerBridge::makeSnapshot(const QString& message,
     out.insert(QStringLiteral("drives"), m_sidebarService->drives());
     out.insert(QStringLiteral("sidebar"), m_sidebarService->sidebarTree());
 
+    out.insert(QStringLiteral("theme"), m_appSettings.theme());
+    out.insert(QStringLiteral("searchScope"), m_appSettings.searchScope());
+    out.insert(QStringLiteral("viewMode"), m_appSettings.viewMode());
     out.insert(QStringLiteral("previewEnabled"), m_previewEnabled);
     out.insert(QStringLiteral("showHiddenFiles"), m_showHiddenFiles);
 
@@ -577,17 +587,26 @@ QVariantMap FileManagerBridge::search(const QString& query, const QString& scope
 
 QVariantMap FileManagerBridge::setSearchScope(const QString& scope)
 {
-    return makeSnapshot(QStringLiteral("[Backend] Search scope set to ") + scope, QStringLiteral("info"));
-}
+    m_appSettings.setSearchScope(scope);
 
-QVariantMap FileManagerBridge::setTheme(const QString& themeMode)
-{
-    return makeSnapshot(QStringLiteral("[Backend] Theme set to ") + themeMode, QStringLiteral("info"));
+    QVariantMap snapshot = makeSnapshot(
+        QStringLiteral("[Backend] Search scope set to ") + m_appSettings.searchScope(),
+        QStringLiteral("info"));
+
+    snapshot.insert(QStringLiteral("searchScope"), m_appSettings.searchScope());
+    return snapshot;
 }
 
 QVariantMap FileManagerBridge::setViewMode(const QString& viewMode)
 {
-    return makeSnapshot(QStringLiteral("[Backend] View mode set to ") + viewMode, QStringLiteral("info"));
+    m_appSettings.setViewMode(viewMode);
+
+    QVariantMap snapshot = makeSnapshot(
+        QStringLiteral("[Backend] View mode set to ") + m_appSettings.viewMode(),
+        QStringLiteral("info"));
+
+    snapshot.insert(QStringLiteral("viewMode"), m_appSettings.viewMode());
+    return snapshot;
 }
 
 QVariantMap FileManagerBridge::openFolderByRow(int row)
@@ -1235,15 +1254,30 @@ QVariantMap FileManagerBridge::openSidebarLocationInNewTab(const QString& label,
                         QStringLiteral("success"));
 }
 
+QVariantMap FileManagerBridge::setTheme(const QString& themeMode)
+{
+    m_appSettings.setTheme(themeMode);
+
+    QVariantMap snapshot = makeSnapshot(
+        QStringLiteral("[Backend] Theme set to ") + m_appSettings.theme(),
+        QStringLiteral("info"));
+
+    snapshot.insert(QStringLiteral("theme"), m_appSettings.theme());
+    return snapshot;
+}
+
 QVariantMap FileManagerBridge::setPreviewEnabled(bool enabled)
 {
     m_previewEnabled = enabled;
+    m_appSettings.setPreviewEnabled(enabled);
 
     QVariantMap snapshot = makeSnapshot(
         m_previewEnabled
             ? QStringLiteral("[Backend] Preview enabled")
             : QStringLiteral("[Backend] Preview disabled"),
         QStringLiteral("info"));
+
+    snapshot.insert(QStringLiteral("previewEnabled"), m_previewEnabled);
 
     if (!m_previewEnabled) {
         QVariantMap preview;
@@ -1262,14 +1296,16 @@ QVariantMap FileManagerBridge::setPreviewEnabled(bool enabled)
 
     if (m_currentFileRow >= 0) {
         const QVariantMap previewSnapshot = previewItemByRow(m_currentFileRow);
-        if (previewSnapshot.contains(QStringLiteral("preview")))
+        if (previewSnapshot.contains(QStringLiteral("preview"))) {
             snapshot.insert(QStringLiteral("preview"),
                             previewSnapshot.value(QStringLiteral("preview")));
+        }
     } else {
         const QVariantMap clearSnapshot = clearPreview();
-        if (clearSnapshot.contains(QStringLiteral("preview")))
+        if (clearSnapshot.contains(QStringLiteral("preview"))) {
             snapshot.insert(QStringLiteral("preview"),
                             clearSnapshot.value(QStringLiteral("preview")));
+        }
     }
 
     return snapshot;
@@ -1278,6 +1314,7 @@ QVariantMap FileManagerBridge::setPreviewEnabled(bool enabled)
 QVariantMap FileManagerBridge::setShowHiddenFiles(bool enabled)
 {
     m_showHiddenFiles = enabled;
+    m_appSettings.setShowHiddenFiles(enabled);
 
     m_fileOpsService->reloadForPath(m_navigationService->pathText());
 
@@ -1289,4 +1326,29 @@ QVariantMap FileManagerBridge::setShowHiddenFiles(bool enabled)
 
     snapshot.insert(QStringLiteral("showHiddenFiles"), m_showHiddenFiles);
     return snapshot;
+}
+
+QString FileManagerBridge::savedTheme() const
+{
+    return m_appSettings.theme();
+}
+
+QString FileManagerBridge::savedSearchScope() const
+{
+    return m_appSettings.searchScope();
+}
+
+QString FileManagerBridge::savedViewMode() const
+{
+    return m_appSettings.viewMode();
+}
+
+bool FileManagerBridge::savedPreviewEnabled() const
+{
+    return m_appSettings.previewEnabled();
+}
+
+bool FileManagerBridge::savedShowHiddenFiles() const
+{
+    return m_appSettings.showHiddenFiles();
 }

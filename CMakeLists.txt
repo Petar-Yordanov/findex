@@ -26,8 +26,8 @@ qt_add_executable(Findex
     FileManagerSessionService.h
     FileManagerNavigationService.cpp
     FileManagerNavigationService.h
-    FileManagerFileOpsService.cpp
-    FileManagerFileOpsService.h
+    FileOperationsService.cpp
+    FileOperationsService.h
     FileManagerSearchService.cpp
     FileManagerSearchService.h
     FileManagerSidebarService.cpp
@@ -215,7 +215,7 @@ qt_add_qml_module(Findex
         SOURCES FileManagerBridge.h FileManagerBridge.cpp
         SOURCES FileManagerSessionService.h FileManagerSessionService.cpp
         SOURCES FileManagerNavigationService.h FileManagerNavigationService.cpp
-        SOURCES FileManagerFileOpsService.h FileManagerFileOpsService.cpp
+        SOURCES FileOperationsService.h FileOperationsService.cpp
         SOURCES FileManagerSearchService.h FileManagerSearchService.cpp
         SOURCES FileManagerSidebarService.h FileManagerSidebarService.cpp
         RESOURCES qml/components/theme/qmldir
@@ -256,6 +256,7 @@ qt_add_qml_module(Findex
         QML_FILES qml/shared/layout/AppShell.qml
         QML_FILES qml/shared/layout/WindowResizeHandles.qml
         QML_FILES qml/shared/popups/ToastOverlay.qml
+        SOURCES ApplicationSettings.h ApplicationSettings.cpp
 )
 
 set_target_properties(Findex PROPERTIES
