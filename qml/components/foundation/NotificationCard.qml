@@ -51,12 +51,12 @@ Rectangle {
 
     Column {
         anchors.fill: parent
-        anchors.margins: 12
-        spacing: 8
+        anchors.margins: Theme.Metrics.spacingXl
+        spacing: Theme.Metrics.spacingMd
 
         Row {
             width: parent.width
-            spacing: 8
+            spacing: Theme.Metrics.spacingMd
 
             AppIcon {
                 name: control.kind === "success"

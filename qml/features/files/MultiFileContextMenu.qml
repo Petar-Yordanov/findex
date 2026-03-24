@@ -1,7 +1,6 @@
 import QtQuick
 import "../../components/foundation"
 import "../../components/theme" as Theme
-import "../../shared/menus"
 
 StyledMenu {
     id: menu
@@ -80,15 +79,62 @@ StyledMenu {
 
     StyledMenuSeparator {}
 
-    CopyPathsMenu {
-        enabledForSelection: rootWindow.selectedFileCount() > 0
+    StyledMenu {
+        title: "Copy paths"
+        darkTheme: Theme.AppTheme.isDark
 
-        onCopyRequested: function(relativeToCurrentDir, recursive) {
-            rootWindow.copyPathsForItems(
-                rootWindow.selectedItemsForBackend(),
-                relativeToCurrentDir,
-                recursive
-            )
+        StyledMenuItem {
+            text: "Full path"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.selectedFileCount() > 0
+            onTriggered: {
+                rootWindow.copyPathsForItems(
+                    rootWindow.selectedItemsForBackend(),
+                    false,
+                    false
+                )
+            }
+        }
+
+        StyledMenuItem {
+            text: "Relative path"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.selectedFileCount() > 0
+            onTriggered: {
+                rootWindow.copyPathsForItems(
+                    rootWindow.selectedItemsForBackend(),
+                    true,
+                    false
+                )
+            }
+        }
+
+        StyledMenuSeparator {}
+
+        StyledMenuItem {
+            text: "Full paths recursively"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.selectedFileCount() > 0
+            onTriggered: {
+                rootWindow.copyPathsForItems(
+                    rootWindow.selectedItemsForBackend(),
+                    false,
+                    true
+                )
+            }
+        }
+
+        StyledMenuItem {
+            text: "Relative paths recursively"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.selectedFileCount() > 0
+            onTriggered: {
+                rootWindow.copyPathsForItems(
+                    rootWindow.selectedItemsForBackend(),
+                    true,
+                    true
+                )
+            }
         }
     }
 

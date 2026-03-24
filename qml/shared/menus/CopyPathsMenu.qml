@@ -3,43 +3,48 @@ import "../../components/foundation"
 import "../../components/theme" as Theme
 
 StyledMenu {
-    id: menu
+    id: copyPathsMenu
 
-    required property bool enabledForSelection
-    property string menuTitle: "Copy paths"
+    property var rootWindow
 
-    signal copyRequested(bool relativeToCurrentDir, bool recursive)
-
-    title: menu.menuTitle
+    title: "Copy paths"
     darkTheme: Theme.AppTheme.isDark
 
     StyledMenuItem {
         text: "Full path"
-        enabled: menu.enabledForSelection
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.copyRequested(false, false)
+        enabled: copyPathsMenu.rootWindow
+                 && (copyPathsMenu.rootWindow.selectedFileCount() > 0
+                     || copyPathsMenu.rootWindow.currentFileRow >= 0)
+        onTriggered: copyPathsMenu.rootWindow.copySelectedOrCurrentPaths(false, false)
     }
 
     StyledMenuItem {
         text: "Relative path"
-        enabled: menu.enabledForSelection
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.copyRequested(true, false)
+        enabled: copyPathsMenu.rootWindow
+                 && (copyPathsMenu.rootWindow.selectedFileCount() > 0
+                     || copyPathsMenu.rootWindow.currentFileRow >= 0)
+        onTriggered: copyPathsMenu.rootWindow.copySelectedOrCurrentPaths(true, false)
     }
 
     StyledMenuSeparator {}
 
     StyledMenuItem {
         text: "Full paths recursively"
-        enabled: menu.enabledForSelection
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.copyRequested(false, true)
+        enabled: copyPathsMenu.rootWindow
+                 && (copyPathsMenu.rootWindow.selectedFileCount() > 0
+                     || copyPathsMenu.rootWindow.currentFileRow >= 0)
+        onTriggered: copyPathsMenu.rootWindow.copySelectedOrCurrentPaths(false, true)
     }
 
     StyledMenuItem {
         text: "Relative paths recursively"
-        enabled: menu.enabledForSelection
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.copyRequested(true, true)
+        enabled: copyPathsMenu.rootWindow
+                 && (copyPathsMenu.rootWindow.selectedFileCount() > 0
+                     || copyPathsMenu.rootWindow.currentFileRow >= 0)
+        onTriggered: copyPathsMenu.rootWindow.copySelectedOrCurrentPaths(true, true)
     }
 }

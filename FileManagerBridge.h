@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QVariantList>
 #include <QVariantMap>
+#include "ApplicationSettings.h"
 
 class FileManagerSessionService;
 class FileManagerNavigationService;
@@ -97,6 +98,12 @@ public:
     Q_INVOKABLE QVariantMap setPreviewEnabled(bool enabled);
     Q_INVOKABLE QVariantMap setShowHiddenFiles(bool enabled);
 
+    Q_INVOKABLE QString savedTheme() const;
+    Q_INVOKABLE QString savedSearchScope() const;
+    Q_INVOKABLE QString savedViewMode() const;
+    Q_INVOKABLE bool savedPreviewEnabled() const;
+    Q_INVOKABLE bool savedShowHiddenFiles() const;
+
 private:
     QVariantMap makeSnapshot(const QString& message = QString(),
                              const QString& messageKind = QString()) const;
@@ -124,7 +131,10 @@ private:
     FileManagerFileOpsService* m_fileOpsService;
     FileManagerSearchService* m_searchService;
     FileManagerSidebarService* m_sidebarService;
+
+    ApplicationSettings m_appSettings;
+
     bool m_previewEnabled = true;
     bool m_showHiddenFiles = false;
-    int m_currentFileRow = 0;
+    int m_currentFileRow = -1;
 };

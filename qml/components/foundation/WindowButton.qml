@@ -8,9 +8,9 @@ Rectangle {
     property bool hoverFxEnabled: true
 
     property string iconName: ""
-    property color hoverColor: Theme.AppTheme.isDark ? "#2c3544" : "#dbe7fb"
-    property color pressedColor: Theme.AppTheme.isDark ? "#39465b" : "#c9daf8"
-    property color hoverBorderColor: Theme.AppTheme.isDark ? "#3b4659" : "#bfd0ef"
+    property color hoverColor: Theme.AppTheme.selected
+    property color pressedColor: Theme.AppTheme.menuHighlight
+    property color hoverBorderColor: Theme.AppTheme.menuHighlightBorder
 
     signal clicked()
 

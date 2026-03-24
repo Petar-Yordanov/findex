@@ -1,7 +1,6 @@
 import QtQuick
 import "../../components/foundation"
 import "../../components/theme" as Theme
-import "../../shared/menus"
 
 StyledMenu {
     id: menu
@@ -40,27 +39,88 @@ StyledMenu {
         }
     }
 
-    OpenWithMenu {
-        enabledForSelection: rootWindow.contextFileRow >= 0
+    StyledMenu {
+        title: "Open with..."
+        darkTheme: Theme.AppTheme.isDark
 
-        onAppSelected: function(appName) {
-            if (rootWindow.contextFileRow >= 0) {
-                rootWindow.applySnapshot(
-                    rootWindow.backend.openItemsWith(
-                        rootWindow.singleItemForBackend(rootWindow.contextFileRow),
-                        appName
+        StyledMenuItem {
+            text: "Notepad"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.contextFileRow >= 0
+            onTriggered: {
+                if (rootWindow.contextFileRow >= 0) {
+                    rootWindow.applySnapshot(
+                        rootWindow.backend.openItemsWith(
+                            rootWindow.singleItemForBackend(rootWindow.contextFileRow),
+                            "Notepad"
+                        )
                     )
-                )
+                }
             }
         }
 
-        onChooseAnotherApp: {
-            if (rootWindow.contextFileRow >= 0) {
-                rootWindow.applySnapshot(
-                    rootWindow.backend.chooseOpenWithApp(
-                        rootWindow.singleItemForBackend(rootWindow.contextFileRow)
+        StyledMenuItem {
+            text: "Visual Studio Code"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.contextFileRow >= 0
+            onTriggered: {
+                if (rootWindow.contextFileRow >= 0) {
+                    rootWindow.applySnapshot(
+                        rootWindow.backend.openItemsWith(
+                            rootWindow.singleItemForBackend(rootWindow.contextFileRow),
+                            "Visual Studio Code"
+                        )
                     )
-                )
+                }
+            }
+        }
+
+        StyledMenuItem {
+            text: "Qt Creator"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.contextFileRow >= 0
+            onTriggered: {
+                if (rootWindow.contextFileRow >= 0) {
+                    rootWindow.applySnapshot(
+                        rootWindow.backend.openItemsWith(
+                            rootWindow.singleItemForBackend(rootWindow.contextFileRow),
+                            "Qt Creator"
+                        )
+                    )
+                }
+            }
+        }
+
+        StyledMenuItem {
+            text: "Windows Media Player"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.contextFileRow >= 0
+            onTriggered: {
+                if (rootWindow.contextFileRow >= 0) {
+                    rootWindow.applySnapshot(
+                        rootWindow.backend.openItemsWith(
+                            rootWindow.singleItemForBackend(rootWindow.contextFileRow),
+                            "Windows Media Player"
+                        )
+                    )
+                }
+            }
+        }
+
+        StyledMenuSeparator {}
+
+        StyledMenuItem {
+            text: "Choose another app..."
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.contextFileRow >= 0
+            onTriggered: {
+                if (rootWindow.contextFileRow >= 0) {
+                    rootWindow.applySnapshot(
+                        rootWindow.backend.chooseOpenWithApp(
+                            rootWindow.singleItemForBackend(rootWindow.contextFileRow)
+                        )
+                    )
+                }
             }
         }
     }
@@ -103,15 +163,70 @@ StyledMenu {
         }
     }
 
-    CopyPathsMenu {
-        enabledForSelection: rootWindow.contextFileRow >= 0
+    StyledMenu {
+        title: "Copy paths"
+        darkTheme: Theme.AppTheme.isDark
 
-        onCopyRequested: function(relativeToCurrentDir, recursive) {
-            rootWindow.copyPathsForItems(
-                rootWindow.singleItemForBackend(rootWindow.contextFileRow),
-                relativeToCurrentDir,
-                recursive
-            )
+        StyledMenuItem {
+            text: "Full path"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.contextFileRow >= 0
+            onTriggered: {
+                if (rootWindow.contextFileRow >= 0) {
+                    rootWindow.copyPathsForItems(
+                        rootWindow.singleItemForBackend(rootWindow.contextFileRow),
+                        false,
+                        false
+                    )
+                }
+            }
+        }
+
+        StyledMenuItem {
+            text: "Relative path"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.contextFileRow >= 0
+            onTriggered: {
+                if (rootWindow.contextFileRow >= 0) {
+                    rootWindow.copyPathsForItems(
+                        rootWindow.singleItemForBackend(rootWindow.contextFileRow),
+                        true,
+                        false
+                    )
+                }
+            }
+        }
+
+        StyledMenuSeparator {}
+
+        StyledMenuItem {
+            text: "Full paths recursively"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.contextFileRow >= 0
+            onTriggered: {
+                if (rootWindow.contextFileRow >= 0) {
+                    rootWindow.copyPathsForItems(
+                        rootWindow.singleItemForBackend(rootWindow.contextFileRow),
+                        false,
+                        true
+                    )
+                }
+            }
+        }
+
+        StyledMenuItem {
+            text: "Relative paths recursively"
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rootWindow.contextFileRow >= 0
+            onTriggered: {
+                if (rootWindow.contextFileRow >= 0) {
+                    rootWindow.copyPathsForItems(
+                        rootWindow.singleItemForBackend(rootWindow.contextFileRow),
+                        true,
+                        true
+                    )
+                }
+            }
         }
     }
 

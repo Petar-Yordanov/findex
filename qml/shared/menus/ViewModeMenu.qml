@@ -3,34 +3,53 @@ import "../../components/foundation"
 import "../../components/theme" as Theme
 
 StyledMenu {
-    id: menu
+    id: viewModeMenu
 
-    required property string currentViewMode
-    signal viewModeSelected(string mode)
+    required property var rootWindow
 
     darkTheme: Theme.AppTheme.isDark
 
     StyledMenuItem {
         text: "Details"
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.viewModeSelected("Details")
+        onTriggered: {
+            viewModeMenu.rootWindow.currentViewMode = "Details"
+            viewModeMenu.rootWindow.applySnapshot(
+                viewModeMenu.rootWindow.backend.setViewMode("Details")
+            )
+        }
     }
 
     StyledMenuItem {
         text: "Tiles"
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.viewModeSelected("Tiles")
+        onTriggered: {
+            viewModeMenu.rootWindow.currentViewMode = "Tiles"
+            viewModeMenu.rootWindow.applySnapshot(
+                viewModeMenu.rootWindow.backend.setViewMode("Tiles")
+            )
+        }
     }
 
     StyledMenuItem {
         text: "Compact"
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.viewModeSelected("Compact")
+        onTriggered: {
+            viewModeMenu.rootWindow.currentViewMode = "Compact"
+            viewModeMenu.rootWindow.applySnapshot(
+                viewModeMenu.rootWindow.backend.setViewMode("Compact")
+            )
+        }
     }
 
     StyledMenuItem {
         text: "Large icons"
         darkTheme: Theme.AppTheme.isDark
-        onTriggered: menu.viewModeSelected("Large icons")
+        onTriggered: {
+            viewModeMenu.rootWindow.currentViewMode = "Large icons"
+            viewModeMenu.rootWindow.applySnapshot(
+                viewModeMenu.rootWindow.backend.setViewMode("Large icons")
+            )
+        }
     }
 }

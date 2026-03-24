@@ -13,8 +13,8 @@ TextField {
     selectByMouse: true
     color: textColor
     font.pixelSize: Theme.Typography.bodyLg
-    leftPadding: 8
-    rightPadding: 8
+    leftPadding: Theme.Metrics.spacingMd
+    rightPadding: Theme.Metrics.spacingMd
     topPadding: 0
     bottomPadding: 0
 

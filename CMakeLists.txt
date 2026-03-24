@@ -26,8 +26,8 @@ qt_add_executable(Findex
     FileManagerSessionService.h
     FileManagerNavigationService.cpp
     FileManagerNavigationService.h
-    FileManagerFileOpsService.cpp
-    FileManagerFileOpsService.h
+    FileOperationsService.cpp
+    FileOperationsService.h
     FileManagerSearchService.cpp
     FileManagerSearchService.h
     FileManagerSidebarService.cpp
@@ -63,9 +63,25 @@ qt_add_qml_module(Findex
         qml/components/foundation/StyledMenuSeparator.qml
         qml/components/foundation/ThinProgressBar.qml
         qml/components/foundation/WindowButton.qml
+        qml/components/foundation/BaseTooltip.qml
+
         qml/components/theme/AppTheme.qml
         qml/components/theme/Metrics.qml
         qml/components/theme/Typography.qml
+
+        qml/shared/menus/ViewModeMenu.qml
+        qml/shared/menus/ThemeMenu.qml
+        qml/shared/menus/OpenWithMenu.qml
+        qml/shared/menus/CopyPathsMenu.qml
+        qml/shared/menus/SortByMenu.qml
+        qml/shared/menus/CreateMenu.qml
+
+        qml/features/files/FileContextMenu.qml
+        qml/features/files/MultiFileContextMenu.qml
+        qml/features/files/EmptyAreaContextMenu.qml
+        qml/features/sidebar/SidebarContextMenu.qml
+        qml/features/tabs/TabContextMenu.qml
+        qml/features/breadcrumb/BreadcrumbContextMenu.qml
 
     RESOURCES
         assets/icons/light/add.png
@@ -199,26 +215,48 @@ qt_add_qml_module(Findex
         SOURCES FileManagerBridge.h FileManagerBridge.cpp
         SOURCES FileManagerSessionService.h FileManagerSessionService.cpp
         SOURCES FileManagerNavigationService.h FileManagerNavigationService.cpp
-        SOURCES FileManagerFileOpsService.h FileManagerFileOpsService.cpp
+        SOURCES FileOperationsService.h FileOperationsService.cpp
         SOURCES FileManagerSearchService.h FileManagerSearchService.cpp
         SOURCES FileManagerSidebarService.h FileManagerSidebarService.cpp
         RESOURCES qml/components/theme/qmldir
         RESOURCES assets/icons/findex-color.png assets/icons/findex-plain.png
         RESOURCES appicon.rc
         RESOURCES findex.desktop
-        QML_FILES qml/shared/menus/ViewModeMenu.qml
-        QML_FILES qml/shared/menus/ThemeMenu.qml
-        QML_FILES qml/shared/menus/OpenWithMenu.qml
-        QML_FILES qml/shared/menus/CopyPathsMenu.qml
-        QML_FILES qml/shared/menus/SortByMenu.qml
-        QML_FILES qml/shared/menus/CreateMenu.qml
-        QML_FILES qml/features/files/FileContextMenu.qml
-        QML_FILES qml/features/files/MultiFileContextMenu.qml
-        QML_FILES qml/features/files/EmptyAreaContextMenu.qml
-        QML_FILES qml/features/files/SidebarContextMenu.qml
-        QML_FILES qml/features/files/TabContextMenu.qml
-        QML_FILES qml/features/files/BreadcrumbContextMenu.qml
-        QML_FILES qml/components/foundation/BaseTooltip.qml
+        QML_FILES qml/features/views/DetailsFileView.qml
+        QML_FILES qml/features/views/TilesFileView.qml
+        QML_FILES qml/features/views/CompactFileView.qml
+        QML_FILES qml/features/views/LargeIconsFileView.qml
+        QML_FILES qml/shared/menus/MoreActionsMenu.qml
+        QML_FILES qml/shared/popups/NotificationsPopup.qml
+        QML_FILES qml/shared/dialogs/ConfirmDialog.qml
+        QML_FILES qml/shared/cards/DriveCard.qml
+        QML_FILES qml/features/sidebar/DriveListPane.qml
+        QML_FILES qml/features/sidebar/SidebarItem.qml
+        QML_FILES qml/features/sidebar/SidebarTreePane.qml
+        QML_FILES qml/features/breadcrumb/BreadcrumbItem.qml
+        QML_FILES qml/features/breadcrumb/BreadcrumbBar.qml
+        QML_FILES qml/shared/headers/ResizableHeaderCell.qml
+        QML_FILES qml/shared/headers/DetailsHeaderBar.qml
+        QML_FILES qml/shared/panels/PreviewPane.qml
+        QML_FILES qml/features/files/FileDragPreview.qml
+        QML_FILES qml/features/tabs/TabButton.qml
+        QML_FILES qml/features/tabs/TabStrip.qml
+        QML_FILES qml/shared/popups/SearchScopePopup.qml
+        QML_FILES qml/shared/headers/AppTitleBar.qml
+        QML_FILES
+        QML_FILES
+        QML_FILES qml/shared/panels/WorkspaceArea.qml
+        QML_FILES qml/features/files/FileAreaContextMenu.qml
+        QML_FILES
+        QML_FILES qml/shared/layout/NavigationBar.qml
+        QML_FILES qml/shared/layout/CommandBar.qml
+        QML_FILES qml/shared/layout/SplitWorkspace.qml
+        QML_FILES qml/shared/runtime/AppModels.qml
+        QML_FILES qml/shared/runtime/AppOverlays.qml
+        QML_FILES qml/shared/layout/AppShell.qml
+        QML_FILES qml/shared/layout/WindowResizeHandles.qml
+        QML_FILES qml/shared/popups/ToastOverlay.qml
+        SOURCES ApplicationSettings.h ApplicationSettings.cpp
 )
 
 set_target_properties(Findex PROPERTIES

@@ -12,8 +12,8 @@ Rectangle {
     property int iconSize: Theme.Metrics.iconLg
     property int tooltipDelay: 450
 
-    width: 32
-    height: 32
+    width: Theme.Metrics.controlHeightLg
+    height: Theme.Metrics.controlHeightLg
     radius: Theme.Metrics.radiusMd
     clip: false
 
@@ -51,15 +51,15 @@ Rectangle {
 
         anchors.horizontalCenter: parent.horizontalCenter
         anchors.bottom: parent.top
-        anchors.bottomMargin: 8
+        anchors.bottomMargin: Theme.Metrics.spacingMd
 
-        width: Math.min(240, tooltipLabel.implicitWidth + 16)
-        height: tooltipLabel.implicitHeight + 10
-        radius: 8
+        width: Math.min(240, tooltipLabel.implicitWidth + Theme.Metrics.spacingMd * 2)
+        height: tooltipLabel.implicitHeight + Theme.Metrics.spacingLg
+        radius: Theme.Metrics.radiusMd
 
-        color: control.darkTheme ? "#202632" : "#ffffff"
-        border.color: control.darkTheme ? "#3a4456" : "#d7deea"
-        border.width: 1
+        color: control.darkTheme ? Theme.AppTheme.popupAltBg : Theme.AppTheme.popupBg
+        border.color: control.darkTheme ? Theme.AppTheme.separator : Theme.AppTheme.border
+        border.width: Theme.Metrics.borderWidth
 
         Behavior on opacity {
             NumberAnimation {
@@ -72,8 +72,8 @@ Rectangle {
             id: tooltipLabel
             anchors.centerIn: parent
             text: control.tooltipText
-            color: control.darkTheme ? "#f3f6fb" : "#1f2937"
-            font.pixelSize: 11
+            color: Theme.AppTheme.text
+            font.pixelSize: Theme.Typography.caption
             font.bold: true
         }
     }

@@ -1,7 +1,6 @@
 import QtQuick
 import "../../components/foundation"
 import "../../components/theme" as Theme
-import "../../shared/menus"
 
 StyledMenu {
     id: menu
@@ -10,28 +9,134 @@ StyledMenu {
 
     darkTheme: Theme.AppTheme.isDark
 
-    ViewModeMenu {
+    StyledMenu {
         title: "Change view"
-        currentViewMode: rootWindow.currentViewMode
+        darkTheme: Theme.AppTheme.isDark
 
-        onViewModeSelected: function(mode) {
-            rootWindow.currentViewMode = mode
-            rootWindow.applySnapshot(rootWindow.backend.setViewMode(mode))
+        StyledMenuItem {
+            text: "Details"
+            darkTheme: Theme.AppTheme.isDark
+            onTriggered: {
+                rootWindow.currentViewMode = "Details"
+                rootWindow.applySnapshot(rootWindow.backend.setViewMode("Details"))
+            }
+        }
+
+        StyledMenuItem {
+            text: "Tiles"
+            darkTheme: Theme.AppTheme.isDark
+            onTriggered: {
+                rootWindow.currentViewMode = "Tiles"
+                rootWindow.applySnapshot(rootWindow.backend.setViewMode("Tiles"))
+            }
+        }
+
+        StyledMenuItem {
+            text: "Compact"
+            darkTheme: Theme.AppTheme.isDark
+            onTriggered: {
+                rootWindow.currentViewMode = "Compact"
+                rootWindow.applySnapshot(rootWindow.backend.setViewMode("Compact"))
+            }
+        }
+
+        StyledMenuItem {
+            text: "Large icons"
+            darkTheme: Theme.AppTheme.isDark
+            onTriggered: {
+                rootWindow.currentViewMode = "Large icons"
+                rootWindow.applySnapshot(rootWindow.backend.setViewMode("Large icons"))
+            }
         }
     }
 
-    CreateMenu {
+    StyledMenu {
         title: "New"
-        fileText: "File"
-        folderText: "Folder"
+        darkTheme: Theme.AppTheme.isDark
 
-        onNewFileRequested: rootWindow.addNewFile()
-        onNewFolderRequested: rootWindow.addNewFolder()
+        StyledMenuItem {
+            text: "New folder"
+            darkTheme: Theme.AppTheme.isDark
+            onTriggered: rootWindow.addNewFolder()
+        }
+
+        StyledMenuItem {
+            text: "New file"
+            darkTheme: Theme.AppTheme.isDark
+            onTriggered: rootWindow.addNewFile()
+        }
     }
 
-    SortByMenu {
-        onSortRequested: function(column, ascending) {
-            rootWindow.sortFilesExplicit(column, ascending)
+    StyledMenu {
+        title: "Sort by"
+        darkTheme: Theme.AppTheme.isDark
+
+        StyledMenu {
+            title: "Name"
+            darkTheme: Theme.AppTheme.isDark
+
+            StyledMenuItem {
+                text: "Ascending"
+                darkTheme: Theme.AppTheme.isDark
+                onTriggered: rootWindow.sortFilesExplicit(0, true)
+            }
+
+            StyledMenuItem {
+                text: "Descending"
+                darkTheme: Theme.AppTheme.isDark
+                onTriggered: rootWindow.sortFilesExplicit(0, false)
+            }
+        }
+
+        StyledMenu {
+            title: "Date modified"
+            darkTheme: Theme.AppTheme.isDark
+
+            StyledMenuItem {
+                text: "Ascending"
+                darkTheme: Theme.AppTheme.isDark
+                onTriggered: rootWindow.sortFilesExplicit(1, true)
+            }
+
+            StyledMenuItem {
+                text: "Descending"
+                darkTheme: Theme.AppTheme.isDark
+                onTriggered: rootWindow.sortFilesExplicit(1, false)
+            }
+        }
+
+        StyledMenu {
+            title: "Type"
+            darkTheme: Theme.AppTheme.isDark
+
+            StyledMenuItem {
+                text: "Ascending"
+                darkTheme: Theme.AppTheme.isDark
+                onTriggered: rootWindow.sortFilesExplicit(2, true)
+            }
+
+            StyledMenuItem {
+                text: "Descending"
+                darkTheme: Theme.AppTheme.isDark
+                onTriggered: rootWindow.sortFilesExplicit(2, false)
+            }
+        }
+
+        StyledMenu {
+            title: "Size"
+            darkTheme: Theme.AppTheme.isDark
+
+            StyledMenuItem {
+                text: "Ascending"
+                darkTheme: Theme.AppTheme.isDark
+                onTriggered: rootWindow.sortFilesExplicit(3, true)
+            }
+
+            StyledMenuItem {
+                text: "Descending"
+                darkTheme: Theme.AppTheme.isDark
+                onTriggered: rootWindow.sortFilesExplicit(3, false)
+            }
         }
     }
 
