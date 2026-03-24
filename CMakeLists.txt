@@ -243,14 +243,19 @@ qt_add_qml_module(Findex
         QML_FILES qml/features/tabs/TabStrip.qml
         QML_FILES qml/shared/popups/SearchScopePopup.qml
         QML_FILES qml/shared/headers/AppTitleBar.qml
-        QML_FILES qml/shared/headers/NavigationBar.qml
-        QML_FILES qml/shared/headers/CommandBar.qml
+        QML_FILES
+        QML_FILES
         QML_FILES qml/shared/panels/WorkspaceArea.qml
         QML_FILES qml/features/files/FileAreaContextMenu.qml
-        QML_FILES qml/shared/layout/TitleBar.qml
+        QML_FILES
         QML_FILES qml/shared/layout/NavigationBar.qml
         QML_FILES qml/shared/layout/CommandBar.qml
         QML_FILES qml/shared/layout/SplitWorkspace.qml
+        QML_FILES qml/shared/runtime/AppModels.qml
+        QML_FILES qml/shared/runtime/AppOverlays.qml
+        QML_FILES qml/shared/layout/AppShell.qml
+        QML_FILES qml/shared/layout/WindowResizeHandles.qml
+        QML_FILES qml/shared/popups/ToastOverlay.qml
 )
 
 set_target_properties(Findex PROPERTIES

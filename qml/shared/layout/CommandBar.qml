@@ -77,12 +77,7 @@ Rectangle {
             iconName: "sync"
             tooltipText: "Test progress notification"
             darkTheme: Theme.AppTheme.isDark
-            onClicked: {
-                rootWindow.deleteProgressTimer.stop()
-                rootWindow.deleteProgressTimer.progressValue = 0
-                rootWindow.deleteProgressTimer.notificationId = rootWindow.addProgressNotification("Moving files...", 0)
-                rootWindow.deleteProgressTimer.start()
-            }
+            onClicked: rootWindow.startTestProgressNotification()
         }
 
         IconButton {

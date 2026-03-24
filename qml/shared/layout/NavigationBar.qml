@@ -12,14 +12,12 @@ Rectangle {
     required property var breadcrumbContextMenu
     required property var searchScopeMenu
 
+    readonly property alias pathFieldRef: pathField
+    readonly property alias pathBarRef: pathBar
+
     color: Theme.AppTheme.surface
     border.color: Theme.AppTheme.borderSoft
     border.width: Theme.Metrics.borderWidth
-
-    Component.onCompleted: {
-        rootWindow.pathFieldRef = pathField
-        rootWindow.pathBarRef = pathBar
-    }
 
     RowLayout {
         anchors.fill: parent
@@ -31,28 +29,28 @@ Rectangle {
             iconName: "arrow-back"
             tooltipText: "Back"
             darkTheme: Theme.AppTheme.isDark
-            onClicked: rootWindow.applySnapshot(rootWindow.backend.goBack())
+            onClicked: navBar.rootWindow.applySnapshot(navBar.rootWindow.backend.goBack())
         }
 
         IconButton {
             iconName: "arrow-forward"
             tooltipText: "Forward"
             darkTheme: Theme.AppTheme.isDark
-            onClicked: rootWindow.applySnapshot(rootWindow.backend.goForward())
+            onClicked: navBar.rootWindow.applySnapshot(navBar.rootWindow.backend.goForward())
         }
 
         IconButton {
             iconName: "arrow-upward"
             tooltipText: "Up"
             darkTheme: Theme.AppTheme.isDark
-            onClicked: rootWindow.applySnapshot(rootWindow.backend.goUp())
+            onClicked: navBar.rootWindow.applySnapshot(navBar.rootWindow.backend.goUp())
         }
 
         IconButton {
             iconName: "refresh"
             tooltipText: "Refresh"
             darkTheme: Theme.AppTheme.isDark
-            onClicked: rootWindow.applySnapshot(rootWindow.backend.refresh())
+            onClicked: navBar.rootWindow.applySnapshot(navBar.rootWindow.backend.refresh())
         }
 
         Rectangle {
@@ -61,12 +59,12 @@ Rectangle {
             Layout.preferredHeight: 38
             radius: Theme.Metrics.radiusLg
             color: Theme.AppTheme.popupBg
-            border.color: rootWindow.editingPath ? Theme.AppTheme.accent : Theme.AppTheme.border
+            border.color: navBar.rootWindow.editingPath ? Theme.AppTheme.accent : Theme.AppTheme.border
             border.width: Theme.Metrics.borderWidth
 
             StackLayout {
                 anchors.fill: parent
-                currentIndex: rootWindow.editingPath ? 1 : 0
+                currentIndex: navBar.rootWindow.editingPath ? 1 : 0
 
                 Item {
                     clip: true
@@ -88,7 +86,7 @@ Rectangle {
                             spacing: Theme.Metrics.spacingSm
 
                             Repeater {
-                                model: pathModel
+                                model: navBar.pathModel
 
                                 delegate: Row {
                                     id: breadcrumbDelegate
@@ -96,21 +94,24 @@ Rectangle {
                                     required property var modelData
                                     spacing: Theme.Metrics.spacingSm
 
-                                    readonly property bool dropHovered: rootWindow.breadcrumbDropHoverIndex === index
+                                    readonly property var rw: navBar.rootWindow
+                                    readonly property var bcMenu: navBar.breadcrumbContextMenu
+
+                                    readonly property bool dropHovered: breadcrumbDelegate.rw.breadcrumbDropHoverIndex === index
 
                                     Rectangle {
                                         id: crumbPill
                                         height: Theme.Metrics.controlHeightMd
                                         radius: Theme.Metrics.radiusMd
-                                        color: dropHovered
+                                        color: breadcrumbDelegate.dropHovered
                                                ? Theme.AppTheme.selectedSoft
                                                : crumbMouse.pressed
                                                  ? Theme.AppTheme.pressed
                                                  : crumbMouse.containsMouse
                                                    ? (Theme.AppTheme.isDark ? "#344055" : "#dfe9f8")
                                                    : "transparent"
-                                        border.color: dropHovered ? Theme.AppTheme.accent : "transparent"
-                                        border.width: dropHovered ? 1 : 0
+                                        border.color: breadcrumbDelegate.dropHovered ? Theme.AppTheme.accent : "transparent"
+                                        border.width: breadcrumbDelegate.dropHovered ? 1 : 0
                                         width: Math.min(crumbContent.implicitWidth + 16, 190)
                                         clip: true
 
@@ -118,24 +119,24 @@ Rectangle {
                                             anchors.fill: parent
 
                                             onEntered: function(drag) {
-                                                drag.accepted = rootWindow.draggedFileCount > 0
+                                                drag.accepted = breadcrumbDelegate.rw.draggedFileCount > 0
                                                 if (drag.accepted)
-                                                    rootWindow.breadcrumbDropHoverIndex = breadcrumbDelegate.index
+                                                    breadcrumbDelegate.rw.breadcrumbDropHoverIndex = breadcrumbDelegate.index
                                             }
 
-                                            onExited: function(drag) {
-                                                if (rootWindow.breadcrumbDropHoverIndex === breadcrumbDelegate.index)
-                                                    rootWindow.breadcrumbDropHoverIndex = -1
+                                            onExited: {
+                                                if (breadcrumbDelegate.rw.breadcrumbDropHoverIndex === breadcrumbDelegate.index)
+                                                    breadcrumbDelegate.rw.breadcrumbDropHoverIndex = -1
                                             }
 
                                             onDropped: function(drop) {
-                                                if (rootWindow.draggedFileCount > 0) {
+                                                if (breadcrumbDelegate.rw.draggedFileCount > 0) {
                                                     drop.accepted = true
-                                                    rootWindow.handleDroppedItem(breadcrumbDelegate.modelData.label, "breadcrumb")
+                                                    breadcrumbDelegate.rw.handleDroppedItem(breadcrumbDelegate.modelData.label, "breadcrumb")
                                                 }
 
-                                                if (rootWindow.breadcrumbDropHoverIndex === breadcrumbDelegate.index)
-                                                    rootWindow.breadcrumbDropHoverIndex = -1
+                                                if (breadcrumbDelegate.rw.breadcrumbDropHoverIndex === breadcrumbDelegate.index)
+                                                    breadcrumbDelegate.rw.breadcrumbDropHoverIndex = -1
                                             }
                                         }
 
@@ -175,19 +176,19 @@ Rectangle {
 
                                             onPressed: function(mouse) {
                                                 if (mouse.button === Qt.RightButton) {
-                                                    rootWindow.contextBreadcrumbIndex = index
-                                                    breadcrumbContextMenu.popup()
+                                                    breadcrumbDelegate.rw.contextBreadcrumbIndex = breadcrumbDelegate.index
+                                                    breadcrumbDelegate.bcMenu.popup()
                                                     mouse.accepted = true
                                                 }
                                             }
 
                                             onClicked: function(mouse) {
                                                 if (mouse.button === Qt.LeftButton)
-                                                    rootWindow.setPathFromIndex(index)
+                                                    breadcrumbDelegate.rw.setPathFromIndex(breadcrumbDelegate.index)
                                             }
 
                                             onDoubleClicked: {
-                                                rootWindow.editingPath = true
+                                                breadcrumbDelegate.rw.editingPath = true
                                                 pathField.forceActiveFocus()
                                                 pathField.selectAll()
                                             }
@@ -195,7 +196,7 @@ Rectangle {
                                     }
 
                                     AppIcon {
-                                        visible: index < pathModel.count - 1
+                                        visible: breadcrumbDelegate.index < pathModel.count - 1
                                         anchors.verticalCenter: parent.verticalCenter
                                         name: "chevron-right"
                                         darkTheme: Theme.AppTheme.isDark
@@ -214,7 +215,7 @@ Rectangle {
                             acceptedButtons: Qt.LeftButton
 
                             onDoubleClicked: {
-                                rootWindow.editingPath = true
+                                navBar.rootWindow.editingPath = true
                                 pathField.forceActiveFocus()
                                 pathField.selectAll()
                             }
@@ -235,12 +236,12 @@ Rectangle {
                     verticalAlignment: TextInput.AlignVCenter
                     background: Rectangle { color: "transparent" }
 
-                    onAccepted: rootWindow.finishPathEditing(true)
+                    onAccepted: navBar.rootWindow.finishPathEditing(true)
                     onActiveFocusChanged: {
-                        if (!activeFocus && rootWindow.editingPath)
-                            rootWindow.finishPathEditing(false)
+                        if (!activeFocus && navBar.rootWindow.editingPath)
+                            navBar.rootWindow.finishPathEditing(false)
                     }
-                    Keys.onEscapePressed: rootWindow.finishPathEditing(false)
+                    Keys.onEscapePressed: navBar.rootWindow.finishPathEditing(false)
                 }
             }
         }
@@ -275,13 +276,15 @@ Rectangle {
                         spacing: 2
 
                         AppIcon {
-                            name: rootWindow.searchScope === "global" ? "hard-drive" : "folder"
+                            name: navBar.rootWindow.searchScope === "global" ? "hard-drive" : "folder"
                             darkTheme: Theme.AppTheme.isDark
                             iconSize: Theme.Metrics.iconSm
                         }
 
                         AppIcon {
-                            name: searchScopeMenu.visible ? "keyboard-arrow-up" : "keyboard-arrow-down"
+                            name: (navBar.searchScopeMenu && navBar.searchScopeMenu.visible)
+                                  ? "keyboard-arrow-up"
+                                  : "keyboard-arrow-down"
                             darkTheme: Theme.AppTheme.isDark
                             iconSize: 10
                             iconOpacity: 0.6
@@ -293,11 +296,15 @@ Rectangle {
                         anchors.fill: parent
                         hoverEnabled: true
                         acceptedButtons: Qt.LeftButton | Qt.RightButton
+
                         onClicked: {
-                            var p = searchScopeButton.mapToItem(rootWindow.contentItem, 0, searchScopeButton.height + 6)
-                            searchScopeMenu.x = p.x
-                            searchScopeMenu.y = p.y
-                            searchScopeMenu.open()
+                            if (!navBar.searchScopeMenu)
+                                return
+
+                            var p = searchScopeButton.mapToItem(navBar.rootWindow.contentItem, 0, searchScopeButton.height + 6)
+                            navBar.searchScopeMenu.x = p.x
+                            navBar.searchScopeMenu.y = p.y
+                            navBar.searchScopeMenu.open()
                         }
                     }
                 }
@@ -313,11 +320,11 @@ Rectangle {
                     id: searchField
                     Layout.fillWidth: true
                     Layout.fillHeight: true
-                    placeholderText: rootWindow.searchScope === "global"
+                    placeholderText: navBar.rootWindow.searchScope === "global"
                                      ? "Search everywhere"
                                      : "Search in folder"
                     placeholderTextColor: Theme.AppTheme.muted
-                    text: rootWindow.currentSearch
+                    text: navBar.rootWindow.currentSearch
                     color: Theme.AppTheme.text
                     font.pixelSize: Theme.Typography.bodyLg
                     topPadding: 0
@@ -328,8 +335,8 @@ Rectangle {
                     selectByMouse: true
                     background: Rectangle { color: "transparent" }
 
-                    onTextChanged: rootWindow.currentSearch = text
-                    onAccepted: rootWindow.applySnapshot(rootWindow.backend.search(text, rootWindow.searchScope))
+                    onTextChanged: navBar.rootWindow.currentSearch = text
+                    onAccepted: navBar.rootWindow.applySnapshot(navBar.rootWindow.backend.search(text, navBar.rootWindow.searchScope))
                 }
             }
         }

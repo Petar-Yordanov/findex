@@ -19,6 +19,17 @@ Item {
     required property var notificationsPopup
     required property var viewModeMenu
     required property var notificationsModel
+    readonly property int safeDrivesCount: splitViewHost.drivesModel ? splitViewHost.drivesModel.count : 0
+    readonly property int safeNotificationsCount: splitViewHost.notificationsModel ? splitViewHost.notificationsModel.count : 0
+    readonly property int safeFilesCount: {
+        if (!splitViewHost.filesModel)
+            return 0
+        if (splitViewHost.filesModel.rows)
+            return splitViewHost.filesModel.rows.length
+        if (splitViewHost.filesModel.rowCount !== undefined)
+            return splitViewHost.filesModel.rowCount
+        return 0
+    }
 
     property int sidebarWidth: 286
     property int sidebarMinWidth: 220
@@ -277,7 +288,7 @@ Item {
 
             Rectangle {
                 Layout.fillWidth: true
-                Layout.preferredHeight: 20 + 22 + (splitViewHost.drivesModel.count * 48) + Math.max(0, splitViewHost.drivesModel.count - 1) * 1 + 20
+                Layout.preferredHeight: 20 + 22 + (splitViewHost.safeDrivesCount * 48) + Math.max(0, splitViewHost.safeDrivesCount - 1) * 1 + 20
                 Layout.minimumHeight: 120
                 radius: Theme.Metrics.radiusXl
                 color: Theme.AppTheme.isDark ? "#171d27" : "#fbfcfd"
@@ -1121,8 +1132,8 @@ Item {
 
                     Text {
                         text: splitViewHost.rootWindow.selectedFileCount() > 0
-                              ? (splitViewHost.filesModel.rowCount + " items   " + splitViewHost.rootWindow.selectedFileCount() + " selected")
-                              : (splitViewHost.filesModel.rowCount + " items")
+                              ? (splitViewHost.safeFilesCount + " items   " + splitViewHost.rootWindow.selectedFileCount() + " selected")
+                              : (splitViewHost.safeFilesCount + " items")
                         color: Theme.AppTheme.muted
                         font.pixelSize: Theme.Typography.caption
                     }
@@ -1197,7 +1208,7 @@ Item {
                         }
 
                         Rectangle {
-                            visible: splitViewHost.notificationsModel.count > 0
+                            visible: splitViewHost.safeNotificationsCount > 0
                             width: 8
                             height: 8
                             radius: 4

@@ -17,6 +17,8 @@ Rectangle {
     border.color: Theme.AppTheme.borderSoft
     border.width: Theme.Metrics.borderWidth
 
+    readonly property int safeTabCount: titleBar.tabsModel ? titleBar.tabsModel.count : 0
+
     RowLayout {
         anchors.fill: parent
         anchors.leftMargin: Theme.Metrics.spacingLg
@@ -132,7 +134,8 @@ Rectangle {
                                 onClicked: {
                                     titleBar.rootWindow.addTab("New Tab")
                                     Qt.callLater(function() {
-                                        titleBar.rootWindow.ensureTabVisible(titleBar.tabsModel.count - 1)
+                                        if (titleBar.tabsModel)
+                                            titleBar.rootWindow.ensureTabVisible(titleBar.tabsModel.count - 1)
                                     })
                                 }
                             }
@@ -160,9 +163,9 @@ Rectangle {
 
                             Item {
                                 id: tabsContent
-                                width: titleBar.tabsModel.count > 0
-                                       ? titleBar.tabsModel.count * titleBar.rootWindow.tabWidth
-                                         + (titleBar.tabsModel.count - 1) * titleBar.rootWindow.tabSpacing
+                                width: titleBar.safeTabCount > 0
+                                       ? titleBar.safeTabCount * titleBar.rootWindow.tabWidth
+                                         + (titleBar.safeTabCount - 1) * titleBar.rootWindow.tabSpacing
                                        : 0
                                 height: parent.height
 
@@ -426,7 +429,7 @@ Rectangle {
                                                 var draggedCenterX = draggedLeftX + tabDelegate.rootWindow.tabWidth / 2
 
                                                 var targetIndex = Math.floor(draggedCenterX / slotSize)
-                                                targetIndex = Math.max(0, Math.min(titleBar.tabsModel.count - 1, targetIndex))
+                                                targetIndex = Math.max(0, Math.min(titleBar.safeTabCount - 1, targetIndex))
 
                                                 tabDelegate.rootWindow.draggedTabOffset =
                                                         draggedLeftX - currentIndex * slotSize

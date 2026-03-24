@@ -1,23 +1,11 @@
 import QtQuick
-import QtQuick.Controls
-import QtQuick.Layouts
 import QtQuick.Window
-import QtQml.Models
-import Qt.labs.qmlmodels as Labs
 import "components/foundation"
 import "components/theme" as Theme
 import "features/files"
-import "features/breadcrumb"
-import "features/sidebar"
-import "features/tabs"
-import "features/views"
-import "shared/menus"
+import "shared/layout" as Layout
+import "shared/runtime" as Runtime
 import "shared/popups"
-import "shared/dialogs"
-import "shared/panels"
-import "shared/headers"
-import "shared/cards"
-import "shared/layout"
 
 Window {
     id: root
@@ -37,6 +25,44 @@ Window {
     property var backend: fileManagerBridge
 
     onThemeModeChanged: Theme.AppTheme.mode = themeMode
+
+    Runtime.AppModels {
+        id: appModels
+    }
+
+    Runtime.AppOverlays {
+        id: overlays
+        anchors.fill: parent
+        z: 2000
+        rootWindow: root
+        notificationsModel: appModels.notificationsModel
+    }
+
+    ListModel {
+        id: toastModel
+    }
+
+    property alias notificationsModel: appModels.notificationsModel
+    property alias tabsModel: appModels.tabsModel
+    property alias pathModel: appModels.pathModel
+    property alias sidebarModel: appModels.sidebarModel
+    property alias drivesModel: appModels.drivesModel
+    property alias filesModel: appModels.filesModel
+
+    property alias createMenu: overlays.createMenu
+    property alias moreActionsMenu: overlays.moreActionsMenu
+    property alias confirmDialog: overlays.confirmDialog
+    property alias notificationsPopup: overlays.notificationsPopup
+    property alias searchScopeMenu: overlays.searchScopeMenu
+    property alias breadcrumbContextMenu: overlays.breadcrumbContextMenu
+    property alias emptyAreaContextMenu: overlays.emptyAreaContextMenu
+    property alias tabContextMenu: overlays.tabContextMenu
+    property alias sidebarContextMenu: overlays.sidebarContextMenu
+    property alias fileRowContextMenu: overlays.fileRowContextMenu
+    property alias multiFileContextMenu: overlays.multiFileContextMenu
+    property alias fileAreaContextMenu: overlays.fileAreaContextMenu
+    property alias viewModeMenu: overlays.viewModeMenu
+    property alias themeMenu: overlays.themeMenu
 
     property int notificationOverlayBottomOffset: notificationsPopup.visible ? (notificationsPopup.height + 52) : 40
     property var tabAutoScrollTimerRef: tabAutoScrollTimer
@@ -78,9 +104,6 @@ Window {
     property string tooltipText: ""
     property int tooltipDelay: 450
 
-    ListModel {
-        id: notificationsModel
-    }
     property int contextBreadcrumbIndex: -1
 
     property int tabWidth: 210
@@ -151,6 +174,29 @@ Window {
     onPreviewPaneWidthChanged: {
         if (root.previewEnabled && root.previewPaneWidth >= root.previewPaneMinWidth)
             root.previewPaneLastExpandedWidth = root.previewPaneWidth
+    }
+
+    function navigationBarRef() {
+        return appShell && appShell.navigationBarRef ? appShell.navigationBarRef : null
+    }
+
+    function titleBarRef() {
+        return appShell && appShell.titleBarRef ? appShell.titleBarRef : null
+    }
+
+    function pathFieldRef() {
+        var nav = navigationBarRef()
+        return nav && nav.pathFieldRef ? nav.pathFieldRef : nullf
+    }
+
+    function pathBarRef() {
+        var nav = navigationBarRef()
+        return nav && nav.pathBarRef ? nav.pathBarRef : null
+    }
+
+    function tabFlickRef() {
+        var titleBar = titleBarRef()
+        return titleBar && titleBar.tabFlickRef ? titleBar.tabFlickRef : null
     }
 
     function copyPathsForItems(items, relativeToCurrentDir, recursive) {
@@ -400,13 +446,22 @@ Window {
             root.showPreviewData(null)
     }
 
+    function startTestProgressNotification() {
+        deleteProgressTimer.stop()
+        deleteProgressTimer.progressValue = 0
+        deleteProgressTimer.notificationId = addProgressNotification("Moving files...", 0)
+        deleteProgressTimer.start()
+    }
+
     function finishPathEditing(acceptTypedPath) {
         if (!editingPath)
             return
 
+        var pf = pathFieldRef()
+
         if (acceptTypedPath) {
             editingPath = false
-            applySnapshot(backend.navigateToPathString(pathField.text))
+            applySnapshot(backend.navigateToPathString(pf ? pf.text : ""))
         } else {
             editingPath = false
             syncPathField()
@@ -468,6 +523,9 @@ Window {
 
         var preserveTabsOrder = options && options.preserveTabsOrder === true
 
+        if (snapshot.message)
+            console.log("notification message:", snapshot.message)
+
         if (snapshot.tabs !== undefined) {
             if (preserveTabsOrder)
                 updateTabsPreservingOrder(snapshot.tabs)
@@ -487,17 +545,29 @@ Window {
         if (snapshot.drives !== undefined)
             replaceListModel(drivesModel, toJsArray(snapshot.drives))
 
-        //if (snapshot.sidebar !== undefined)
-        //    sidebarModel.rows = toJsArray(snapshot.sidebar)
+        // if (snapshot.sidebar !== undefined)
+        //     sidebarModel.rows = toJsArray(snapshot.sidebar)
 
-        if (snapshot.files !== undefined)
+        if (snapshot.files !== undefined) {
             filesModel.rows = toJsArray(snapshot.files)
+
+            if (filesModel.rows.length === 0) {
+                clearFileSelection()
+                currentFileRow = -1
+                selectionAnchorRow = -1
+            } else if (currentFileRow >= filesModel.rows.length) {
+                currentFileRow = filesModel.rows.length - 1
+            }
+        }
 
         if (snapshot.currentTab !== undefined)
             currentTab = snapshot.currentTab
 
-        if (snapshot.pathText !== undefined && pathField)
-            pathField.text = snapshot.pathText
+        if (snapshot.pathText !== undefined) {
+            var pf = pathFieldRef()
+            if (pf)
+                pf.text = snapshot.pathText
+        }
 
         if (snapshot.previewEnabled !== undefined) {
             var nextPreviewEnabled = !!snapshot.previewEnabled
@@ -598,7 +668,7 @@ Window {
         interval: root.tooltipDelay
         repeat: false
         onTriggered: {
-            if (hoverArea.containsMouse && root.enabled && root.tooltipText !== "")
+            if (root.enabled && root.tooltipText !== "")
                 buttonTooltip.shown = true
         }
     }
@@ -998,41 +1068,49 @@ Window {
     }
 
     function scrollTabsBy(delta) {
-        if (!tabFlick)
+        var flick = tabFlickRef()
+        if (!flick)
             return
-        var maxX = Math.max(0, tabFlick.contentWidth - tabFlick.width)
-        tabFlick.contentX = Math.max(0, Math.min(maxX, tabFlick.contentX + delta))
+
+        var maxX = Math.max(0, flick.contentWidth - flick.width)
+        flick.contentX = Math.max(0, Math.min(maxX, flick.contentX + delta))
     }
 
     function ensureTabVisible(index) {
-        if (!tabFlick || index < 0 || index >= tabsModel.count)
+        var flick = tabFlickRef()
+        if (!flick || index < 0 || index >= tabsModel.count)
             return
 
         var left = index * (tabWidth + tabSpacing)
         var right = left + tabWidth
-        var viewLeft = tabFlick.contentX
-        var viewRight = tabFlick.contentX + tabFlick.width
+        var viewLeft = flick.contentX
+        var viewRight = flick.contentX + flick.width
 
         if (left < viewLeft)
-            tabFlick.contentX = left
+            flick.contentX = left
         else if (right > viewRight)
-            tabFlick.contentX = right - tabFlick.width
+            flick.contentX = right - flick.width
     }
 
     function addToastNotification(message, kind) {
         var id = nextNotificationId++
+        var level = kind || "info"
+
         notificationsModel.append({
             notificationId: id,
             title: message,
-            kind: kind || "info",
+            kind: level,
             progress: -1,
             autoClose: true,
             done: true
         })
 
-        var item = toastRepeater.itemAt(notificationsModel.count - 1)
-        if (item)
-            item.restartTimer()
+        toastModel.append({
+            toastId: id,
+            title: message,
+            kind: level,
+            duration: 5000
+        })
 
         return id
     }
@@ -1069,10 +1147,6 @@ Window {
                     notificationsModel.setProperty(i, "autoClose", true)
                     if (doneTitle)
                         notificationsModel.setProperty(i, "title", doneTitle)
-
-                    var item = toastRepeater.itemAt(i)
-                    if (item)
-                        item.restartTimer()
                 }
                 return
             }
@@ -1179,31 +1253,36 @@ Window {
             return
 
         var parts = []
-        for (var i = 0; i <= index; ++i)
+        for (var i = 0; i <= index; ++i) {
             parts.push({
                 label: pathModel.get(i).label,
                 icon: pathModel.get(i).icon
             })
+        }
 
         navigateToPath(parts)
     }
 
     function syncPathField() {
+        var pf = pathFieldRef()
+        if (!pf)
+            return
+
         var parts = []
         for (var i = 0; i < pathModel.count; ++i)
             parts.push(pathModel.get(i).label)
 
         if (parts.length === 0) {
-            pathField.text = ""
+            pf.text = ""
             return
         }
 
         var first = parts[0]
 
         if (/^[A-Z]:$/.test(first))
-            pathField.text = first + "/" + parts.slice(1).join("/")
+            pf.text = first + "/" + parts.slice(1).join("/")
         else
-            pathField.text = parts.join("/")
+            pf.text = parts.join("/")
     }
 
     function closeTab(index) {
@@ -1437,420 +1516,45 @@ Window {
         return "list-view"
     }
 
-    ListModel {
-        id: tabsModel
-        ListElement { title: "Home"; icon: "home" }
-        ListElement { title: "Local Disk (C:)"; icon: "hard-drive" }
-    }
-
-    ListModel {
-        id: pathModel
-        ListElement { label: "C:"; icon: "hard-drive" }
-        ListElement { label: "Projects"; icon: "folder" }
-        ListElement { label: "Qt"; icon: "folder" }
-    }
-
-    Labs.TreeModel {
-        id: sidebarModel
-
-        Labs.TableModelColumn { display: "label" }
-        Labs.TableModelColumn { display: "icon" }
-        Labs.TableModelColumn { display: "section" }
-        Labs.TableModelColumn { display: "kind" }
-
-        rows: [
-            {
-                label: "Quick Access",
-                icon: "",
-                section: true,
-                kind: "section",
-                rows: [
-                    { label: "Recent", icon: "history", kind: "quick", section: false },
-                    { label: "Home", icon: "home", kind: "quick", section: false },
-                    { label: "Desktop", icon: "desktop-windows", kind: "quick", section: false },
-                    { label: "Downloads", icon: "download", kind: "quick", section: false },
-                    { label: "Documents", icon: "description", kind: "quick", section: false },
-                    { label: "Pictures", icon: "image", kind: "quick", section: false },
-                    { label: "Music", icon: "music-note", kind: "quick", section: false },
-                    { label: "Videos", icon: "movie", kind: "quick", section: false }
-                ]
-            }
-        ]
-    }
-
-    ListModel {
-        id: drivesModel
-
-        ListElement {
-            label: "Local Disk (C:)"
-            icon: "hard-drive"
-            used: 0.5
-            total: 1.0
-            usedText: "0.5 TB used of 1 TB"
-        }
-
-        ListElement {
-            label: "Data (D:)"
-            icon: "storage"
-            used: 0.37
-            total: 1.0
-            usedText: "0.37 TB used of 1 TB"
-        }
-
-        ListElement {
-            label: "Backup (E:)"
-            icon: "save"
-            used: 0.91
-            total: 1.0
-            usedText: "0.91 TB used of 1 TB"
-        }
-
-        ListElement {
-            label: "USB Drive (F:)"
-            icon: "usb"
-            used: 0.18
-            total: 1.0
-            usedText: "0.18 TB used of 1 TB"
-        }
-    }
-
-    Labs.TableModel {
-        id: filesModel
-
-        Labs.TableModelColumn { display: "name" }
-        Labs.TableModelColumn { display: "dateModified" }
-        Labs.TableModelColumn { display: "type" }
-        Labs.TableModelColumn { display: "size" }
-        Labs.TableModelColumn { display: "icon" }
-
-        rows: [
-            { "name": "Backup", "dateModified": "13/02/2026 12:01", "type": "File folder", "size": "", "icon": "folder" },
-            { "name": "Games", "dateModified": "06/03/2026 21:58", "type": "File folder", "size": "", "icon": "folder" },
-            { "name": "inetpub", "dateModified": "07/02/2026 22:34", "type": "File folder", "size": "", "icon": "folder" },
-            { "name": "Program Files", "dateModified": "06/03/2026 22:07", "type": "File folder", "size": "", "icon": "folder" },
-            { "name": "appverifUI.dll", "dateModified": "12/11/2025 15:27", "type": "Application extension", "size": "110 KB", "icon": "insert-drive-file" },
-            { "name": "chrome.exe", "dateModified": "03/03/2026 09:14", "type": "Application", "size": "248 MB", "icon": "insert-drive-file" },
-            { "name": "readme.txt", "dateModified": "28/02/2026 18:42", "type": "Text Document", "size": "4 KB", "icon": "description" },
-            { "name": "meeting-notes.docx", "dateModified": "10/03/2026 11:05", "type": "Microsoft Word Document", "size": "86 KB", "icon": "description" },
-            { "name": "budget-2026.xlsx", "dateModified": "14/03/2026 08:51", "type": "Microsoft Excel Worksheet", "size": "214 KB", "icon": "description" },
-            { "name": "presentation-q1.pptx", "dateModified": "07/03/2026 16:23", "type": "Microsoft PowerPoint Presentation", "size": "3.8 MB", "icon": "description" },
-            { "name": "invoice-1482.pdf", "dateModified": "01/03/2026 13:37", "type": "PDF Document", "size": "512 KB", "icon": "picture-as-pdf" },
-            { "name": "hero-banner.png", "dateModified": "11/03/2026 20:16", "type": "PNG File", "size": "1.9 MB", "icon": "image" },
-            { "name": "vacation-photo.jpg", "dateModified": "22/02/2026 17:08", "type": "JPEG Image", "size": "4.6 MB", "icon": "image" },
-            { "name": "logo-final.svg", "dateModified": "09/03/2026 10:44", "type": "SVG Document", "size": "72 KB", "icon": "image" },
-            { "name": "theme-song.mp3", "dateModified": "18/01/2026 21:55", "type": "MP3 File", "size": "8.7 MB", "icon": "music-note" },
-            { "name": "launch-trailer.mp4", "dateModified": "13/03/2026 22:11", "type": "MP4 Video", "size": "148 MB", "icon": "movie" },
-            { "name": "archive-backup.zip", "dateModified": "05/03/2026 07:30", "type": "Compressed (zipped) Folder", "size": "640 MB", "icon": "zip" },
-            { "name": "logs.7z", "dateModified": "27/02/2026 23:03", "type": "7-Zip Archive", "size": "92 MB", "icon": "zip" },
-            { "name": "installer.msi", "dateModified": "16/02/2026 14:29", "type": "Windows Installer Package", "size": "27 MB", "icon": "insert-drive-file" },
-            { "name": "config.json", "dateModified": "12/03/2026 09:57", "type": "JSON Source File", "size": "12 KB", "icon": "code" },
-            { "name": "settings.yaml", "dateModified": "11/03/2026 08:40", "type": "YAML Document", "size": "6 KB", "icon": "code" },
-            { "name": "main.cpp", "dateModified": "14/03/2026 10:32", "type": "C++ Source File", "size": "34 KB", "icon": "code" },
-            { "name": "mainwindow.qml", "dateModified": "14/03/2026 10:48", "type": "QML File", "size": "58 KB", "icon": "code" },
-            { "name": "script.ps1", "dateModified": "06/03/2026 12:19", "type": "PowerShell Script", "size": "9 KB", "icon": "terminal" },
-            { "name": "run.bat", "dateModified": "20/02/2026 19:11", "type": "Windows Batch File", "size": "2 KB", "icon": "terminal" },
-            { "name": "package-lock.json", "dateModified": "14/03/2026 10:49", "type": "JSON Source File", "size": "418 KB", "icon": "code" },
-            { "name": "database.db", "dateModified": "08/03/2026 15:02", "type": "Database File", "size": "19 MB", "icon": "storage" },
-            { "name": "font-regular.ttf", "dateModified": "25/01/2026 13:13", "type": "TrueType Font File", "size": "164 KB", "icon": "insert-drive-file" },
-            { "name": "shortcut.lnk", "dateModified": "02/03/2026 08:12", "type": "Shortcut", "size": "1 KB", "icon": "launch" },
-            { "name": "DumpStack.log", "dateModified": "12/03/2026 12:21", "type": "Log File", "size": "12 KB", "icon": "description" },
-            { "name": "notes.md", "dateModified": "14/03/2026 09:26", "type": "Markdown File", "size": "18 KB", "icon": "description" },
-            { "name": "design.fig", "dateModified": "04/03/2026 17:46", "type": "FIG File", "size": "28 MB", "icon": "insert-drive-file" },
-            { "name": "virtual-disk.vhdx", "dateModified": "21/02/2026 23:58", "type": "Virtual Hard Disk", "size": "18 GB", "icon": "storage" },
-            { "name": "certificate.pem", "dateModified": "15/02/2026 06:44", "type": "PEM File", "size": "3 KB", "icon": "lock" }
-        ]
-    }
-
-    CreateMenu {
-        id: createMenu
-        rootWindow: root
-    }
-
-    MoreActionsMenu {
-        id: moreActionsMenu
-        rootWindow: root
-    }
-
-    ConfirmDialog {
-        id: confirmDialog
-        rootWindow: root
-    }
-
-    NotificationsPopup {
-        id: notificationsPopup
-        rootWindow: root
-        notificationsModel: notificationsModel
-    }
-
-    SearchScopePopup {
-        id: searchScopeMenu
-        rootWindow: root
-    }
-
-
-    BreadcrumbContextMenu {
-        id: breadcrumbContextMenu
-        rootWindow: root
-    }
-
-    EmptyAreaContextMenu {
-        id: emptyAreaContextMenu
-        rootWindow: root
-    }
-
-    TabContextMenu {
-        id: tabContextMenu
-        rootWindow: root
-        tabsCount: tabsModel.count
-    }
-
-    SidebarContextMenu {
-        id: sidebarContextMenu
-        rootWindow: root
-    }
-
-    FileContextMenu {
-        id: fileRowContextMenu
-        rootWindow: root
-    }
-
-    MultiFileContextMenu {
-        id: multiFileContextMenu
-        rootWindow: root
-    }
-
-    StyledMenu {
-        id: fileAreaContextMenu
-        darkTheme: Theme.AppTheme.isDark
-
-        StyledMenuItem {
-            text: "New folder"
-            onTriggered: root.addNewFolder()
-            darkTheme: Theme.AppTheme.isDark
-        }
-
-        StyledMenuItem {
-            text: "New file"
-            onTriggered: root.addNewFile()
-            darkTheme: Theme.AppTheme.isDark
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Paste"
-            onTriggered: applySnapshot(backend.pasteItems())
-            darkTheme: Theme.AppTheme.isDark
-        }
-
-        StyledMenuSeparator {}
-
-        StyledMenuItem {
-            text: "Refresh"
-            onTriggered: applySnapshot(backend.refresh())
-            darkTheme: Theme.AppTheme.isDark
-        }
-
-        StyledMenuItem {
-            text: "Properties"
-            onTriggered: applySnapshot(backend.showCurrentLocationProperties())
-            darkTheme: Theme.AppTheme.isDark
-        }
-    }
-
-    ViewModeMenu {
-        id: viewModeMenu
-        rootWindow: root
-    }
-
-    ThemeMenu {
-        id: themeMenu
-        rootWindow: root
-    }
-
-    Component {
-        id: detailsViewComponent
-
-        DetailsFileView {
-            rootWindow: root
-            filesTableModel: filesModel
-            rowContextMenu: fileRowContextMenu
-            multiSelectionContextMenu: multiFileContextMenu
-            emptyContextMenu: emptyAreaContextMenu
-        }
-    }
-
-    Component {
-        id: tilesViewComponent
-
-        TilesFileView {
-            rootWindow: root
-            filesTableModel: filesModel
-            rowContextMenu: fileRowContextMenu
-            multiSelectionContextMenu: multiFileContextMenu
-            emptyContextMenu: emptyAreaContextMenu
-        }
-    }
-
-    Component {
-        id: compactViewComponent
-
-        CompactFileView {
-            rootWindow: root
-            filesTableModel: filesModel
-            rowContextMenu: fileRowContextMenu
-            multiSelectionContextMenu: multiFileContextMenu
-            emptyContextMenu: emptyAreaContextMenu
-        }
-    }
-
-    Component {
-        id: largeIconsViewComponent
-
-        LargeIconsFileView {
-            rootWindow: root
-            filesTableModel: filesModel
-            rowContextMenu: fileRowContextMenu
-            multiSelectionContextMenu: multiFileContextMenu
-            emptyContextMenu: emptyAreaContextMenu
-        }
-    }
-
-    Rectangle {
+    Layout.AppShell {
+        id: appShell
         anchors.fill: parent
-        radius: (root.visibility === Window.Maximized || root.windowMoveActive) ? 0 : 14
-        color: Theme.AppTheme.bg
-        border.color: (root.visibility === Window.Maximized || root.windowMoveActive) ? "transparent" : Theme.AppTheme.border
-        border.width: (root.visibility === Window.Maximized || root.windowMoveActive) ? 0 : 1
-        clip: !root.windowMoveActive
+        z: 0
 
-        ColumnLayout {
-            anchors.fill: parent
-            spacing: 0
+        rootWindow: root
 
-            AppTitleBar {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 46
-                rootWindow: root
-                tabsModel: tabsModel
-            }
+        tabsModel: root.tabsModel
+        pathModel: root.pathModel
+        sidebarModel: root.sidebarModel
+        drivesModel: root.drivesModel
+        filesModel: root.filesModel
 
-            NavigationBar {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 54
-                rootWindow: root
-                pathModel: pathModel
-                searchScopeMenu: searchScopeMenu
-                breadcrumbContextMenu: breadcrumbContextMenu
-            }
-
-            CommandBar {
-                Layout.fillWidth: true
-                Layout.preferredHeight: 46
-                rootWindow: root
-                createMenu: createMenu
-                moreActionsMenu: moreActionsMenu
-                viewModeMenu: viewModeMenu
-                themeMenu: themeMenu
-            }
-
-            SplitWorkspace {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                rootWindow: root
-                sidebarModel: sidebarModel
-                drivesModel: drivesModel
-                filesModel: filesModel
-
-                fileRowContextMenu: fileRowContextMenu
-                multiFileContextMenu: multiFileContextMenu
-                emptyAreaContextMenu: emptyAreaContextMenu
-                sidebarContextMenu: sidebarContextMenu
-                viewModeMenu: viewModeMenu
-                notificationsPopup: notificationsPopup
-            }
-        }
+        createMenu: root.createMenu
+        moreActionsMenu: root.moreActionsMenu
+        viewModeMenu: root.viewModeMenu
+        themeMenu: root.themeMenu
+        searchScopeMenu: root.searchScopeMenu
+        breadcrumbContextMenu: root.breadcrumbContextMenu
+        fileRowContextMenu: root.fileRowContextMenu
+        multiFileContextMenu: root.multiFileContextMenu
+        emptyAreaContextMenu: root.emptyAreaContextMenu
+        sidebarContextMenu: root.sidebarContextMenu
+        notificationsPopup: root.notificationsPopup
+        notificationsModel: root.notificationsModel
     }
 
-    MouseArea {
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.top: parent.top
-        height: root.resizeMargin
-        cursorShape: Qt.SizeVerCursor
-        acceptedButtons: Qt.LeftButton
-        onPressed: root.startSystemResize(Qt.TopEdge)
+    ToastOverlay {
+        id: toastOverlay
+        anchors.fill: parent
+        z: 1800
+        rootWindow: root
+        toastsModel: toastModel
     }
 
-    MouseArea {
-        anchors.left: parent.left
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        height: root.resizeMargin
-        cursorShape: Qt.SizeVerCursor
-        acceptedButtons: Qt.LeftButton
-        onPressed: root.startSystemResize(Qt.BottomEdge)
-    }
-
-    MouseArea {
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.left: parent.left
-        width: root.resizeMargin
-        cursorShape: Qt.SizeHorCursor
-        acceptedButtons: Qt.LeftButton
-        onPressed: root.startSystemResize(Qt.LeftEdge)
-    }
-
-    MouseArea {
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        width: root.resizeMargin
-        cursorShape: Qt.SizeHorCursor
-        acceptedButtons: Qt.LeftButton
-        onPressed: root.startSystemResize(Qt.RightEdge)
-    }
-
-    MouseArea {
-        anchors.left: parent.left
-        anchors.top: parent.top
-        width: root.resizeMargin
-        height: root.resizeMargin
-        cursorShape: Qt.SizeFDiagCursor
-        acceptedButtons: Qt.LeftButton
-        onPressed: root.startSystemResize(Qt.TopEdge | Qt.LeftEdge)
-    }
-
-    MouseArea {
-        anchors.right: parent.right
-        anchors.top: parent.top
-        width: root.resizeMargin
-        height: root.resizeMargin
-        cursorShape: Qt.SizeBDiagCursor
-        acceptedButtons: Qt.LeftButton
-        onPressed: root.startSystemResize(Qt.TopEdge | Qt.RightEdge)
-    }
-
-    MouseArea {
-        anchors.left: parent.left
-        anchors.bottom: parent.bottom
-        width: root.resizeMargin
-        height: root.resizeMargin
-        cursorShape: Qt.SizeBDiagCursor
-        acceptedButtons: Qt.LeftButton
-        onPressed: root.startSystemResize(Qt.BottomEdge | Qt.LeftEdge)
-    }
-
-    MouseArea {
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        width: root.resizeMargin
-        height: root.resizeMargin
-        cursorShape: Qt.SizeFDiagCursor
-        acceptedButtons: Qt.LeftButton
-        onPressed: root.startSystemResize(Qt.BottomEdge | Qt.RightEdge)
+    Layout.WindowResizeHandles {
+        anchors.fill: parent
+        z: 1500
+        rootWindow: root
     }
 
     FileDragPreview {
@@ -1888,9 +1592,24 @@ Window {
     Component.onCompleted: {
         Theme.AppTheme.mode = root.themeMode
 
-        applySnapshot(backend.bootstrap())
+        console.log("before bootstrap:",
+                    "tabs=", tabsModel ? tabsModel.count : "undef",
+                    "drives=", drivesModel ? drivesModel.count : "undef",
+                    "files=", (filesModel && filesModel.rows) ? filesModel.rows.length : "undef")
 
-        if (!pathField.text || pathField.text === "")
+        var snapshot = backend.bootstrap()
+
+        console.log("bootstrap snapshot:",
+                    "tabs=", snapshot && snapshot.tabs !== undefined ? snapshot.tabs.length : "undef",
+                    "path=", snapshot && snapshot.path !== undefined ? snapshot.path.length : "undef",
+                    "drives=", snapshot && snapshot.drives !== undefined ? snapshot.drives.length : "undef",
+                    "files=", snapshot && snapshot.files !== undefined ? snapshot.files.length : "undef",
+                    "sidebar=", snapshot && snapshot.sidebar !== undefined ? snapshot.sidebar.length : "undef")
+
+        applySnapshot(snapshot)
+
+        var pf = pathFieldRef()
+        if (pf && (!pf.text || pf.text === ""))
             syncPathField()
 
         refreshPreviewSelection()
@@ -1905,8 +1624,16 @@ Window {
         hoverEnabled: false
 
         onPressed: function(mouse) {
-            var p = mapToItem(pathBar, mouse.x, mouse.y)
-            var insidePathBar = p.x >= 0 && p.y >= 0 && p.x < pathBar.width && p.y < pathBar.height
+            var bar = pathBarRef()
+
+            if (!bar) {
+                root.finishPathEditing(false)
+                mouse.accepted = false
+                return
+            }
+
+            var p = mapToItem(bar, mouse.x, mouse.y)
+            var insidePathBar = p.x >= 0 && p.y >= 0 && p.x < bar.width && p.y < bar.height
 
             if (!insidePathBar) {
                 root.finishPathEditing(false)
