@@ -25,6 +25,8 @@ QVariant DriveListModel::data(const QModelIndex& index, int role) const
     case Qt::DisplayRole:
     case LabelRole:
         return item.label;
+    case PathRole:
+        return item.path;
     case IconRole:
         return item.icon;
     case UsedRole:
@@ -42,6 +44,7 @@ QHash<int, QByteArray> DriveListModel::roleNames() const
 {
     return {
         { LabelRole, "label" },
+        { PathRole, "path" },
         { IconRole, "icon" },
         { UsedRole, "used" },
         { TotalRole, "total" },
@@ -55,10 +58,10 @@ void DriveListModel::loadDefaults()
 
     m_items.clear();
     m_items = {
-        { "Local Disk (C:)", "hard-drive", 500ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.5 TB used of 1 TB" },
-        { "Data (D:)", "storage", 370ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.37 TB used of 1 TB" },
-        { "Backup (E:)", "save", 910ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.91 TB used of 1 TB" },
-        { "USB Drive (F:)", "usb", 180ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.18 TB used of 1 TB" }
+        { "Local Disk (C:)", "C:/", "hard-drive", 500ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.5 TB used of 1 TB" },
+        { "Data (D:)", "D:/", "storage", 370ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.37 TB used of 1 TB" },
+        { "Backup (E:)", "E:/", "save", 910ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.91 TB used of 1 TB" },
+        { "USB Drive (F:)", "F:/", "usb", 180ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.18 TB used of 1 TB" }
     };
 
     endResetModel();

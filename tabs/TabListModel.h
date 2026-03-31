@@ -13,6 +13,7 @@ public:
     {
         TitleRole = Qt::UserRole + 1,
         IconRole,
+        PathRole,
         ActiveRole
     };
     Q_ENUM(Roles)
@@ -21,6 +22,7 @@ public:
     {
         QString title;
         QString icon;
+        QString path;
         bool active = false;
     };
 
@@ -31,10 +33,11 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     void setTabs(const QVector<TabItem>& tabs);
-    void addTab(const QString& title, const QString& icon = QStringLiteral("folder"));
+    void addTab(const QString& title, const QString& icon = QStringLiteral("folder"), const QString& path = QStringLiteral("C:/"));
     void closeTab(int index);
     void activateTab(int index);
     void renameTab(int index, const QString& title);
+    void setTabPath(int index, const QString& path);
     void moveTab(int from, int to);
 
     QVector<TabItem> tabs() const;

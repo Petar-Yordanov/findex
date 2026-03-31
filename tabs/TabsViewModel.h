@@ -27,10 +27,12 @@ public:
     Q_INVOKABLE void addTab();
     Q_INVOKABLE void closeTab(int index);
     Q_INVOKABLE void activateTab(int index);
+    Q_INVOKABLE void activateTabForDrop(int index);
     Q_INVOKABLE void beginRenameTab(int index);
     Q_INVOKABLE void commitRenameTab(int index, const QString& title);
     Q_INVOKABLE void cancelRenameTab();
     Q_INVOKABLE void moveTab(int from, int to);
+    Q_INVOKABLE void setCurrentTabPath(const QString& path);
 
 signals:
     void currentIndexChanged();

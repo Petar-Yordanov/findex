@@ -10,6 +10,8 @@ WorkspaceViewModel::WorkspaceViewModel(QObject* parent)
     , m_fileModel(this)
     , m_viewMode(normalizeViewMode(m_settings.viewMode()))
 {
+    m_fileModel.loadDefaults(m_currentDirectoryPath);
+
     if (m_fileModel.rowCount() > 0)
     {
         m_currentIndex = 0;
@@ -71,6 +73,54 @@ int WorkspaceViewModel::selectionRevision() const
     return m_selectionRevision;
 }
 
+QString WorkspaceViewModel::currentDirectoryPath() const
+{
+    return m_currentDirectoryPath;
+}
+
+void WorkspaceViewModel::setCurrentDirectoryPath(const QString& value)
+{
+    QString normalized = value.trimmed();
+    if (normalized.isEmpty())
+        normalized = QStringLiteral("C:/Projects/Findex");
+
+    normalized.replace('\\', '/');
+    while (normalized.contains(QStringLiteral("//")))
+        normalized.replace(QStringLiteral("//"), QStringLiteral("/"));
+
+    if (m_currentDirectoryPath == normalized)
+        return;
+
+    m_currentDirectoryPath = normalized;
+    emit currentDirectoryPathChanged();
+}
+
+bool WorkspaceViewModel::draggingItems() const
+{
+    return m_draggingItems;
+}
+
+QVariantList WorkspaceViewModel::draggedItems() const
+{
+    return m_draggedItems;
+}
+
+QString WorkspaceViewModel::draggedPathsText() const
+{
+    QStringList paths;
+    paths.reserve(m_draggedItems.size());
+
+    for (const QVariant& entry : m_draggedItems)
+    {
+        const QVariantMap item = entry.toMap();
+        const QString path = item.value(QStringLiteral("path")).toString();
+        if (!path.isEmpty())
+            paths.push_back(path);
+    }
+
+    return paths.join(QLatin1Char('\n'));
+}
+
 void WorkspaceViewModel::setViewMode(const QString& value)
 {
     const QString resolved = normalizeViewMode(value);
@@ -84,7 +134,7 @@ void WorkspaceViewModel::setViewMode(const QString& value)
 
 void WorkspaceViewModel::activateRow(int row)
 {
-    if (row < 0 || row >= m_fileModel.rowCount())
+    if (!isValidRow(row))
         return;
 
     if (m_currentIndex == row)
@@ -96,7 +146,7 @@ void WorkspaceViewModel::activateRow(int row)
 
 void WorkspaceViewModel::selectOnlyRow(int row)
 {
-    if (row < 0 || row >= m_fileModel.rowCount())
+    if (!isValidRow(row))
         return;
 
     const int previousSelected = selectedItems();
@@ -118,7 +168,7 @@ void WorkspaceViewModel::selectOnlyRow(int row)
 
 void WorkspaceViewModel::toggleRowSelection(int row)
 {
-    if (row < 0 || row >= m_fileModel.rowCount())
+    if (!isValidRow(row))
         return;
 
     const int previousSelected = selectedItems();
@@ -148,7 +198,7 @@ void WorkspaceViewModel::toggleRowSelection(int row)
 
 void WorkspaceViewModel::selectRange(int startRow, int endRow)
 {
-    if (startRow < 0 || endRow < 0 || startRow >= m_fileModel.rowCount() || endRow >= m_fileModel.rowCount())
+    if (!isValidRow(startRow) || !isValidRow(endRow))
         return;
 
     const int previousSelected = selectedItems();
@@ -176,7 +226,7 @@ void WorkspaceViewModel::selectRange(int startRow, int endRow)
 
 void WorkspaceViewModel::clickRow(int row, int modifiers)
 {
-    if (row < 0 || row >= m_fileModel.rowCount())
+    if (!isValidRow(row))
         return;
 
     const Qt::KeyboardModifiers keyboardModifiers =
@@ -203,16 +253,21 @@ void WorkspaceViewModel::clickRow(int row, int modifiers)
 
 void WorkspaceViewModel::openRow(int row)
 {
-    if (row < 0 || row >= m_fileModel.rowCount())
+    if (!isValidRow(row))
         return;
 
     selectOnlyRow(row);
 
     const QVariantMap item = fileAt(row);
     if (item.value(QStringLiteral("isDir")).toBool())
+    {
+        setCurrentDirectoryPath(item.value(QStringLiteral("path")).toString());
         emit openDirectoryRequested(item);
+    }
     else
+    {
         emit openFileRequested(item);
+    }
 }
 
 bool WorkspaceViewModel::isRowSelected(int row) const
@@ -271,7 +326,7 @@ QVariantMap WorkspaceViewModel::previewData() const
 
 void WorkspaceViewModel::beginDragSelection(int anchorRow)
 {
-    if (anchorRow < 0 || anchorRow >= m_fileModel.rowCount())
+    if (!isValidRow(anchorRow))
         return;
 
     if (!m_dragSelecting)
@@ -279,6 +334,8 @@ void WorkspaceViewModel::beginDragSelection(int anchorRow)
         m_dragSelecting = true;
         emit dragSelectingChanged();
     }
+
+    cancelFileDrag();
 
     m_selectionAnchorRow = anchorRow;
     selectRange(anchorRow, anchorRow);
@@ -289,7 +346,7 @@ void WorkspaceViewModel::updateDragSelection(int targetRow)
     if (!m_dragSelecting)
         return;
 
-    if (targetRow < 0 || targetRow >= m_fileModel.rowCount())
+    if (!isValidRow(targetRow))
         return;
 
     const int anchor =
@@ -340,6 +397,124 @@ void WorkspaceViewModel::endDragSelection()
 
     m_dragSelecting = false;
     emit dragSelectingChanged();
+}
+
+void WorkspaceViewModel::startFileDrag(int row, int modifiers)
+{
+    if (!isValidRow(row))
+        return;
+
+    if (m_dragSelecting)
+        return;
+
+    const Qt::KeyboardModifiers keyboardModifiers =
+        static_cast<Qt::KeyboardModifiers>(modifiers);
+
+    if (keyboardModifiers.testFlag(Qt::ControlModifier)
+        || keyboardModifiers.testFlag(Qt::ShiftModifier)
+        || keyboardModifiers.testFlag(Qt::AltModifier))
+    {
+        return;
+    }
+
+    if (!m_selectedRows.contains(row))
+        selectOnlyRow(row);
+    else
+        activateRow(row);
+
+    const QVariantList nextDraggedItems = buildDraggedItems();
+    if (nextDraggedItems.isEmpty())
+        return;
+
+    m_draggedItems = nextDraggedItems;
+
+    if (m_draggingItems)
+        return;
+
+    m_draggingItems = true;
+    emit draggingItemsChanged();
+}
+
+void WorkspaceViewModel::finishFileDrag(bool accepted)
+{
+    if (!m_draggingItems)
+        return;
+
+    Q_UNUSED(accepted);
+    clearDragState();
+}
+
+void WorkspaceViewModel::cancelFileDrag()
+{
+    if (!m_draggingItems)
+        return;
+
+    clearDragState();
+}
+
+bool WorkspaceViewModel::canDropOnRow(int row) const
+{
+    if (!isValidRow(row))
+        return false;
+
+    const QVariantMap item = fileAt(row);
+    if (!item.value(QStringLiteral("isDir")).toBool())
+        return false;
+
+    return canDropToPath(item.value(QStringLiteral("path")).toString());
+}
+
+bool WorkspaceViewModel::canDropToPath(const QString& targetPath) const
+{
+    if (!m_draggingItems)
+        return false;
+
+    QString normalized = targetPath.trimmed();
+    if (normalized.isEmpty())
+        return false;
+
+    normalized.replace('\\', '/');
+
+    for (const QVariant& entry : m_draggedItems)
+    {
+        const QVariantMap item = entry.toMap();
+        const QString draggedPath = item.value(QStringLiteral("path")).toString();
+        if (draggedPath.compare(normalized, Qt::CaseInsensitive) == 0)
+            return false;
+    }
+
+    return true;
+}
+
+void WorkspaceViewModel::dropOnRow(int row)
+{
+    if (!canDropOnRow(row))
+        return;
+
+    const QVariantMap item = fileAt(row);
+    requestDropToPath(item.value(QStringLiteral("path")).toString(), QStringLiteral("folder"));
+}
+
+void WorkspaceViewModel::requestDropToPath(const QString& targetPath, const QString& targetKind)
+{
+    if (!canDropToPath(targetPath))
+        return;
+
+    emit fileDropRequested(
+        m_draggedItems,
+        targetPath,
+        targetKind.trimmed().isEmpty() ? QStringLiteral("path") : targetKind);
+}
+
+bool WorkspaceViewModel::isOnlyDraggingRow(int row) const
+{
+    if (!m_draggingItems || m_draggedItems.size() != 1 || !isValidRow(row))
+        return false;
+
+    const QString rowPath = fileAt(row).value(QStringLiteral("path")).toString();
+    const QString draggedPath = m_draggedItems.first().toMap().value(QStringLiteral("path")).toString();
+
+    return rowPath.compare(draggedPath, Qt::CaseInsensitive) == 0;
 }
 
 QString WorkspaceViewModel::normalizeViewMode(const QString& value) const
@@ -417,6 +592,7 @@ QVariantMap WorkspaceViewModel::previewDataForRow(int row) const
 
     QVariantList lines;
     lines.push_back(QStringLiteral("Name: %1").arg(name));
+    lines.push_back(QStringLiteral("Path: %1").arg(item.value(QStringLiteral("path")).toString()));
     lines.push_back(QStringLiteral("Type: %1").arg(type));
     lines.push_back(QStringLiteral("Modified: %1").arg(dateModified));
     if (!size.isEmpty())
@@ -432,9 +608,35 @@ QVariantMap WorkspaceViewModel::previewDataForRow(int row) const
     data.insert(QStringLiteral("dateModified"), dateModified);
     data.insert(
         QStringLiteral("summary"),
-        isDir
-            ? QStringLiteral("Folder selected.")
-            : QStringLiteral("File selected."));
+        isDir ? QStringLiteral("Folder selected.") : QStringLiteral("File selected."));
     data.insert(QStringLiteral("lines"), lines);
     return data;
+}
+
+QVariantList WorkspaceViewModel::buildDraggedItems() const
+{
+    QVariantList result;
+
+    QList<int> rows = m_selectedRows.values();
+    std::sort(rows.begin(), rows.end());
+
+    for (int row : rows)
+        result.push_back(fileAt(row));
+
+    return result;
+}
+
+bool WorkspaceViewModel::isValidRow(int row) const
+{
+    return row >= 0 && row < m_fileModel.rowCount();
+}
+
+void WorkspaceViewModel::clearDragState()
+{
+    const bool wasDragging = m_draggingItems;
+    m_draggingItems = false;
+    m_draggedItems.clear();
+
+    if (wasDragging)
+        emit draggingItemsChanged();
 }

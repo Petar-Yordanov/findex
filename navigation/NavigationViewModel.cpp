@@ -191,6 +191,7 @@ void NavigationViewModel::navigateToBreadcrumb(int index)
                 QVariantMap item;
                 item.insert(QStringLiteral("label"), items.at(i).label);
                 item.insert(QStringLiteral("icon"), items.at(i).icon);
+                item.insert(QStringLiteral("path"), items.at(i).path);
                 parts.push_back(item);
             }
 
@@ -226,6 +227,7 @@ void NavigationViewModel::setBreadcrumbsFromPathText(const QString& text)
     QVector<NavigationBreadcrumbModel::Item> items;
     items.reserve(parts.size());
 
+    QString cumulativePath;
     for (int i = 0; i < parts.size(); ++i)
     {
         NavigationBreadcrumbModel::Item item;
@@ -233,6 +235,13 @@ void NavigationViewModel::setBreadcrumbsFromPathText(const QString& text)
         item.icon = (i == 0 && item.label.contains(':'))
                         ? QStringLiteral("hard-drive")
                         : QStringLiteral("folder");
+
+        if (i == 0)
+            cumulativePath = item.label;
+        else
+            cumulativePath += QStringLiteral("/") + item.label;
+
+        item.path = cumulativePath;
         items.push_back(item);
     }
 
@@ -246,9 +255,9 @@ void NavigationViewModel::seedDefaultBreadcrumbsIfEmpty()
         return;
 
     QVector<NavigationBreadcrumbModel::Item> items;
-    items.push_back({ QStringLiteral("C:"), QStringLiteral("hard-drive") });
-    items.push_back({ QStringLiteral("Projects"), QStringLiteral("folder") });
-    items.push_back({ QStringLiteral("Findex"), QStringLiteral("folder") });
+    items.push_back({ QStringLiteral("C:"), QStringLiteral("hard-drive"), QStringLiteral("C:") });
+    items.push_back({ QStringLiteral("Projects"), QStringLiteral("folder"), QStringLiteral("C:/Projects") });
+    items.push_back({ QStringLiteral("Findex"), QStringLiteral("folder"), QStringLiteral("C:/Projects/Findex") });
     m_breadcrumbModel.setItems(items);
 }
 
@@ -276,17 +285,7 @@ void NavigationViewModel::syncPathTextFromBreadcrumbs()
         return;
     }
 
-    QStringList labels;
-    labels.reserve(items.size());
-
-    for (const auto& item : items)
-        labels.push_back(item.label);
-
-    QString next;
-    if (!labels.isEmpty() && labels.first().contains(':'))
-        next = labels.first() + "/" + labels.mid(1).join('/');
-    else
-        next = labels.join('/');
+    const QString next = items.last().path;
 
     if (m_pathText == next)
         return;

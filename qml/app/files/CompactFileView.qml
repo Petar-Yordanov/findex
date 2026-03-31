@@ -16,33 +16,26 @@ Rectangle {
         spacing: 1
         model: viewModel ? viewModel.fileModel : null
         boundsBehavior: Flickable.StopAtBounds
-        interactive: !(viewModel && viewModel.dragSelecting)
+        interactive: !(viewModel && viewModel.dragSelecting) && !overlay.pointerArmed
 
         ScrollBar.vertical: ExplorerScrollbarV {}
 
         SelectionBand {
             id: selectionBand
             parent: fileList.contentItem
-            active: overlay.dragActive || dragState.dragActive
-            startX: overlay.dragActive ? overlay.startX : dragState.startX
-            currentX: overlay.dragActive ? overlay.currentX : dragState.currentX
-            startY: overlay.dragActive ? overlay.startY : dragState.startY
-            currentY: overlay.dragActive ? overlay.currentY : dragState.currentY
-        }
-
-        QtObject {
-            id: dragState
-            property bool dragActive: false
-            property real startX: 0
-            property real currentX: 0
-            property real startY: 0
-            property real currentY: 0
+            active: overlay.dragActive
+            startX: overlay.startX
+            currentX: overlay.currentX
+            startY: overlay.startY
+            currentY: overlay.currentY
         }
 
         delegate: Item {
             required property int index
             required property string name
+            required property string path
             required property string icon
+            required property bool isDir
 
             readonly property bool selectedState: {
                 const rev = viewModel ? viewModel.selectionRevision : 0
@@ -52,17 +45,34 @@ Rectangle {
             width: ListView.view.width
             height: 30
 
+            Item {
+                id: dragProxy
+                visible: false
+                Drag.active: mouseArea.fileDragActive
+                Drag.dragType: Drag.Automatic
+                Drag.supportedActions: Qt.MoveAction
+                Drag.hotSpot.x: 14
+                Drag.hotSpot.y: 14
+                Drag.mimeData: {
+                    "text/plain": viewModel ? viewModel.draggedPathsText : ""
+                }
+            }
+
             Rectangle {
                 anchors.fill: parent
                 radius: 6
-                color: selectedState
+                color: folderDropArea.containsDrag
                        ? Theme.AppTheme.selected
-                       : mouseArea.containsMouse
-                         ? Theme.AppTheme.selectedSoft
-                         : "transparent"
+                       : selectedState
+                         ? Theme.AppTheme.selected
+                         : mouseArea.containsMouse
+                           ? Theme.AppTheme.selectedSoft
+                           : "transparent"
 
-                border.color: selectedState ? Theme.AppTheme.accent : "transparent"
-                border.width: selectedState ? 1 : 0
+                border.color: folderDropArea.containsDrag
+                              ? Theme.AppTheme.accent
+                              : selectedState ? Theme.AppTheme.accent : "transparent"
+                border.width: (folderDropArea.containsDrag || selectedState) ? 1 : 0
             }
 
             Row {
@@ -90,6 +100,20 @@ Rectangle {
                 }
             }
 
+            DropArea {
+                id: folderDropArea
+                anchors.fill: parent
+                enabled: isDir && viewModel && viewModel.draggingItems && !viewModel.isOnlyDraggingRow(index)
+
+                onDropped: function(drop) {
+                    if (!viewModel || !viewModel.canDropOnRow(index))
+                        return
+                    viewModel.dropOnRow(index)
+                    viewModel.finishFileDrag(true)
+                    drop.accept(Qt.MoveAction)
+                }
+            }
+
             MouseArea {
                 id: mouseArea
                 anchors.fill: parent
@@ -97,89 +121,107 @@ Rectangle {
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 preventStealing: true
 
-                property real pressX: 0
-                property real pressY: 0
+                drag.target: dragProxy
+                drag.axis: Drag.XAndYAxis
+                drag.threshold: 8
+
+                property bool fileDragActive: false
                 property bool dragStarted: false
                 property bool suppressNextClick: false
-                property int lastValidTargetIndex: -1
+                property bool pressStartedOnSelectedItem: false
+                property real pressX: 0
+                property real pressY: 0
 
                 onPressed: function(mouse) {
                     if (mouse.button !== Qt.LeftButton)
                         return
 
+                    if (mouse.modifiers & Qt.AltModifier) {
+                        fileDragActive = false
+                        dragStarted = false
+                        suppressNextClick = false
+                        pressStartedOnSelectedItem = false
+                        dragProxy.x = 0
+                        dragProxy.y = 0
+                        mouse.accepted = false
+                        return
+                    }
+
+                    fileDragActive = false
+                    dragStarted = false
+                    suppressNextClick = false
                     pressX = mouse.x
                     pressY = mouse.y
-                    dragStarted = false
-                    lastValidTargetIndex = index
-
-                    var p = mouseArea.mapToItem(fileList.contentItem, mouse.x, mouse.y)
-                    dragState.startX = p.x
-                    dragState.currentX = p.x
-                    dragState.startY = p.y
-                    dragState.currentY = p.y
-                    dragState.dragActive = false
+                    pressStartedOnSelectedItem = viewModel ? viewModel.isRowSelected(index) : false
                 }
 
                 onPositionChanged: function(mouse) {
                     if (!(mouse.buttons & Qt.LeftButton))
                         return
 
+                    if (mouse.modifiers & Qt.AltModifier)
+                        return
                     if (mouse.modifiers & Qt.ControlModifier)
                         return
+                    if (mouse.modifiers & Qt.ShiftModifier)
+                        return
 
-                    var p = mouseArea.mapToItem(fileList.contentItem, mouse.x, mouse.y)
-                    dragState.currentX = p.x
-                    dragState.currentY = p.y
+                    if (Math.abs(mouse.x - pressX) < 6 && Math.abs(mouse.y - pressY) < 6)
+                        return
 
                     if (!dragStarted) {
-                        if (Math.abs(mouse.x - pressX) < 6 && Math.abs(mouse.y - pressY) < 6)
-                            return
-
                         dragStarted = true
                         suppressNextClick = true
-                        dragState.dragActive = true
-                        viewModel.beginDragSelection(index)
+
+                        if (viewModel && !pressStartedOnSelectedItem)
+                            viewModel.selectOnlyRow(index)
+
+                        if (viewModel)
+                            viewModel.startFileDrag(index, mouse.modifiers)
+
+                        fileDragActive = true
                     }
-
-                    var probeX = Math.max(1, Math.min(fileList.width - 2, fileList.width * 0.5))
-                    var targetIndex = fileList.indexAt(probeX, p.y)
-
-                    if (targetIndex >= 0) {
-                        lastValidTargetIndex = targetIndex
-                    } else if (p.y < 0) {
-                        targetIndex = 0
-                        lastValidTargetIndex = targetIndex
-                    } else if (p.y > fileList.contentHeight) {
-                        targetIndex = Math.max(0, fileList.count - 1)
-                        lastValidTargetIndex = targetIndex
-                    } else if (lastValidTargetIndex >= 0) {
-                        targetIndex = lastValidTargetIndex
-                    } else {
-                        targetIndex = index
-                    }
-
-                    viewModel.updateDragSelection(targetIndex)
                 }
 
                 onReleased: function(mouse) {
+                    dragProxy.x = 0
+                    dragProxy.y = 0
+
                     if (mouse.button !== Qt.LeftButton)
                         return
 
-                    if (dragStarted)
-                        viewModel.endDragSelection()
+                    if (mouse.modifiers & Qt.AltModifier) {
+                        fileDragActive = false
+                        dragStarted = false
+                        suppressNextClick = false
+                        pressStartedOnSelectedItem = false
+                        return
+                    }
 
-                    dragState.dragActive = false
+                    if (fileDragActive && viewModel)
+                        viewModel.finishFileDrag(false)
+
+                    fileDragActive = false
+                    dragStarted = false
+                    pressStartedOnSelectedItem = false
                 }
 
                 onCanceled: {
+                    dragProxy.x = 0
+                    dragProxy.y = 0
+                    fileDragActive = false
                     dragStarted = false
                     suppressNextClick = false
-                    dragState.dragActive = false
-                    viewModel.endDragSelection()
+                    pressStartedOnSelectedItem = false
+                    if (viewModel)
+                        viewModel.cancelFileDrag()
                 }
 
                 onClicked: function(mouse) {
                     if (mouse.button !== Qt.LeftButton)
+                        return
+
+                    if (mouse.modifiers & Qt.AltModifier)
                         return
 
                     if (suppressNextClick) {
@@ -195,10 +237,15 @@ Rectangle {
                     if (mouse.button !== Qt.LeftButton)
                         return
 
+                    if (mouse.modifiers & Qt.AltModifier)
+                        return
+
+                    fileDragActive = false
                     dragStarted = false
                     suppressNextClick = false
-                    dragState.dragActive = false
-                    viewModel.endDragSelection()
+                    pressStartedOnSelectedItem = false
+                    if (viewModel)
+                        viewModel.cancelFileDrag()
                     viewModel.openRow(index)
                 }
             }
@@ -210,6 +257,7 @@ Rectangle {
             z: 1000
             acceptedButtons: Qt.LeftButton
             hoverEnabled: false
+            preventStealing: true
 
             property real pressX: 0
             property real pressY: 0
@@ -218,18 +266,21 @@ Rectangle {
             property real currentX: 0
             property real currentY: 0
             property bool dragActive: false
+            property bool pointerArmed: false
+            property bool forcedMarquee: false
             property bool pressedInRealEmptyArea: false
             property int anchorIndex: -1
-            property int lastValidOverlayIndex: -1
 
             function isBelowItems(yInView) {
                 return yInView > (fileList.contentHeight - fileList.contentY)
             }
 
             onPressed: function(mouse) {
+                forcedMarquee = (mouse.modifiers & Qt.AltModifier) !== 0
                 pressedInRealEmptyArea = isBelowItems(mouse.y)
+                pointerArmed = forcedMarquee || pressedInRealEmptyArea
 
-                if (!pressedInRealEmptyArea) {
+                if (!pointerArmed) {
                     mouse.accepted = false
                     return
                 }
@@ -244,11 +295,10 @@ Rectangle {
                 currentY = p.y
                 dragActive = false
                 anchorIndex = -1
-                lastValidOverlayIndex = fileList.count > 0 ? fileList.count - 1 : -1
             }
 
             onPositionChanged: function(mouse) {
-                if (!pressedInRealEmptyArea) {
+                if (!pointerArmed) {
                     mouse.accepted = false
                     return
                 }
@@ -263,37 +313,31 @@ Rectangle {
                 currentX = p.x
                 currentY = p.y
 
-                var firstIndex = fileList.count > 0 ? fileList.count - 1 : -1
-                var probeX = Math.max(1, Math.min(fileList.width - 2, fileList.width * 0.5))
-                var lastIndex = fileList.indexAt(probeX, currentY)
+                var top = Math.min(startY, currentY)
+                var bottom = Math.max(startY, currentY)
 
-                if (lastIndex >= 0) {
-                    lastValidOverlayIndex = lastIndex
-                } else if (currentY < 0) {
-                    lastIndex = 0
-                    lastValidOverlayIndex = lastIndex
-                } else if (currentY > fileList.contentHeight) {
-                    lastIndex = fileList.count > 0 ? fileList.count - 1 : -1
-                    lastValidOverlayIndex = lastIndex
-                } else {
-                    lastIndex = lastValidOverlayIndex
+                var rows = []
+                for (var i = 0; i < fileList.count; ++i) {
+                    var itemY = i * 31
+                    var itemBottom = itemY + 30
+                    if (bottom > itemY && top < itemBottom)
+                        rows.push(i)
                 }
 
-                if (firstIndex < 0 || lastIndex < 0)
+                if (rows.length <= 0)
                     return
 
                 if (!dragActive) {
                     dragActive = true
-                    anchorIndex = firstIndex
+                    anchorIndex = rows[0]
                     viewModel.beginDragSelection(anchorIndex)
                 }
 
-                viewModel.selectRange(firstIndex, lastIndex)
+                viewModel.replaceSelectionRows(rows, rows[rows.length - 1], anchorIndex)
             }
 
             onReleased: function(mouse) {
-                if (!pressedInRealEmptyArea) {
-                    pressedInRealEmptyArea = false
+                if (!pointerArmed) {
                     mouse.accepted = false
                     return
                 }
@@ -302,8 +346,10 @@ Rectangle {
                     viewModel.endDragSelection()
 
                 dragActive = false
-                anchorIndex = -1
+                pointerArmed = false
+                forcedMarquee = false
                 pressedInRealEmptyArea = false
+                anchorIndex = -1
             }
 
             onCanceled: {
@@ -311,8 +357,10 @@ Rectangle {
                     viewModel.endDragSelection()
 
                 dragActive = false
-                anchorIndex = -1
+                pointerArmed = false
+                forcedMarquee = false
                 pressedInRealEmptyArea = false
+                anchorIndex = -1
             }
         }
     }

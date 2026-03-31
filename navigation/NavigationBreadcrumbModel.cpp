@@ -30,6 +30,8 @@ QVariant NavigationBreadcrumbModel::data(const QModelIndex& index, int role) con
         return item.label;
     case IconRole:
         return item.icon;
+    case PathRole:
+        return item.path;
     default:
         return {};
     }
@@ -39,7 +41,8 @@ QHash<int, QByteArray> NavigationBreadcrumbModel::roleNames() const
 {
     return {
         { LabelRole, "label" },
-        { IconRole, "icon" }
+        { IconRole, "icon" },
+        { PathRole, "path" }
     };
 }
 

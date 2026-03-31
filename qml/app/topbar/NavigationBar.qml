@@ -100,6 +100,7 @@ Rectangle {
                                     required property int index
                                     required property string label
                                     required property string icon
+                                    required property string path
 
                                     spacing: Theme.Metrics.spacingSm
 
@@ -107,11 +108,17 @@ Rectangle {
                                         id: crumbPill
                                         height: Theme.Metrics.controlHeightMd
                                         radius: Theme.Metrics.radiusMd
-                                        color: crumbMouse.pressed
-                                               ? Theme.AppTheme.pressed
-                                               : crumbMouse.containsMouse
-                                                 ? (Theme.AppTheme.isDark ? "#344055" : "#dfe9f8")
-                                                 : "transparent"
+                                        color: crumbDropArea.containsDrag
+                                               ? Theme.AppTheme.selected
+                                               : crumbMouse.pressed
+                                                 ? Theme.AppTheme.pressed
+                                                 : crumbMouse.containsMouse
+                                                   ? (Theme.AppTheme.isDark ? "#344055" : "#dfe9f8")
+                                                   : "transparent"
+                                        border.color: crumbDropArea.containsDrag
+                                                      ? Theme.AppTheme.accent
+                                                      : "transparent"
+                                        border.width: crumbDropArea.containsDrag ? 1 : 0
                                         width: Math.min(crumbContent.implicitWidth + 16, 220)
                                         clip: true
 
@@ -137,6 +144,20 @@ Rectangle {
                                                 font.pixelSize: Theme.Typography.bodyLg
                                                 elide: Text.ElideRight
                                                 width: Math.min(150, implicitWidth)
+                                            }
+                                        }
+
+                                        DropArea {
+                                            id: crumbDropArea
+                                            anchors.fill: parent
+                                            enabled: appWorkspaceViewModel && appWorkspaceViewModel.draggingItems
+
+                                            onDropped: function(drop) {
+                                                if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(path))
+                                                    return
+                                                appWorkspaceViewModel.requestDropToPath(path, "breadcrumb")
+                                                appWorkspaceViewModel.finishFileDrag(true)
+                                                drop.accept(Qt.MoveAction)
                                             }
                                         }
 

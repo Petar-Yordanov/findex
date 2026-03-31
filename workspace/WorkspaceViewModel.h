@@ -22,6 +22,11 @@ class WorkspaceViewModel final : public QObject
     Q_PROPERTY(bool dragSelecting READ dragSelecting NOTIFY dragSelectingChanged)
     Q_PROPERTY(int selectionRevision READ selectionRevision NOTIFY selectionStateChanged)
 
+    Q_PROPERTY(QString currentDirectoryPath READ currentDirectoryPath WRITE setCurrentDirectoryPath NOTIFY currentDirectoryPathChanged)
+    Q_PROPERTY(bool draggingItems READ draggingItems NOTIFY draggingItemsChanged)
+    Q_PROPERTY(QVariantList draggedItems READ draggedItems NOTIFY draggingItemsChanged)
+    Q_PROPERTY(QString draggedPathsText READ draggedPathsText NOTIFY draggingItemsChanged)
+
 public:
     explicit WorkspaceViewModel(QObject* parent = nullptr);
 
@@ -34,6 +39,13 @@ public:
     QString itemsText() const;
     bool dragSelecting() const;
     int selectionRevision() const;
+
+    QString currentDirectoryPath() const;
+    void setCurrentDirectoryPath(const QString& value);
+
+    bool draggingItems() const;
+    QVariantList draggedItems() const;
+    QString draggedPathsText() const;
 
     Q_INVOKABLE void setViewMode(const QString& value);
     Q_INVOKABLE void activateRow(int row);
@@ -51,6 +63,15 @@ public:
     Q_INVOKABLE void replaceSelectionRows(const QVariantList& rows, int currentRow = -1, int anchorRow = -1);
     Q_INVOKABLE void endDragSelection();
 
+    Q_INVOKABLE void startFileDrag(int row, int modifiers = 0);
+    Q_INVOKABLE void finishFileDrag(bool accepted = false);
+    Q_INVOKABLE void cancelFileDrag();
+    Q_INVOKABLE bool canDropOnRow(int row) const;
+    Q_INVOKABLE bool canDropToPath(const QString& targetPath) const;
+    Q_INVOKABLE void dropOnRow(int row);
+    Q_INVOKABLE void requestDropToPath(const QString& targetPath, const QString& targetKind);
+    Q_INVOKABLE bool isOnlyDraggingRow(int row) const;
+
 signals:
     void viewModeChanged();
     void currentIndexChanged();
@@ -60,8 +81,13 @@ signals:
     void selectionStateChanged();
     void dragSelectingChanged();
 
+    void currentDirectoryPathChanged();
+    void draggingItemsChanged();
+
     void openFileRequested(const QVariantMap& fileData);
     void openDirectoryRequested(const QVariantMap& directoryData);
+
+    void fileDropRequested(const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind);
 
 private:
     QString normalizeViewMode(const QString& value) const;
@@ -69,6 +95,9 @@ private:
     void emitSelectionSignals(int previousSelected, const QString& previousItemsText, bool selectionChanged);
     int firstSelectedRow() const;
     QVariantMap previewDataForRow(int row) const;
+    QVariantList buildDraggedItems() const;
+    bool isValidRow(int row) const;
+    void clearDragState();
 
 private:
     ApplicationSettings m_settings;
@@ -79,4 +108,8 @@ private:
     QSet<int> m_selectedRows;
     bool m_dragSelecting = false;
     int m_selectionRevision = 0;
+
+    QString m_currentDirectoryPath = QStringLiteral("C:/Projects/Findex");
+    bool m_draggingItems = false;
+    QVariantList m_draggedItems;
 };

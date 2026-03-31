@@ -26,6 +26,8 @@ QVariant TabListModel::data(const QModelIndex& index, int role) const
         return item.title;
     case IconRole:
         return item.icon;
+    case PathRole:
+        return item.path;
     case ActiveRole:
         return item.active;
     default:
@@ -38,6 +40,7 @@ QHash<int, QByteArray> TabListModel::roleNames() const
     return {
         { TitleRole, "title" },
         { IconRole, "icon" },
+        { PathRole, "path" },
         { ActiveRole, "active" }
     };
 }
@@ -49,7 +52,7 @@ void TabListModel::setTabs(const QVector<TabItem>& tabs)
     endResetModel();
 }
 
-void TabListModel::addTab(const QString& title, const QString& icon)
+void TabListModel::addTab(const QString& title, const QString& icon, const QString& path)
 {
     const int previousCount = m_tabs.size();
 
@@ -61,7 +64,7 @@ void TabListModel::addTab(const QString& title, const QString& icon)
 
     const int row = m_tabs.size();
     beginInsertRows(QModelIndex(), row, row);
-    m_tabs.push_back(TabItem{ title, icon, true });
+    m_tabs.push_back(TabItem{ title, icon, path, true });
     endInsertRows();
 }
 
@@ -78,7 +81,7 @@ void TabListModel::closeTab(int index)
 
     if (m_tabs.isEmpty())
     {
-        addTab(QStringLiteral("Home"), QStringLiteral("home"));
+        addTab(QStringLiteral("Home"), QStringLiteral("home"), QStringLiteral("C:/Users/Petar"));
         return;
     }
 
@@ -117,6 +120,19 @@ void TabListModel::renameTab(int index, const QString& title)
     m_tabs[index].title = title;
     const QModelIndex modelIndex = this->index(index, 0);
     emit dataChanged(modelIndex, modelIndex, { TitleRole });
+}
+
+void TabListModel::setTabPath(int index, const QString& path)
+{
+    if (index < 0 || index >= m_tabs.size())
+        return;
+
+    if (m_tabs[index].path == path)
+        return;
+
+    m_tabs[index].path = path;
+    const QModelIndex modelIndex = this->index(index, 0);
+    emit dataChanged(modelIndex, modelIndex, { PathRole });
 }
 
 void TabListModel::moveTab(int from, int to)

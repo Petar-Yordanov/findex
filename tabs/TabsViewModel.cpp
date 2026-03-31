@@ -5,8 +5,8 @@ TabsViewModel::TabsViewModel(QObject* parent)
     , m_tabsModel(this)
 {
     m_tabsModel.setTabs({
-        { QStringLiteral("Home"), QStringLiteral("home"), true },
-        { QStringLiteral("Local Disk (C:)"), QStringLiteral("hard-drive"), false }
+        { QStringLiteral("Home"), QStringLiteral("home"), QStringLiteral("C:/Users/Petar"), true },
+        { QStringLiteral("Local Disk (C:)"), QStringLiteral("hard-drive"), QStringLiteral("C:/"), false }
     });
 }
 
@@ -42,7 +42,7 @@ void TabsViewModel::setEditingTitle(const QString& value)
 void TabsViewModel::addTab()
 {
     cancelRenameTab();
-    m_tabsModel.addTab(QStringLiteral("New Tab"), QStringLiteral("folder"));
+    m_tabsModel.addTab(QStringLiteral("New Tab"), QStringLiteral("folder"), QStringLiteral("C:/"));
     setCurrentIndexInternal(m_tabsModel.rowCount() - 1);
     m_tabsModel.activateTab(m_currentIndex);
 }
@@ -75,6 +75,11 @@ void TabsViewModel::activateTab(int index)
 
     setCurrentIndexInternal(index);
     m_tabsModel.activateTab(index);
+}
+
+void TabsViewModel::activateTabForDrop(int index)
+{
+    activateTab(index);
 }
 
 void TabsViewModel::beginRenameTab(int index)
@@ -126,6 +131,11 @@ void TabsViewModel::moveTab(int from, int to)
 
     setCurrentIndexInternal(to);
     m_tabsModel.activateTab(to);
+}
+
+void TabsViewModel::setCurrentTabPath(const QString& path)
+{
+    m_tabsModel.setTabPath(m_currentIndex, path);
 }
 
 void TabsViewModel::setCurrentIndexInternal(int index)

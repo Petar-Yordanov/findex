@@ -17,6 +17,7 @@ SidebarTreeItem* SidebarTreeModel::makeItem(
     const QString& label,
     const QString& icon,
     const QString& kind,
+    const QString& path,
     bool section,
     bool expandedByDefault,
     SidebarTreeItem* parent)
@@ -25,6 +26,7 @@ SidebarTreeItem* SidebarTreeModel::makeItem(
     item->data.label = label;
     item->data.icon = icon;
     item->data.kind = kind;
+    item->data.path = path;
     item->data.section = section;
     item->data.expandedByDefault = expandedByDefault;
     item->parent = parent;
@@ -98,6 +100,8 @@ QVariant SidebarTreeModel::data(const QModelIndex& index, int role) const
         return item->data.icon;
     case KindRole:
         return item->data.kind;
+    case PathRole:
+        return item->data.path;
     case SectionRole:
         return item->data.section;
     case ExpandedByDefaultRole:
@@ -115,6 +119,7 @@ QHash<int, QByteArray> SidebarTreeModel::roleNames() const
         { LabelRole, "label" },
         { IconRole, "icon" },
         { KindRole, "kind" },
+        { PathRole, "path" },
         { SectionRole, "section" },
         { ExpandedByDefaultRole, "expandedByDefault" },
         { HasChildrenRole, "hasChildren" }
@@ -134,6 +139,11 @@ QString SidebarTreeModel::icon(const QModelIndex& index) const
 QString SidebarTreeModel::kind(const QModelIndex& index) const
 {
     return data(index, KindRole).toString();
+}
+
+QString SidebarTreeModel::path(const QModelIndex& index) const
+{
+    return data(index, PathRole).toString();
 }
 
 bool SidebarTreeModel::section(const QModelIndex& index) const
@@ -158,17 +168,17 @@ void SidebarTreeModel::loadDefaults()
     qDeleteAll(m_root->children);
     m_root->children.clear();
 
-    auto* quickAccess = makeItem("Quick Access", "", "section", true, true, m_root);
+    auto* quickAccess = makeItem("Quick Access", "", "section", "", true, true, m_root);
     m_root->children.append(quickAccess);
 
-    quickAccess->children.append(makeItem("Recent", "history", "quick", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Home", "home", "quick", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Desktop", "desktop-windows", "quick", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Downloads", "download", "quick", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Documents", "description", "quick", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Pictures", "image", "quick", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Music", "music-note", "quick", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Videos", "movie", "quick", false, false, quickAccess));
+    quickAccess->children.append(makeItem("Recent", "history", "quick", "C:/Users/Petar/Recent", false, false, quickAccess));
+    quickAccess->children.append(makeItem("Home", "home", "quick", "C:/Users/Petar", false, false, quickAccess));
+    quickAccess->children.append(makeItem("Desktop", "desktop-windows", "quick", "C:/Users/Petar/Desktop", false, false, quickAccess));
+    quickAccess->children.append(makeItem("Downloads", "download", "quick", "C:/Users/Petar/Downloads", false, false, quickAccess));
+    quickAccess->children.append(makeItem("Documents", "description", "quick", "C:/Users/Petar/Documents", false, false, quickAccess));
+    quickAccess->children.append(makeItem("Pictures", "image", "quick", "C:/Users/Petar/Pictures", false, false, quickAccess));
+    quickAccess->children.append(makeItem("Music", "music-note", "quick", "C:/Users/Petar/Music", false, false, quickAccess));
+    quickAccess->children.append(makeItem("Videos", "movie", "quick", "C:/Users/Petar/Videos", false, false, quickAccess));
 
     endResetModel();
 }

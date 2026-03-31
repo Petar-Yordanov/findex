@@ -12,6 +12,7 @@ public:
     struct FileItem
     {
         QString name;
+        QString path;
         QString dateModified;
         QString type;
         QString size;
@@ -22,6 +23,7 @@ public:
     enum Roles
     {
         NameRole = Qt::UserRole + 1,
+        PathRole,
         DateModifiedRole,
         TypeRole,
         SizeRole,
@@ -40,7 +42,7 @@ public:
     QVector<FileItem> items() const;
 
     Q_INVOKABLE QVariantMap get(int row) const;
-    Q_INVOKABLE void loadDefaults();
+    Q_INVOKABLE void loadDefaults(const QString& basePath = QStringLiteral("C:/Projects/Findex"));
 
 private:
     QVector<FileItem> m_items;

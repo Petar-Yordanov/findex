@@ -12,7 +12,8 @@ public:
     enum Roles
     {
         LabelRole = Qt::UserRole + 1,
-        IconRole
+        IconRole,
+        PathRole
     };
     Q_ENUM(Roles)
 
@@ -20,6 +21,7 @@ public:
     {
         QString label;
         QString icon;
+        QString path;
     };
 
     explicit NavigationBreadcrumbModel(QObject* parent = nullptr);

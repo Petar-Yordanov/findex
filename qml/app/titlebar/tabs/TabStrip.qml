@@ -24,7 +24,6 @@ Item {
                                       ? tabCount * tabWidth + (tabCount - 1) * tabSpacing
                                       : 0
 
-    // Keep slot sizes constant to avoid binding loops.
     readonly property real leftSlotWidth: sideInset + sideControlWidth + sideGap
     readonly property real rightSlotWidth: sideInset + addButtonSize + sideGap + sideControlWidth
 

@@ -15,6 +15,7 @@ Rectangle {
     required property int index
     required property string title
     required property string icon
+    required property string path
     required property bool active
 
     required property int tabWidth
@@ -23,6 +24,7 @@ Rectangle {
     readonly property int tabIndex: index
     readonly property string tabTitle: title
     readonly property string tabIcon: icon
+    readonly property string tabPath: path
     readonly property bool tabActive: active
 
     property bool dragging: false
@@ -39,21 +41,25 @@ Rectangle {
     radius: 9
     z: dragging ? 100 : 1
 
-    color: tabActive
-           ? (mouseArea.pressed && !dragging
-                ? (Theme.AppTheme.isDark ? "#2a3342" : "#e7edf8")
-                : mouseArea.containsMouse
-                  ? (Theme.AppTheme.isDark ? "#242c3a" : "#f4f7fc")
-                  : (Theme.AppTheme.isDark ? "#202633" : "#ffffff"))
-           : (mouseArea.pressed && !dragging
-                ? (Theme.AppTheme.isDark ? "#2b3443" : "#dde5f0")
-                : mouseArea.containsMouse
-                  ? (Theme.AppTheme.isDark ? "#252e3c" : "#e7edf5")
-                  : (Theme.AppTheme.isDark ? "#1b2230" : "#e9edf2"))
+    color: tabDropArea.containsDrag
+           ? Theme.AppTheme.selected
+           : tabActive
+             ? (mouseArea.pressed && !dragging
+                  ? (Theme.AppTheme.isDark ? "#2a3342" : "#e7edf8")
+                  : mouseArea.containsMouse
+                    ? (Theme.AppTheme.isDark ? "#242c3a" : "#f4f7fc")
+                    : (Theme.AppTheme.isDark ? "#202633" : "#ffffff"))
+             : (mouseArea.pressed && !dragging
+                  ? (Theme.AppTheme.isDark ? "#2b3443" : "#dde5f0")
+                  : mouseArea.containsMouse
+                    ? (Theme.AppTheme.isDark ? "#252e3c" : "#e7edf5")
+                    : (Theme.AppTheme.isDark ? "#1b2230" : "#e9edf2"))
 
-    border.color: tabActive
-                  ? Theme.AppTheme.border
-                  : (Theme.AppTheme.isDark ? "#2b3443" : "#cfd6df")
+    border.color: tabDropArea.containsDrag
+                  ? Theme.AppTheme.accent
+                  : tabActive
+                    ? Theme.AppTheme.border
+                    : (Theme.AppTheme.isDark ? "#2b3443" : "#cfd6df")
     border.width: Theme.Metrics.borderWidth
 
     function resetDrag() {
@@ -61,6 +67,31 @@ Rectangle {
         strip.draggingTab = false
         dragX = baseX
         dropIndex = tabIndex
+    }
+
+    DropArea {
+        id: tabDropArea
+        anchors.fill: parent
+        enabled: appWorkspaceViewModel
+                 && appWorkspaceViewModel.draggingItems
+                 && tabPath !== ""
+
+        onEntered: {
+            if (viewModel)
+                viewModel.activateTabForDrop(tabIndex)
+        }
+
+        onDropped: function(drop) {
+            if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(tabPath))
+                return
+
+            if (viewModel)
+                viewModel.activateTabForDrop(tabIndex)
+
+            appWorkspaceViewModel.requestDropToPath(tabPath, "tab")
+            appWorkspaceViewModel.finishFileDrag(true)
+            drop.accept(Qt.MoveAction)
+        }
     }
 
     Item {

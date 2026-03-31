@@ -12,6 +12,7 @@ public:
     struct DriveItem
     {
         QString label;
+        QString path;
         QString icon;
         qint64 used = 0;
         qint64 total = 0;
@@ -21,6 +22,7 @@ public:
     enum Roles
     {
         LabelRole = Qt::UserRole + 1,
+        PathRole,
         IconRole,
         UsedRole,
         TotalRole,

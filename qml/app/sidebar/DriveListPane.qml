@@ -58,6 +58,7 @@ Rectangle {
 
                     delegate: Rectangle {
                         required property string label
+                        required property string path
                         required property string icon
                         required property double used
                         required property double total
@@ -75,19 +76,23 @@ Rectangle {
                             ? root.viewModel.isSelected(label, "drive")
                             : false
 
-                        color: driveMouseArea.pressed
-                            ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
-                            : selectedState
+                        color: driveDropArea.containsDrag
+                            ? Theme.AppTheme.selected
+                            : driveMouseArea.pressed
+                              ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
+                              : selectedState
                                 ? Theme.AppTheme.selected
                                 : driveMouseArea.containsMouse
-                                    ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
-                                    : "transparent"
+                                  ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
+                                  : "transparent"
 
-                        border.color: driveMouseArea.pressed
-                            ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
-                            : "transparent"
+                        border.color: driveDropArea.containsDrag
+                            ? Theme.AppTheme.accent
+                            : driveMouseArea.pressed
+                              ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
+                              : "transparent"
 
-                        border.width: driveMouseArea.pressed ? 1 : 0
+                        border.width: (driveDropArea.containsDrag || driveMouseArea.pressed) ? 1 : 0
 
                         Column {
                             anchors.fill: parent
@@ -139,6 +144,20 @@ Rectangle {
                                 font.pixelSize: 10
                                 elide: Text.ElideRight
                                 width: parent.width
+                            }
+                        }
+
+                        DropArea {
+                            id: driveDropArea
+                            anchors.fill: parent
+                            enabled: appWorkspaceViewModel && appWorkspaceViewModel.draggingItems
+
+                            onDropped: function(drop) {
+                                if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(path))
+                                    return
+                                appWorkspaceViewModel.requestDropToPath(path, "drive")
+                                appWorkspaceViewModel.finishFileDrag(true)
+                                drop.accept(Qt.MoveAction)
                             }
                         }
 

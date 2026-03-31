@@ -13,6 +13,7 @@ public:
         LabelRole = Qt::UserRole + 1,
         IconRole,
         KindRole,
+        PathRole,
         SectionRole,
         ExpandedByDefaultRole,
         HasChildrenRole
@@ -32,6 +33,7 @@ public:
     Q_INVOKABLE QString label(const QModelIndex& index) const;
     Q_INVOKABLE QString icon(const QModelIndex& index) const;
     Q_INVOKABLE QString kind(const QModelIndex& index) const;
+    Q_INVOKABLE QString path(const QModelIndex& index) const;
     Q_INVOKABLE bool section(const QModelIndex& index) const;
     Q_INVOKABLE bool expandedByDefault(const QModelIndex& index) const;
     Q_INVOKABLE bool hasChildrenAt(const QModelIndex& index) const;
@@ -46,6 +48,7 @@ private:
         const QString& label,
         const QString& icon,
         const QString& kind,
+        const QString& path,
         bool section,
         bool expandedByDefault,
         SidebarTreeItem* parent);

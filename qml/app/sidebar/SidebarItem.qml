@@ -22,12 +22,15 @@ Item {
     required property string label
     required property string icon
     required property string kind
+    required property string path
     required property bool section
 
     readonly property string itemLabel: label || ""
     readonly property string itemIcon: icon || ""
     readonly property string itemKind: kind || ""
+    readonly property string itemPath: path || ""
     readonly property bool itemSection: section === true
+    readonly property bool acceptsDrop: !itemSection && itemPath !== ""
 
     readonly property bool selectedState: viewModel
         ? viewModel.isSelected(itemLabel, itemKind)
@@ -45,23 +48,27 @@ Item {
         anchors.fill: parent
         radius: Theme.Metrics.radiusMd
         color: itemSection ? "transparent"
-                           : hoverState
-                             ? Theme.AppTheme.selectedSoft
-                             : tapArea.pressed
-                               ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
-                               : selectedState
-                                 ? Theme.AppTheme.selected
-                                 : tapArea.containsMouse
-                                   ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
-                                   : "transparent"
+                           : itemDropArea.containsDrag
+                             ? Theme.AppTheme.selected
+                             : hoverState
+                               ? Theme.AppTheme.selectedSoft
+                               : tapArea.pressed
+                                 ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
+                                 : selectedState
+                                   ? Theme.AppTheme.selected
+                                   : tapArea.containsMouse
+                                     ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
+                                     : "transparent"
 
-        border.color: hoverState
+        border.color: itemDropArea.containsDrag
                       ? Theme.AppTheme.accent
-                      : tapArea.pressed
-                        ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
-                        : "transparent"
+                      : hoverState
+                        ? Theme.AppTheme.accent
+                        : tapArea.pressed
+                          ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
+                          : "transparent"
 
-        border.width: (hoverState || tapArea.pressed) ? 1 : 0
+        border.width: (itemDropArea.containsDrag || hoverState || tapArea.pressed) ? 1 : 0
     }
 
     Item {
@@ -118,6 +125,20 @@ Item {
                 elide: Text.ElideRight
                 width: Math.max(0, parent.width - x)
             }
+        }
+    }
+
+    DropArea {
+        id: itemDropArea
+        anchors.fill: parent
+        enabled: acceptsDrop && appWorkspaceViewModel && appWorkspaceViewModel.draggingItems
+
+        onDropped: function(drop) {
+            if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(itemPath))
+                return
+            appWorkspaceViewModel.requestDropToPath(itemPath, itemKind)
+            appWorkspaceViewModel.finishFileDrag(true)
+            drop.accept(Qt.MoveAction)
         }
     }
 

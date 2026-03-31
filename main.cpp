@@ -42,6 +42,12 @@ int main(int argc, char* argv[])
             previewPaneViewModel.showPreviewData(data);
     };
 
+    auto syncPathState = [&]()
+    {
+        navigationViewModel.commitPathEdit(workspaceViewModel.currentDirectoryPath());
+        tabsViewModel.setCurrentTabPath(workspaceViewModel.currentDirectoryPath());
+    };
+
     commandBarViewModel.setViewMode(workspaceViewModel.viewMode());
     statusBarViewModel.setCurrentViewMode(workspaceViewModel.viewMode());
     statusBarViewModel.setTotalItems(workspaceViewModel.totalItems());
@@ -115,6 +121,14 @@ int main(int argc, char* argv[])
 
     QObject::connect(
         &workspaceViewModel,
+        &WorkspaceViewModel::currentDirectoryPathChanged,
+        [&]()
+        {
+            syncPathState();
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
         &WorkspaceViewModel::openFileRequested,
         [](const QVariantMap& fileData)
         {
@@ -129,6 +143,18 @@ int main(int argc, char* argv[])
             qDebug() << "openDirectory:" << directoryData;
         });
 
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::fileDropRequested,
+        [](const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind)
+        {
+            qDebug() << "fileDropRequested:";
+            qDebug() << "  targetPath =" << targetPath;
+            qDebug() << "  targetKind =" << targetKind;
+            qDebug() << "  draggedItems =" << draggedItems;
+        });
+
+    syncPathState();
     refreshPreview();
 
     engine.rootContext()->setContextProperty("appSidebarViewModel", &sidebarViewModel);
