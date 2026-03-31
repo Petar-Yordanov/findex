@@ -3,6 +3,8 @@
 #include <QQmlContext>
 #include <QDebug>
 
+#include "ApplicationSettings.h"
+
 #include "sidebar/SidebarViewModel.h"
 #include "navigation/NavigationViewModel.h"
 #include "toolbar/CommandBarViewModel.h"
@@ -16,6 +18,8 @@ int main(int argc, char* argv[])
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
 
+    ApplicationSettings appSettings;
+
     SidebarViewModel sidebarViewModel;
     NavigationViewModel navigationViewModel;
     CommandBarViewModel commandBarViewModel;
@@ -23,6 +27,11 @@ int main(int argc, char* argv[])
     PreviewPaneViewModel previewPaneViewModel;
     StatusBarViewModel statusBarViewModel;
     WorkspaceViewModel workspaceViewModel;
+
+    commandBarViewModel.setThemeMode(appSettings.theme());
+    commandBarViewModel.setShowHiddenFiles(appSettings.showHiddenFiles());
+
+    previewPaneViewModel.setPreviewEnabled(appSettings.previewEnabled());
 
     auto refreshPreview = [&]()
     {
@@ -38,6 +47,30 @@ int main(int argc, char* argv[])
     statusBarViewModel.setTotalItems(workspaceViewModel.totalItems());
     statusBarViewModel.setSelectedItems(workspaceViewModel.selectedItems());
     statusBarViewModel.setNotificationCount(0);
+
+    QObject::connect(
+        &commandBarViewModel,
+        &CommandBarViewModel::themeModeChanged,
+        [&]()
+        {
+            appSettings.setTheme(commandBarViewModel.themeMode());
+        });
+
+    QObject::connect(
+        &commandBarViewModel,
+        &CommandBarViewModel::showHiddenFilesChanged,
+        [&]()
+        {
+            appSettings.setShowHiddenFiles(commandBarViewModel.showHiddenFiles());
+        });
+
+    QObject::connect(
+        &previewPaneViewModel,
+        &PreviewPaneViewModel::previewEnabledChanged,
+        [&]()
+        {
+            appSettings.setPreviewEnabled(previewPaneViewModel.previewEnabled());
+        });
 
     QObject::connect(
         &commandBarViewModel,

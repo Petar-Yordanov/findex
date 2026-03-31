@@ -31,6 +31,12 @@ Window {
     property var themeMenu: overlays.themeMenu
     property var notificationsPopupRef: overlays.notificationsPopup
 
+    Binding {
+        target: Theme.AppTheme
+        property: "mode"
+        value: root.commandBarVm ? root.commandBarVm.themeMode : "Light"
+    }
+
     function popupBelow(anchorItem, popup) {
         if (!anchorItem || !popup || !popup.parent)
             return
