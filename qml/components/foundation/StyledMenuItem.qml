@@ -1,55 +1,52 @@
 import QtQuick
-import QtQuick.Controls
 import "../theme" as Theme
 
-MenuItem {
+Rectangle {
     id: control
 
     property bool darkTheme: Theme.AppTheme.isDark
+    property string text: ""
 
-    implicitWidth: Theme.Metrics.menuWidth
-    implicitHeight: Theme.Metrics.controlHeightXl
+    signal triggered()
 
-    leftPadding: 16
-    rightPadding: control.subMenu ? 36 : 16
-    topPadding: 0
-    bottomPadding: 0
+    width: parent && parent.width > 0 ? parent.width : implicitWidth
+    implicitWidth: 184
+    implicitHeight: 36
+    radius: Theme.Metrics.radiusSm
 
-    indicator: null
+    color: !enabled
+           ? "transparent"
+           : mouseArea.pressed
+             ? (Theme.AppTheme.isDark ? "#2d394a" : "#d7e3f7")
+             : mouseArea.containsMouse
+               ? Theme.AppTheme.menuHighlight
+               : "transparent"
 
-    arrow: Item {
-        visible: control.subMenu !== null
-        width: visible ? 14 : 0
-        height: control.height
-        x: control.width - width - 16
-        y: 0
+    border.color: mouseArea.containsMouse && enabled
+                  ? Theme.AppTheme.menuHighlightBorder
+                  : "transparent"
+    border.width: mouseArea.containsMouse && enabled ? Theme.Metrics.borderWidth : 0
+    opacity: enabled ? 1.0 : 0.6
 
-        AppIcon {
-            anchors.centerIn: parent
-            name: "chevron-right"
-            darkTheme: control.darkTheme
-            iconSize: Theme.Metrics.iconSm
-            iconOpacity: control.enabled ? 0.8 : 0.45
-        }
-    }
-
-    contentItem: Text {
+    Text {
+        anchors.fill: parent
+        anchors.leftMargin: 14
+        anchors.rightMargin: 14
         text: control.text
-        color: control.enabled ? Theme.AppTheme.text : Theme.AppTheme.disabledText
+        color: enabled ? Theme.AppTheme.text : Theme.AppTheme.disabledText
         font.pixelSize: Theme.Typography.bodyLg
         elide: Text.ElideRight
         verticalAlignment: Text.AlignVCenter
+        horizontalAlignment: Text.AlignLeft
     }
 
-    background: Rectangle {
-        x: Theme.Metrics.spacingSm
-        y: Theme.Metrics.spacingXs
-        width: control.width - Theme.Metrics.spacingXl
-        height: control.height - Theme.Metrics.spacingMd
-        radius: Theme.Metrics.radiusSm
+    MouseArea {
+        id: mouseArea
+        anchors.fill: parent
+        hoverEnabled: control.enabled
+        enabled: control.enabled
+        cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
 
-        color: control.highlighted ? Theme.AppTheme.menuHighlight : "transparent"
-        border.color: control.highlighted ? Theme.AppTheme.menuHighlightBorder : "transparent"
-        border.width: control.highlighted ? Theme.Metrics.borderWidth : 0
+        onClicked: control.triggered()
     }
 }

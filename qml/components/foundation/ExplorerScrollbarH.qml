@@ -1,33 +1,27 @@
 import QtQuick
-import QtQuick.Controls
-import "../theme" as Theme
+import QtQuick.Controls.Basic
 
 ScrollBar {
     id: control
 
-    property bool darkTheme: Theme.AppTheme.isDark
-    property color thumbColor: Theme.AppTheme.scrollbarThumb
-    property color thumbHoverColor: Theme.AppTheme.scrollbarThumbHover
-    property color thumbPressedColor: Theme.AppTheme.scrollbarThumbPressed
-    property color trackColor: Theme.AppTheme.scrollbarTrack
-
     orientation: Qt.Horizontal
-    height: Theme.Metrics.scrollbarThickness
     policy: ScrollBar.AsNeeded
+    height: 10
+    minimumSize: 0.08
 
     contentItem: Rectangle {
         implicitHeight: 6
-        radius: Theme.Metrics.radiusXs
-        color: control.pressed ? control.thumbPressedColor
-                               : control.hovered ? control.thumbHoverColor
-                                                 : control.thumbColor
-        opacity: control.darkTheme ? (control.active ? 0.95 : 0.75)
-                                   : (control.active ? 0.9 : 0.8)
+        radius: height / 2
+        color: control.pressed
+               ? "#7a7a7a"
+               : control.hovered
+                 ? "#8a8a8a"
+                 : "#9a9a9a"
     }
 
     background: Rectangle {
-        radius: Theme.Metrics.radiusXs
-        color: control.trackColor
-        opacity: control.darkTheme ? 0.0 : 1.0
+        implicitHeight: 10
+        radius: height / 2
+        color: "#22000000"
     }
 }

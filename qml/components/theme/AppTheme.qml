@@ -4,7 +4,7 @@ import QtQuick
 QtObject {
     id: theme
 
-    property string mode: "Dark"   // Dark | Light | System
+    property string mode: "Light"   // Dark | Light | System
     property bool systemDark: false
 
     readonly property bool isDark: mode === "Dark" || (mode === "System" && systemDark)

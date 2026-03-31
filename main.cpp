@@ -1,85 +1,122 @@
 #include <QGuiApplication>
 #include <QQmlApplicationEngine>
-#include <QQmlError>
-#include <QDebug>
-#include <QQuickStyle>
-#include "FileAssociationService.h"
-#include "FileManagerBridge.h"
-#include "FileManagerSidebarService.h"
 #include <QQmlContext>
-#include <QIcon>
-#include <QFile>
+#include <QDebug>
 
-void dumpApps(const QString& filePath)
+#include "sidebar/SidebarViewModel.h"
+#include "navigation/NavigationViewModel.h"
+#include "toolbar/CommandBarViewModel.h"
+#include "tabs/TabsViewModel.h"
+#include "preview/PreviewPaneViewModel.h"
+#include "statusbar/StatusBarViewModel.h"
+#include "workspace/WorkspaceViewModel.h"
+
+int main(int argc, char* argv[])
 {
-    const auto pdfApps = FileAssociationService::appsForExtension(".png");
-
-    qDebug() << "Apps for" << filePath;
-    for (const auto& app : pdfApps) {
-        qDebug().noquote()
-            << QString("  [%1] name=%2 id=%3 exe=%4 cmd=%5 url=%6")
-                   .arg(app.isDefault ? "default" : "other")
-                   .arg(app.name)
-                   .arg(app.id)
-                   .arg(app.executable)
-                   .arg(app.command)
-                   .arg(app.appUrl.toString());
-    }
-
-    qDebug() << QFile::exists(":/icons/findex-plain.png");
-    qDebug() << QFile::exists(":/assets/icons/findex-plain.png");
-    qDebug() << QFile::exists(":/qt/qml/Findex/assets/icons/findex-plain.png");
-}
-
-int main(int argc, char *argv[])
-{
-    QQuickStyle::setStyle("Fusion");
     QGuiApplication app(argc, argv);
-    app.setWindowIcon(QIcon(":/assets/icons/findex-plain.ico"));
-
-    QCoreApplication::setOrganizationName("PetarYordanov");
-    QCoreApplication::setApplicationName("Findex");
-
-    qInstallMessageHandler([](QtMsgType, const QMessageLogContext&, const QString& msg) {
-        fprintf(stderr, "%s\n", msg.toLocal8Bit().constData());
-        fflush(stderr);
-    });
-
-    dumpApps("");
-
     QQmlApplicationEngine engine;
 
-    FileManagerBridge fileManagerBridge;
-    FileManagerSidebarService fileManagerSidebarService;
+    SidebarViewModel sidebarViewModel;
+    NavigationViewModel navigationViewModel;
+    CommandBarViewModel commandBarViewModel;
+    TabsViewModel tabsViewModel;
+    PreviewPaneViewModel previewPaneViewModel;
+    StatusBarViewModel statusBarViewModel;
+    WorkspaceViewModel workspaceViewModel;
 
-    engine.rootContext()->setContextProperty("fileManagerBridge", &fileManagerBridge);
-    engine.rootContext()->setContextProperty("fileManagerSidebarService", &fileManagerSidebarService);
+    auto refreshPreview = [&]()
+    {
+        const QVariantMap data = workspaceViewModel.previewData();
+        if (data.isEmpty())
+            previewPaneViewModel.clearPreview();
+        else
+            previewPaneViewModel.showPreviewData(data);
+    };
+
+    commandBarViewModel.setViewMode(workspaceViewModel.viewMode());
+    statusBarViewModel.setCurrentViewMode(workspaceViewModel.viewMode());
+    statusBarViewModel.setTotalItems(workspaceViewModel.totalItems());
+    statusBarViewModel.setSelectedItems(workspaceViewModel.selectedItems());
+    statusBarViewModel.setNotificationCount(0);
 
     QObject::connect(
-        &engine,
-        &QQmlApplicationEngine::warnings,
-        [](const QList<QQmlError>& warnings) {
-            for (const auto& w : warnings) {
-                qWarning().noquote() << w.toString();
-            }
+        &commandBarViewModel,
+        &CommandBarViewModel::viewModeChanged,
+        [&]()
+        {
+            workspaceViewModel.setViewMode(commandBarViewModel.viewMode());
         });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::viewModeChanged,
+        [&]()
+        {
+            commandBarViewModel.setViewMode(workspaceViewModel.viewMode());
+            statusBarViewModel.setCurrentViewMode(workspaceViewModel.viewMode());
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::selectedItemsChanged,
+        [&]()
+        {
+            statusBarViewModel.setSelectedItems(workspaceViewModel.selectedItems());
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::selectionStateChanged,
+        [&]()
+        {
+            refreshPreview();
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::totalItemsChanged,
+        [&]()
+        {
+            statusBarViewModel.setTotalItems(workspaceViewModel.totalItems());
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::openFileRequested,
+        [](const QVariantMap& fileData)
+        {
+            qDebug() << "openFile:" << fileData;
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::openDirectoryRequested,
+        [](const QVariantMap& directoryData)
+        {
+            qDebug() << "openDirectory:" << directoryData;
+        });
+
+    refreshPreview();
+
+    engine.rootContext()->setContextProperty("appSidebarViewModel", &sidebarViewModel);
+    engine.rootContext()->setContextProperty("appNavigationViewModel", &navigationViewModel);
+    engine.rootContext()->setContextProperty("appCommandBarViewModel", &commandBarViewModel);
+    engine.rootContext()->setContextProperty("appTabsViewModel", &tabsViewModel);
+    engine.rootContext()->setContextProperty("appPreviewPaneViewModel", &previewPaneViewModel);
+    engine.rootContext()->setContextProperty("appStatusBarViewModel", &statusBarViewModel);
+    engine.rootContext()->setContextProperty("appWorkspaceViewModel", &workspaceViewModel);
 
     QObject::connect(
         &engine,
         &QQmlApplicationEngine::objectCreationFailed,
         &app,
-        []() {
-            qCritical() << "QML object creation failed";
-            QCoreApplication::exit(-1);
-        },
+        []() { QCoreApplication::exit(-1); },
         Qt::QueuedConnection);
 
     engine.loadFromModule("Findex", "Main");
 
-    if (engine.rootObjects().isEmpty()) {
-        qCritical() << "No root objects loaded";
+    if (engine.rootObjects().isEmpty())
         return -1;
-    }
 
     return app.exec();
 }

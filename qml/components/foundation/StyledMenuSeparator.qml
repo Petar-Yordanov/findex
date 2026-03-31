@@ -1,28 +1,22 @@
 import QtQuick
-import QtQuick.Controls
 import "../theme" as Theme
 
-MenuSeparator {
+Item {
     id: control
 
     property bool darkTheme: Theme.AppTheme.isDark
 
-    implicitWidth: Theme.Metrics.menuWidth
-    implicitHeight: 10
-    padding: 0
+    width: parent && parent.width > 0 ? parent.width : implicitWidth
+    implicitWidth: 184
+    implicitHeight: 8
 
-    contentItem: Item {
-        implicitWidth: Theme.Metrics.menuWidth
-        implicitHeight: 10
-
-        Rectangle {
-            anchors.verticalCenter: parent.verticalCenter
-            x: 12
-            width: parent.width - 24
-            height: 1
-            color: Theme.AppTheme.separator
-        }
+    Rectangle {
+        anchors.left: parent.left
+        anchors.right: parent.right
+        anchors.leftMargin: 10
+        anchors.rightMargin: 10
+        anchors.verticalCenter: parent.verticalCenter
+        height: 1
+        color: Theme.AppTheme.separator
     }
-
-    background: Item {}
 }

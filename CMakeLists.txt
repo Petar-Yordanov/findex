@@ -7,40 +7,49 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 find_package(Qt6 REQUIRED COMPONENTS Quick Qml QuickControls2)
 
-if(UNIX AND NOT APPLE)
-    find_package(PkgConfig REQUIRED)
-    pkg_check_modules(GIO REQUIRED IMPORTED_TARGET gio-2.0)
-endif()
-
 qt_standard_project_setup(REQUIRES 6.10)
 
 qt_add_executable(Findex
     main.cpp
 
-    FileAssociationService.cpp
-    FileAssociationService.h
-    FileManagerBridge.cpp
-    FileManagerBridge.h
+    ApplicationSettings.cpp
+    ApplicationSettings.h
 
-    FileManagerSessionService.cpp
-    FileManagerSessionService.h
-    FileManagerNavigationService.cpp
-    FileManagerNavigationService.h
-    FileManagerFileOpsService.cpp
-    FileManagerFileOpsService.h
-    FileManagerSearchService.cpp
-    FileManagerSearchService.h
-    FileManagerSidebarService.cpp
-    FileManagerSidebarService.h
+    sidebar/DriveListModel.cpp
+    sidebar/DriveListModel.h
+    sidebar/SidebarItemData.cpp
+    sidebar/SidebarItemData.h
+    sidebar/SidebarTreeItem.cpp
+    sidebar/SidebarTreeItem.h
+    sidebar/SidebarTreeModel.cpp
+    sidebar/SidebarTreeModel.h
+    sidebar/SidebarViewModel.cpp
+    sidebar/SidebarViewModel.h
+
+    navigation/NavigationBreadcrumbModel.cpp
+    navigation/NavigationBreadcrumbModel.h
+    navigation/NavigationViewModel.cpp
+    navigation/NavigationViewModel.h
+
+    toolbar/CommandBarViewModel.cpp
+    toolbar/CommandBarViewModel.h
+
+    tabs/TabListModel.h
+    tabs/TabListModel.cpp
+    tabs/TabsViewModel.h
+    tabs/TabsViewModel.cpp
+
+    preview/PreviewPaneViewModel.h
+    preview/PreviewPaneViewModel.cpp
+
+    statusbar/StatusBarViewModel.h
+    statusbar/StatusBarViewModel.cpp
+
+    workspace/FileListModel.h
+    workspace/FileListModel.cpp
+    workspace/WorkspaceViewModel.h
+    workspace/WorkspaceViewModel.cpp
 )
-
-if(WIN32)
-    target_sources(Findex PRIVATE FileAssociationService_win.cpp appicon.rc)
-elseif(APPLE)
-    target_sources(Findex PRIVATE FileAssociationService_mac.cpp)
-elseif(UNIX)
-    target_sources(Findex PRIVATE FileAssociationService_linux.cpp)
-endif()
 
 target_include_directories(Findex PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}
@@ -48,9 +57,21 @@ target_include_directories(Findex PRIVATE
 
 qt_add_qml_module(Findex
     URI Findex
+    VERSION 1.0
 
     QML_FILES
         qml/Main.qml
+
+        qml/app/layout/AppShell.qml
+        qml/app/layout/SplitWorkspace.qml
+        qml/app/runtime/AppOverlays.qml
+        qml/app/sidebar/SidebarContextMenu.qml
+        qml/app/sidebar/SidebarItem.qml
+        qml/app/sidebar/SidebarTreePane.qml
+        qml/app/sidebar/DriveListPane.qml
+        qml/app/topbar/NavigationBar.qml
+        qml/app/topbar/CommandBar.qml
+
         qml/components/foundation/AppIcon.qml
         qml/components/foundation/ExplorerScrollbarH.qml
         qml/components/foundation/ExplorerScrollbarV.qml
@@ -68,20 +89,6 @@ qt_add_qml_module(Findex
         qml/components/theme/AppTheme.qml
         qml/components/theme/Metrics.qml
         qml/components/theme/Typography.qml
-
-        qml/shared/menus/ViewModeMenu.qml
-        qml/shared/menus/ThemeMenu.qml
-        qml/shared/menus/OpenWithMenu.qml
-        qml/shared/menus/CopyPathsMenu.qml
-        qml/shared/menus/SortByMenu.qml
-        qml/shared/menus/CreateMenu.qml
-
-        qml/features/files/FileContextMenu.qml
-        qml/features/files/MultiFileContextMenu.qml
-        qml/features/files/EmptyAreaContextMenu.qml
-        qml/features/sidebar/SidebarContextMenu.qml
-        qml/features/tabs/TabContextMenu.qml
-        qml/features/breadcrumb/BreadcrumbContextMenu.qml
 
     RESOURCES
         assets/icons/light/add.png
@@ -131,6 +138,7 @@ qt_add_qml_module(Findex
         assets/icons/light/music-note.png
         assets/icons/light/notifications.png
         assets/icons/light/picture-as-pdf.png
+        assets/icons/light/preview.png
         assets/icons/light/refresh.png
         assets/icons/light/save.png
         assets/icons/light/search.png
@@ -146,7 +154,6 @@ qt_add_qml_module(Findex
         assets/icons/light/view-list-alt.png
         assets/icons/light/visibility.png
         assets/icons/light/zip.png
-        assets/icons/light/preview.png
 
         assets/icons/dark/add.png
         assets/icons/dark/add-to-drive.png
@@ -195,6 +202,7 @@ qt_add_qml_module(Findex
         assets/icons/dark/music-note.png
         assets/icons/dark/notifications.png
         assets/icons/dark/picture-as-pdf.png
+        assets/icons/dark/preview.png
         assets/icons/dark/refresh.png
         assets/icons/dark/save.png
         assets/icons/dark/search.png
@@ -210,61 +218,23 @@ qt_add_qml_module(Findex
         assets/icons/dark/view-list-alt.png
         assets/icons/dark/visibility.png
         assets/icons/dark/zip.png
-        assets/icons/dark/preview.png
-
-        SOURCES FileManagerBridge.h FileManagerBridge.cpp
-        SOURCES FileManagerSessionService.h FileManagerSessionService.cpp
-        SOURCES FileManagerNavigationService.h FileManagerNavigationService.cpp
-        SOURCES FileManagerFileOpsService.h FileManagerFileOpsService.cpp
-        SOURCES FileManagerSearchService.h FileManagerSearchService.cpp
-        SOURCES FileManagerSidebarService.h FileManagerSidebarService.cpp
-        RESOURCES qml/components/theme/qmldir
-        RESOURCES assets/icons/findex-color.png assets/icons/findex-plain.png
-        RESOURCES appicon.rc
-        RESOURCES findex.desktop
-        QML_FILES qml/features/views/DetailsFileView.qml
-        QML_FILES qml/features/views/TilesFileView.qml
-        QML_FILES qml/features/views/CompactFileView.qml
-        QML_FILES qml/features/views/LargeIconsFileView.qml
-        QML_FILES qml/shared/menus/MoreActionsMenu.qml
-        QML_FILES qml/shared/popups/NotificationsPopup.qml
-        QML_FILES qml/shared/dialogs/ConfirmDialog.qml
-        QML_FILES qml/shared/cards/DriveCard.qml
-        QML_FILES qml/features/sidebar/DriveListPane.qml
-        QML_FILES qml/features/sidebar/SidebarItem.qml
-        QML_FILES qml/features/sidebar/SidebarTreePane.qml
-        QML_FILES qml/features/breadcrumb/BreadcrumbItem.qml
-        QML_FILES qml/features/breadcrumb/BreadcrumbBar.qml
-        QML_FILES qml/shared/headers/ResizableHeaderCell.qml
-        QML_FILES qml/shared/headers/DetailsHeaderBar.qml
-        QML_FILES qml/shared/panels/PreviewPane.qml
-        QML_FILES qml/features/files/FileDragPreview.qml
-        QML_FILES qml/features/tabs/TabButton.qml
-        QML_FILES qml/features/tabs/TabStrip.qml
-        QML_FILES qml/shared/popups/SearchScopePopup.qml
-        QML_FILES qml/shared/headers/AppTitleBar.qml
-        QML_FILES
-        QML_FILES
-        QML_FILES qml/shared/panels/WorkspaceArea.qml
-        QML_FILES qml/features/files/FileAreaContextMenu.qml
-        QML_FILES
-        QML_FILES qml/shared/layout/NavigationBar.qml
-        QML_FILES qml/shared/layout/CommandBar.qml
-        QML_FILES qml/shared/layout/SplitWorkspace.qml
-        QML_FILES qml/shared/runtime/AppModels.qml
-        QML_FILES qml/shared/runtime/AppOverlays.qml
-        QML_FILES qml/shared/layout/AppShell.qml
-        QML_FILES qml/shared/layout/WindowResizeHandles.qml
-        QML_FILES qml/shared/popups/ToastOverlay.qml
-        SOURCES ApplicationSettings.h ApplicationSettings.cpp
-)
-
-set_target_properties(Findex PROPERTIES
-    MACOSX_BUNDLE_BUNDLE_VERSION ${PROJECT_VERSION}
-    MACOSX_BUNDLE_SHORT_VERSION_STRING ${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}
-    MACOSX_BUNDLE TRUE
-    WIN32_EXECUTABLE TRUE
-    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+        qml/components/theme/qmldir
+        SOURCES tabs/TabsViewModel.h tabs/TabsViewModel.cpp
+        QML_FILES qml/app/titlebar/AppTitleBar.qml
+        QML_FILES qml/app/titlebar/TabContextMenu.qml
+        QML_FILES qml/app/titlebar/tabs/TabStrip.qml
+        QML_FILES qml/app/titlebar/tabs/TabButton.qml
+        SOURCES preview/PreviewPaneViewModel.h preview/PreviewPaneViewModel.cpp
+        SOURCES statusbar/StatusBarViewModel.h statusbar/StatusBarViewModel.cpp
+        QML_FILES qml/app/preview/PreviewPane.qml
+        QML_FILES qml/app/statusbar/StatusBar.qml
+        QML_FILES qml/app/statusbar/NotificationsPopup.qml
+        SOURCES workspace/FileListModel.h workspace/FileListModel.cpp
+        SOURCES workspace/WorkspaceViewModel.h workspace/WorkspaceViewModel.cpp
+        QML_FILES qml/app/files/DetailsFileView.qml
+        QML_FILES qml/app/files/TilesFileView.qml
+        QML_FILES qml/app/files/CompactFileView.qml
+        QML_FILES qml/app/files/LargeIconsFileView.qml
 )
 
 target_link_libraries(Findex
@@ -274,25 +244,11 @@ target_link_libraries(Findex
         Qt6::QuickControls2
 )
 
-if(WIN32)
-    target_link_libraries(Findex PRIVATE
-        Shlwapi
-        Advapi32
-    )
-endif()
-
-if(APPLE)
-    target_link_libraries(Findex PRIVATE
-        "-framework CoreFoundation"
-        "-framework CoreServices"
-    )
-endif()
-
-if(UNIX AND NOT APPLE)
-    target_link_libraries(Findex PRIVATE
-        PkgConfig::GIO
-    )
-endif()
+set_target_properties(Findex PROPERTIES
+    MACOSX_BUNDLE TRUE
+    WIN32_EXECUTABLE TRUE
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
+)
 
 include(GNUInstallDirs)
 
@@ -300,9 +256,3 @@ install(TARGETS Findex
     BUNDLE DESTINATION .
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-
-qt_generate_deploy_qml_app_script(
-    TARGET Findex
-    OUTPUT_SCRIPT deploy_script
-)
-install(SCRIPT ${deploy_script})

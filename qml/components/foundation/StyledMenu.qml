@@ -2,17 +2,31 @@ import QtQuick
 import QtQuick.Controls
 import "../theme" as Theme
 
-Menu {
+Popup {
     id: control
 
     property bool darkTheme: Theme.AppTheme.isDark
+    property int menuWidth: 184
+    property int edgeMargin: 6
 
-    implicitWidth: Theme.Metrics.menuWidth
-    leftPadding: Theme.Metrics.spacingMd
-    rightPadding: Theme.Metrics.spacingMd
-    topPadding: Theme.Metrics.spacingMd
-    bottomPadding: Theme.Metrics.spacingMd
-    overlap: 2
+    default property alias contentData: menuColumn.data
+
+    modal: false
+    focus: true
+
+    padding: 8
+    topPadding: 8
+    bottomPadding: 8
+    leftPadding: 8
+    rightPadding: 8
+    margins: 0
+
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
+    width: menuWidth + leftPadding + rightPadding
+    implicitWidth: width
+    implicitHeight: menuColumn.childrenRect.height + topPadding + bottomPadding
+    height: implicitHeight
 
     background: Rectangle {
         radius: Theme.Metrics.radiusLg
@@ -21,5 +35,30 @@ Menu {
         border.width: Theme.Metrics.borderWidth
     }
 
-    delegate: StyledMenuItem {}
+    contentItem: Column {
+        id: menuColumn
+        width: control.menuWidth
+        spacing: 0
+    }
+
+    function popupAt(px, py) {
+        var popupWidth = control.width
+        var popupHeight = control.implicitHeight
+
+        var nextX = px + 2
+        var nextY = py + 2
+
+        if (parent) {
+            nextX = Math.max(edgeMargin, Math.min(nextX, parent.width - popupWidth - edgeMargin))
+            nextY = Math.max(edgeMargin, Math.min(nextY, parent.height - popupHeight - edgeMargin))
+        }
+
+        x = nextX
+        y = nextY
+        open()
+    }
+
+    function popup() {
+        open()
+    }
 }
