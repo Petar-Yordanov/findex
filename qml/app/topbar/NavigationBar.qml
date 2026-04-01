@@ -8,6 +8,7 @@ import "../../components/theme" as Theme
 Rectangle {
     id: navBar
 
+    required property var rootWindow
     required property var viewModel
     required property var breadcrumbContextMenu
 

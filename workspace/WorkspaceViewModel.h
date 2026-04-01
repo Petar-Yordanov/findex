@@ -27,6 +27,12 @@ class WorkspaceViewModel final : public QObject
     Q_PROPERTY(QVariantList draggedItems READ draggedItems NOTIFY draggingItemsChanged)
     Q_PROPERTY(QString draggedPathsText READ draggedPathsText NOTIFY draggingItemsChanged)
 
+    Q_PROPERTY(bool dragPreviewVisible READ dragPreviewVisible NOTIFY dragPreviewChanged)
+    Q_PROPERTY(qreal dragPreviewX READ dragPreviewX NOTIFY dragPreviewChanged)
+    Q_PROPERTY(qreal dragPreviewY READ dragPreviewY NOTIFY dragPreviewChanged)
+    Q_PROPERTY(QString dragPreviewText READ dragPreviewText NOTIFY dragPreviewChanged)
+    Q_PROPERTY(QString dragPreviewIcon READ dragPreviewIcon NOTIFY dragPreviewChanged)
+
 public:
     explicit WorkspaceViewModel(QObject* parent = nullptr);
 
@@ -46,6 +52,12 @@ public:
     bool draggingItems() const;
     QVariantList draggedItems() const;
     QString draggedPathsText() const;
+
+    bool dragPreviewVisible() const;
+    qreal dragPreviewX() const;
+    qreal dragPreviewY() const;
+    QString dragPreviewText() const;
+    QString dragPreviewIcon() const;
 
     Q_INVOKABLE void setViewMode(const QString& value);
     Q_INVOKABLE void activateRow(int row);
@@ -72,6 +84,10 @@ public:
     Q_INVOKABLE void requestDropToPath(const QString& targetPath, const QString& targetKind);
     Q_INVOKABLE bool isOnlyDraggingRow(int row) const;
 
+    Q_INVOKABLE void beginFileDragPreview(qreal sceneX, qreal sceneY, const QString& text, const QString& icon);
+    Q_INVOKABLE void updateFileDragPreview(qreal sceneX, qreal sceneY);
+    Q_INVOKABLE void endFileDragPreview();
+
 signals:
     void viewModeChanged();
     void currentIndexChanged();
@@ -83,6 +99,7 @@ signals:
 
     void currentDirectoryPathChanged();
     void draggingItemsChanged();
+    void dragPreviewChanged();
 
     void openFileRequested(const QVariantMap& fileData);
     void openDirectoryRequested(const QVariantMap& directoryData);
@@ -98,6 +115,7 @@ private:
     QVariantList buildDraggedItems() const;
     bool isValidRow(int row) const;
     void clearDragState();
+    void clearDragPreview();
 
 private:
     ApplicationSettings m_settings;
@@ -112,4 +130,10 @@ private:
     QString m_currentDirectoryPath = QStringLiteral("C:/Projects/Findex");
     bool m_draggingItems = false;
     QVariantList m_draggedItems;
+
+    bool m_dragPreviewVisible = false;
+    qreal m_dragPreviewX = 0.0;
+    qreal m_dragPreviewY = 0.0;
+    QString m_dragPreviewText;
+    QString m_dragPreviewIcon = QStringLiteral("insert-drive-file");
 };

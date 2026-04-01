@@ -55,25 +55,24 @@ Window {
 
     Layout.AppShell {
         anchors.fill: parent
+
         rootWindow: root
 
         sidebarViewModel: root.sidebarVm
-        sidebarContextMenu: overlays.sidebarContextMenu
-
         navigationViewModel: root.navigationVm
         commandBarViewModel: root.commandBarVm
         tabsViewModel: root.tabsVm
+        previewViewModel: root.previewPaneVm
+        statusBarViewModel: root.statusBarVm
         workspaceViewModel: root.workspaceVm
 
-        tabContextMenu: overlays.tabContextMenu
-        breadcrumbContextMenu: overlays.breadcrumbContextMenu
         createMenu: overlays.createMenu
         moreActionsMenu: overlays.moreActionsMenu
         viewModeMenu: overlays.viewModeMenu
         themeMenu: overlays.themeMenu
-
-        previewViewModel: root.previewPaneVm
-        statusBarViewModel: root.statusBarVm
+        breadcrumbContextMenu: overlays.breadcrumbContextMenu
+        tabContextMenu: overlays.tabContextMenu
+        sidebarContextMenu: overlays.sidebarContextMenu
         notificationsPopup: overlays.notificationsPopup
     }
 }

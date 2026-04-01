@@ -121,6 +121,31 @@ QString WorkspaceViewModel::draggedPathsText() const
     return paths.join(QLatin1Char('\n'));
 }
 
+bool WorkspaceViewModel::dragPreviewVisible() const
+{
+    return m_dragPreviewVisible;
+}
+
+qreal WorkspaceViewModel::dragPreviewX() const
+{
+    return m_dragPreviewX;
+}
+
+qreal WorkspaceViewModel::dragPreviewY() const
+{
+    return m_dragPreviewY;
+}
+
+QString WorkspaceViewModel::dragPreviewText() const
+{
+    return m_dragPreviewText;
+}
+
+QString WorkspaceViewModel::dragPreviewIcon() const
+{
+    return m_dragPreviewIcon;
+}
+
 void WorkspaceViewModel::setViewMode(const QString& value)
 {
     const QString resolved = normalizeViewMode(value);
@@ -517,6 +542,54 @@ bool WorkspaceViewModel::isOnlyDraggingRow(int row) const
     return rowPath.compare(draggedPath, Qt::CaseInsensitive) == 0;
 }
 
+void WorkspaceViewModel::beginFileDragPreview(qreal sceneX, qreal sceneY, const QString& text, const QString& icon)
+{
+    const QString resolvedText = text.trimmed();
+    const QString resolvedIcon = icon.trimmed().isEmpty()
+                                     ? QStringLiteral("insert-drive-file")
+                                     : icon.trimmed();
+
+    const bool changed =
+        !m_dragPreviewVisible
+        || !qFuzzyCompare(m_dragPreviewX + 1.0, sceneX + 1.0)
+        || !qFuzzyCompare(m_dragPreviewY + 1.0, sceneY + 1.0)
+        || m_dragPreviewText != resolvedText
+        || m_dragPreviewIcon != resolvedIcon;
+
+    m_dragPreviewVisible = true;
+    m_dragPreviewX = sceneX;
+    m_dragPreviewY = sceneY;
+    m_dragPreviewText = resolvedText;
+    m_dragPreviewIcon = resolvedIcon;
+
+    if (changed)
+        emit dragPreviewChanged();
+}
+
+void WorkspaceViewModel::updateFileDragPreview(qreal sceneX, qreal sceneY)
+{
+    if (!m_dragPreviewVisible)
+        return;
+
+    if (qFuzzyCompare(m_dragPreviewX + 1.0, sceneX + 1.0)
+        && qFuzzyCompare(m_dragPreviewY + 1.0, sceneY + 1.0))
+    {
+        return;
+    }
+
+    m_dragPreviewX = sceneX;
+    m_dragPreviewY = sceneY;
+    emit dragPreviewChanged();
+}
+
+void WorkspaceViewModel::endFileDragPreview()
+{
+    if (!m_dragPreviewVisible)
+        return;
+
+    clearDragPreview();
+}
+
 QString WorkspaceViewModel::normalizeViewMode(const QString& value) const
 {
     const QString trimmed = value.trimmed();
@@ -637,6 +710,27 @@ void WorkspaceViewModel::clearDragState()
     m_draggingItems = false;
     m_draggedItems.clear();
 
+    clearDragPreview();
+
     if (wasDragging)
         emit draggingItemsChanged();
+}
+
+void WorkspaceViewModel::clearDragPreview()
+{
+    const bool hadPreview =
+        m_dragPreviewVisible
+        || !m_dragPreviewText.isEmpty()
+        || !m_dragPreviewIcon.isEmpty()
+        || !qFuzzyIsNull(m_dragPreviewX)
+        || !qFuzzyIsNull(m_dragPreviewY);
+
+    m_dragPreviewVisible = false;
+    m_dragPreviewX = 0.0;
+    m_dragPreviewY = 0.0;
+    m_dragPreviewText.clear();
+    m_dragPreviewIcon = QStringLiteral("insert-drive-file");
+
+    if (hadPreview)
+        emit dragPreviewChanged();
 }

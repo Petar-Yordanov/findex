@@ -325,11 +325,14 @@ Rectangle {
                 Item {
                     id: dragProxy
                     visible: false
+                    width: 1
+                    height: 1
+
                     Drag.active: mouseArea.fileDragActive
-                    Drag.dragType: Drag.Automatic
+                    Drag.dragType: Drag.Internal
                     Drag.supportedActions: Qt.MoveAction
-                    Drag.hotSpot.x: 16
-                    Drag.hotSpot.y: 16
+                    Drag.hotSpot.x: mouseArea.pressX
+                    Drag.hotSpot.y: mouseArea.pressY
                     Drag.mimeData: {
                         "text/plain": viewModel ? viewModel.draggedPathsText : ""
                     }
@@ -451,6 +454,22 @@ Rectangle {
                     property real pressX: 0
                     property real pressY: 0
 
+                    function dragPreviewText() {
+                        if (!viewModel)
+                            return name
+                        return viewModel.selectedItems > 1 ? (viewModel.selectedItems + " items") : name
+                    }
+
+                    function pushDragPreview(mouse) {
+                        if (!viewModel)
+                            return
+                        var p = mouseArea.mapToItem(null, mouse.x, mouse.y)
+                        if (!viewModel.dragPreviewVisible)
+                            viewModel.beginFileDragPreview(p.x, p.y, dragPreviewText(), icon)
+                        else
+                            viewModel.updateFileDragPreview(p.x, p.y)
+                    }
+
                     onPressed: function(mouse) {
                         if (mouse.button !== Qt.LeftButton)
                             return
@@ -460,8 +479,6 @@ Rectangle {
                             dragStarted = false
                             suppressNextClick = false
                             pressStartedOnSelectedItem = false
-                            dragProxy.x = 0
-                            dragProxy.y = 0
                             mouse.accepted = false
                             return
                         }
@@ -500,12 +517,12 @@ Rectangle {
 
                             fileDragActive = true
                         }
+
+                        if (fileDragActive)
+                            pushDragPreview(mouse)
                     }
 
                     onReleased: function(mouse) {
-                        dragProxy.x = 0
-                        dragProxy.y = 0
-
                         if (mouse.button !== Qt.LeftButton)
                             return
 
@@ -526,8 +543,6 @@ Rectangle {
                     }
 
                     onCanceled: {
-                        dragProxy.x = 0
-                        dragProxy.y = 0
                         fileDragActive = false
                         dragStarted = false
                         suppressNextClick = false

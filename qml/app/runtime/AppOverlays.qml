@@ -53,7 +53,7 @@ Item {
             text: "New folder"
             darkTheme: Theme.AppTheme.isDark
             onTriggered: {
-                if (root.rootWindow.commandBarVm && root.rootWindow.commandBarVm.createFolder)
+                if (root.rootWindow.commandBarVm)
                     root.rootWindow.commandBarVm.createFolder()
                 createMenu.close()
             }
@@ -63,7 +63,7 @@ Item {
             text: "New file"
             darkTheme: Theme.AppTheme.isDark
             onTriggered: {
-                if (root.rootWindow.commandBarVm && root.rootWindow.commandBarVm.createFile)
+                if (root.rootWindow.commandBarVm)
                     root.rootWindow.commandBarVm.createFile()
                 createMenu.close()
             }

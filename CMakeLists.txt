@@ -235,6 +235,7 @@ qt_add_qml_module(Findex
         QML_FILES qml/app/files/TilesFileView.qml
         QML_FILES qml/app/files/CompactFileView.qml
         QML_FILES qml/app/files/LargeIconsFileView.qml
+        QML_FILES
 )
 
 target_link_libraries(Findex

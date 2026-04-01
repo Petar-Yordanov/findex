@@ -12,7 +12,7 @@ Rectangle {
     required property var moreActionsMenu
     required property var viewModeMenu
     required property var themeMenu
-    required property var previewPaneViewModel
+    required property var previewViewModel
 
     color: Theme.AppTheme.surface2
     border.color: Theme.AppTheme.borderSoft
@@ -69,7 +69,7 @@ Rectangle {
             tooltipText: "Cut"
             darkTheme: Theme.AppTheme.isDark
             onClicked: {
-                if (commandBar.viewModel && commandBar.viewModel.cutSelection)
+                if (commandBar.viewModel)
                     commandBar.viewModel.cutSelection()
             }
         }
@@ -79,7 +79,7 @@ Rectangle {
             tooltipText: "Copy"
             darkTheme: Theme.AppTheme.isDark
             onClicked: {
-                if (commandBar.viewModel && commandBar.viewModel.copySelection)
+                if (commandBar.viewModel)
                     commandBar.viewModel.copySelection()
             }
         }
@@ -89,7 +89,7 @@ Rectangle {
             tooltipText: "Paste"
             darkTheme: Theme.AppTheme.isDark
             onClicked: {
-                if (commandBar.viewModel && commandBar.viewModel.paste)
+                if (commandBar.viewModel)
                     commandBar.viewModel.paste()
             }
         }
@@ -99,7 +99,7 @@ Rectangle {
             tooltipText: "Rename"
             darkTheme: Theme.AppTheme.isDark
             onClicked: {
-                if (commandBar.viewModel && commandBar.viewModel.renameSelection)
+                if (commandBar.viewModel)
                     commandBar.viewModel.renameSelection()
             }
         }
@@ -109,7 +109,7 @@ Rectangle {
             tooltipText: "Delete"
             darkTheme: Theme.AppTheme.isDark
             onClicked: {
-                if (commandBar.viewModel && commandBar.viewModel.deleteSelection)
+                if (commandBar.viewModel)
                     commandBar.viewModel.deleteSelection()
             }
         }
@@ -119,7 +119,7 @@ Rectangle {
             tooltipText: "Refresh"
             darkTheme: Theme.AppTheme.isDark
             onClicked: {
-                if (commandBar.viewModel && commandBar.viewModel.refresh)
+                if (commandBar.viewModel)
                     commandBar.viewModel.refresh()
             }
         }
@@ -153,7 +153,7 @@ Rectangle {
             height: Theme.Metrics.controlHeightLg
             radius: 9
 
-            color: commandBar.previewPaneViewModel && commandBar.previewPaneViewModel.previewEnabled
+            color: commandBar.previewViewModel && commandBar.previewViewModel.previewEnabled
                 ? (Theme.AppTheme.isDark ? "#243249" : "#e3edff")
                 : (previewToolbarMouse.pressed
                     ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
@@ -161,7 +161,7 @@ Rectangle {
                         ? (Theme.AppTheme.isDark ? "#2d3748" : "#dce8fb")
                         : (Theme.AppTheme.isDark ? "#1d2431" : "#fafbfc"))
 
-            border.color: commandBar.previewPaneViewModel && commandBar.previewPaneViewModel.previewEnabled
+            border.color: commandBar.previewViewModel && commandBar.previewViewModel.previewEnabled
                 ? Theme.AppTheme.accent
                 : Theme.AppTheme.border
             border.width: Theme.Metrics.borderWidth
@@ -180,7 +180,7 @@ Rectangle {
                     text: "Preview"
                     color: Theme.AppTheme.text
                     font.pixelSize: Theme.Typography.body
-                    font.bold: !!(commandBar.previewPaneViewModel && commandBar.previewPaneViewModel.previewEnabled)
+                    font.bold: !!(commandBar.previewViewModel && commandBar.previewViewModel.previewEnabled)
                 }
             }
 
@@ -190,8 +190,8 @@ Rectangle {
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton
                 onClicked: {
-                    if (commandBar.previewPaneViewModel)
-                        commandBar.previewPaneViewModel.togglePreviewEnabled()
+                    if (commandBar.previewViewModel)
+                        commandBar.previewViewModel.togglePreviewEnabled()
                 }
             }
         }
