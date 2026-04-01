@@ -99,18 +99,19 @@ Rectangle {
             id: dragBadge
             visible: dragOverlayLayer.visible
 
-            property real cursorOffsetX: 14
             property real edgePadding: 8
+            property real iconAnchorX: 18
+            property real iconAnchorY: height / 2
 
             x: {
                 const cursorX = shell.workspaceViewModel ? shell.workspaceViewModel.dragPreviewX : 0
-                const rawX = cursorX + cursorOffsetX
+                const rawX = cursorX - iconAnchorX
                 return Math.max(edgePadding, Math.min(rawX, dragOverlayLayer.width - width - edgePadding))
             }
 
             y: {
                 const cursorY = shell.workspaceViewModel ? shell.workspaceViewModel.dragPreviewY : 0
-                const rawY = cursorY - height / 2
+                const rawY = cursorY - iconAnchorY
                 return Math.max(edgePadding, Math.min(rawY, dragOverlayLayer.height - height - edgePadding))
             }
 
