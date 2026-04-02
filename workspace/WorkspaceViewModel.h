@@ -84,9 +84,11 @@ public:
     Q_INVOKABLE void requestDropToPath(const QString& targetPath, const QString& targetKind);
     Q_INVOKABLE bool isOnlyDraggingRow(int row) const;
 
-    Q_INVOKABLE void beginFileDragPreview(qreal sceneX, qreal sceneY, const QString& text, const QString& icon);
-    Q_INVOKABLE void updateFileDragPreview(qreal sceneX, qreal sceneY);
+    Q_INVOKABLE void beginFileDragPreview(qreal overlayX, qreal overlayY, const QString& text, const QString& icon);
+    Q_INVOKABLE void updateFileDragPreview(qreal overlayX, qreal overlayY);
     Q_INVOKABLE void endFileDragPreview();
+
+    Q_INVOKABLE void requestFileContextAction(const QString& action, int row);
 
 signals:
     void viewModeChanged();
@@ -105,6 +107,8 @@ signals:
     void openDirectoryRequested(const QVariantMap& directoryData);
 
     void fileDropRequested(const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind);
+    void fileContextActionRequested(const QString& action, const QVariantMap& item);
+    void fileDragFinished(bool accepted, const QString& targetPath, const QString& targetKind);
 
 private:
     QString normalizeViewMode(const QString& value) const;
@@ -136,4 +140,7 @@ private:
     qreal m_dragPreviewY = 0.0;
     QString m_dragPreviewText;
     QString m_dragPreviewIcon = QStringLiteral("insert-drive-file");
+
+    QString m_lastDropTargetPath;
+    QString m_lastDropTargetKind;
 };

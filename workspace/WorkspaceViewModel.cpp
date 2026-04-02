@@ -452,6 +452,8 @@ void WorkspaceViewModel::startFileDrag(int row, int modifiers)
         return;
 
     m_draggedItems = nextDraggedItems;
+    m_lastDropTargetPath.clear();
+    m_lastDropTargetKind.clear();
 
     if (m_draggingItems)
         return;
@@ -465,7 +467,11 @@ void WorkspaceViewModel::finishFileDrag(bool accepted)
     if (!m_draggingItems)
         return;
 
-    Q_UNUSED(accepted);
+    emit fileDragFinished(
+        accepted,
+        accepted ? m_lastDropTargetPath : QString(),
+        accepted ? m_lastDropTargetKind : QString());
+
     clearDragState();
 }
 
@@ -474,6 +480,7 @@ void WorkspaceViewModel::cancelFileDrag()
     if (!m_draggingItems)
         return;
 
+    emit fileDragFinished(false, QString(), QString());
     clearDragState();
 }
 
@@ -525,10 +532,13 @@ void WorkspaceViewModel::requestDropToPath(const QString& targetPath, const QStr
     if (!canDropToPath(targetPath))
         return;
 
+    m_lastDropTargetPath = targetPath;
+    m_lastDropTargetKind = targetKind.trimmed().isEmpty() ? QStringLiteral("path") : targetKind;
+
     emit fileDropRequested(
         m_draggedItems,
-        targetPath,
-        targetKind.trimmed().isEmpty() ? QStringLiteral("path") : targetKind);
+        m_lastDropTargetPath,
+        m_lastDropTargetKind);
 }
 
 bool WorkspaceViewModel::isOnlyDraggingRow(int row) const
@@ -542,7 +552,7 @@ bool WorkspaceViewModel::isOnlyDraggingRow(int row) const
     return rowPath.compare(draggedPath, Qt::CaseInsensitive) == 0;
 }
 
-void WorkspaceViewModel::beginFileDragPreview(qreal sceneX, qreal sceneY, const QString& text, const QString& icon)
+void WorkspaceViewModel::beginFileDragPreview(qreal overlayX, qreal overlayY, const QString& text, const QString& icon)
 {
     const QString resolvedText = text.trimmed();
     const QString resolvedIcon = icon.trimmed().isEmpty()
@@ -551,14 +561,14 @@ void WorkspaceViewModel::beginFileDragPreview(qreal sceneX, qreal sceneY, const 
 
     const bool changed =
         !m_dragPreviewVisible
-        || !qFuzzyCompare(m_dragPreviewX + 1.0, sceneX + 1.0)
-        || !qFuzzyCompare(m_dragPreviewY + 1.0, sceneY + 1.0)
+        || !qFuzzyCompare(m_dragPreviewX + 1.0, overlayX + 1.0)
+        || !qFuzzyCompare(m_dragPreviewY + 1.0, overlayY + 1.0)
         || m_dragPreviewText != resolvedText
         || m_dragPreviewIcon != resolvedIcon;
 
     m_dragPreviewVisible = true;
-    m_dragPreviewX = sceneX;
-    m_dragPreviewY = sceneY;
+    m_dragPreviewX = overlayX;
+    m_dragPreviewY = overlayY;
     m_dragPreviewText = resolvedText;
     m_dragPreviewIcon = resolvedIcon;
 
@@ -566,19 +576,19 @@ void WorkspaceViewModel::beginFileDragPreview(qreal sceneX, qreal sceneY, const 
         emit dragPreviewChanged();
 }
 
-void WorkspaceViewModel::updateFileDragPreview(qreal sceneX, qreal sceneY)
+void WorkspaceViewModel::updateFileDragPreview(qreal overlayX, qreal overlayY)
 {
     if (!m_dragPreviewVisible)
         return;
 
-    if (qFuzzyCompare(m_dragPreviewX + 1.0, sceneX + 1.0)
-        && qFuzzyCompare(m_dragPreviewY + 1.0, sceneY + 1.0))
+    if (qFuzzyCompare(m_dragPreviewX + 1.0, overlayX + 1.0)
+        && qFuzzyCompare(m_dragPreviewY + 1.0, overlayY + 1.0))
     {
         return;
     }
 
-    m_dragPreviewX = sceneX;
-    m_dragPreviewY = sceneY;
+    m_dragPreviewX = overlayX;
+    m_dragPreviewY = overlayY;
     emit dragPreviewChanged();
 }
 
@@ -709,6 +719,8 @@ void WorkspaceViewModel::clearDragState()
     const bool wasDragging = m_draggingItems;
     m_draggingItems = false;
     m_draggedItems.clear();
+    m_lastDropTargetPath.clear();
+    m_lastDropTargetKind.clear();
 
     clearDragPreview();
 
@@ -733,4 +745,12 @@ void WorkspaceViewModel::clearDragPreview()
 
     if (hadPreview)
         emit dragPreviewChanged();
+}
+
+void WorkspaceViewModel::requestFileContextAction(const QString& action, int row)
+{
+    if (!isValidRow(row))
+        return;
+
+    emit fileContextActionRequested(action.trimmed(), fileAt(row));
 }

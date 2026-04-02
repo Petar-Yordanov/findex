@@ -2,6 +2,7 @@ import QtQuick
 import "../sidebar"
 import "../titlebar"
 import "../statusbar"
+import "../files"
 import "../../components/foundation"
 import "../../components/theme" as Theme
 
@@ -13,10 +14,12 @@ Item {
     required property var sidebarViewModel
     required property var tabsViewModel
     required property var statusBarViewModel
+    required property var workspaceViewModel
 
     property alias sidebarContextMenu: sidebarContextMenu
     property alias breadcrumbContextMenu: breadcrumbContextMenu
     property alias tabContextMenu: tabContextMenu
+    property alias fileContextMenu: fileContextMenu
 
     property alias createMenu: createMenu
     property alias moreActionsMenu: moreActionsMenu
@@ -43,6 +46,11 @@ Item {
     TabContextMenu {
         id: tabContextMenu
         viewModel: root.tabsViewModel
+    }
+
+    FileContextMenu {
+        id: fileContextMenu
+        viewModel: root.workspaceViewModel
     }
 
     StyledMenu {
@@ -214,5 +222,46 @@ Item {
     NotificationsPopup {
         id: notificationsPopup
         viewModel: root.statusBarViewModel
+    }
+
+    Item {
+        anchors.right: parent.right
+        anchors.bottom: parent.bottom
+        anchors.rightMargin: 14
+        anchors.bottomMargin: 42
+        z: 60000
+        width: 360
+        height: parent.height
+        clip: false
+
+        Column {
+            id: toastColumn
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            spacing: Theme.Metrics.spacingSm
+
+            Repeater {
+                model: root.statusBarViewModel ? root.statusBarViewModel.toastNotifications : []
+
+                delegate: NotificationCard {
+                    required property var modelData
+
+                    width: 340
+                    darkTheme: Theme.AppTheme.isDark
+
+                    notificationId: modelData.id
+                    title: modelData.title || ""
+                    kind: modelData.kind || "info"
+                    progress: modelData.progress === undefined ? -1 : modelData.progress
+                    autoClose: modelData.autoClose === undefined ? true : !!modelData.autoClose
+                    done: !!modelData.done
+
+                    onCloseRequested: function(id) {
+                        if (root.statusBarViewModel)
+                            root.statusBarViewModel.dismissToast(id)
+                    }
+                }
+            }
+        }
     }
 }

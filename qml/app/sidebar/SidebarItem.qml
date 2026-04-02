@@ -171,12 +171,12 @@ Item {
                 return
 
             if (viewModel)
-                viewModel.openLocation(itemLabel, itemIcon, itemKind)
+                viewModel.openLocation(itemLabel, itemIcon, itemKind, itemPath)
         }
 
         onPressed: function(mouse) {
             if (mouse.button === Qt.RightButton && !itemSection && viewModel) {
-                viewModel.setContextItem(itemLabel, itemIcon, itemKind)
+                viewModel.setContextItem(itemLabel, itemIcon, itemKind, itemPath)
                 var p = tapArea.mapToItem(sidebarContextMenu.parent, mouse.x, mouse.y)
                 sidebarContextMenu.popupAt(p.x, p.y)
             }

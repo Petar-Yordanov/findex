@@ -18,6 +18,8 @@ Item {
     required property var previewViewModel
     required property var statusBarViewModel
     required property var notificationsPopup
+    required property var fileContextMenu
+    required property var dragOverlayHost
 
     property int sidebarWidth: 286
     property int sidebarMinWidth: 220
@@ -33,22 +35,38 @@ Item {
 
     Component {
         id: detailsViewComponent
-        DetailsFileView { viewModel: splitViewHost.workspaceViewModel }
+        DetailsFileView {
+            viewModel: splitViewHost.workspaceViewModel
+            fileContextMenu: splitViewHost.fileContextMenu
+            dragOverlayHost: splitViewHost.dragOverlayHost
+        }
     }
 
     Component {
         id: tilesViewComponent
-        TilesFileView { viewModel: splitViewHost.workspaceViewModel }
+        TilesFileView {
+            viewModel: splitViewHost.workspaceViewModel
+            fileContextMenu: splitViewHost.fileContextMenu
+            dragOverlayHost: splitViewHost.dragOverlayHost
+        }
     }
 
     Component {
         id: compactViewComponent
-        CompactFileView { viewModel: splitViewHost.workspaceViewModel }
+        CompactFileView {
+            viewModel: splitViewHost.workspaceViewModel
+            fileContextMenu: splitViewHost.fileContextMenu
+            dragOverlayHost: splitViewHost.dragOverlayHost
+        }
     }
 
     Component {
         id: largeIconsViewComponent
-        LargeIconsFileView { viewModel: splitViewHost.workspaceViewModel }
+        LargeIconsFileView {
+            viewModel: splitViewHost.workspaceViewModel
+            fileContextMenu: splitViewHost.fileContextMenu
+            dragOverlayHost: splitViewHost.dragOverlayHost
+        }
     }
 
     Rectangle {

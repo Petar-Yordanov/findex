@@ -44,17 +44,10 @@ Window {
         popup.popupAt(p.x, p.y)
     }
 
-    Runtime.AppOverlays {
-        id: overlays
-        anchors.fill: parent
-        rootWindow: root
-        sidebarViewModel: root.sidebarVm
-        tabsViewModel: root.tabsVm
-        statusBarViewModel: root.statusBarVm
-    }
-
     Layout.AppShell {
+        id: shell
         anchors.fill: parent
+        z: 0
 
         rootWindow: root
 
@@ -74,5 +67,18 @@ Window {
         tabContextMenu: overlays.tabContextMenu
         sidebarContextMenu: overlays.sidebarContextMenu
         notificationsPopup: overlays.notificationsPopup
+        fileContextMenu: overlays.fileContextMenu
+    }
+
+    Runtime.AppOverlays {
+        id: overlays
+        anchors.fill: parent
+        z: 100000
+
+        rootWindow: root
+        sidebarViewModel: root.sidebarVm
+        tabsViewModel: root.tabsVm
+        statusBarViewModel: root.statusBarVm
+        workspaceViewModel: root.workspaceVm
     }
 }

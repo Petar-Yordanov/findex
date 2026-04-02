@@ -2,9 +2,12 @@
 
 #include <QObject>
 #include <QString>
+#include <QFutureWatcher>
+#include <QTimer>
+#include <QVector>
+#include "DriveListModel.h"
 
 class SidebarTreeModel;
-class DriveListModel;
 
 class SidebarViewModel final : public QObject
 {
@@ -16,6 +19,7 @@ class SidebarViewModel final : public QObject
     Q_PROPERTY(QString contextLabel READ contextLabel NOTIFY contextChanged)
     Q_PROPERTY(QString contextIcon READ contextIcon NOTIFY contextChanged)
     Q_PROPERTY(QString contextKind READ contextKind NOTIFY contextChanged)
+    Q_PROPERTY(QString contextPath READ contextPath NOTIFY contextChanged)
 
     Q_PROPERTY(QString hoveredLabel READ hoveredLabel NOTIFY hoveredChanged)
     Q_PROPERTY(QString hoveredKind READ hoveredKind NOTIFY hoveredChanged)
@@ -29,12 +33,13 @@ public:
     QString contextLabel() const;
     QString contextIcon() const;
     QString contextKind() const;
+    QString contextPath() const;
 
     QString hoveredLabel() const;
     QString hoveredKind() const;
 
-    Q_INVOKABLE void openLocation(const QString& label, const QString& icon, const QString& kind);
-    Q_INVOKABLE void setContextItem(const QString& label, const QString& icon, const QString& kind);
+    Q_INVOKABLE void openLocation(const QString& label, const QString& icon, const QString& kind, const QString& path);
+    Q_INVOKABLE void setContextItem(const QString& label, const QString& icon, const QString& kind, const QString& path);
 
     Q_INVOKABLE bool isSelected(const QString& label, const QString& kind) const;
 
@@ -50,12 +55,20 @@ public:
 signals:
     void contextChanged();
     void hoveredChanged();
+    void selectionChanged();
 
-    void openRequested(const QString& label, const QString& icon, const QString& kind);
-    void openInNewTabRequested(const QString& label, const QString& icon, const QString& kind);
-    void copyPathRequested(const QString& label, const QString& kind);
-    void pinRequested(const QString& label, const QString& kind);
-    void propertiesRequested(const QString& label, const QString& kind);
+    void openRequested(const QString& label, const QString& icon, const QString& kind, const QString& path);
+    void openInNewTabRequested(const QString& label, const QString& icon, const QString& kind, const QString& path);
+    void copyPathRequested(const QString& label, const QString& kind, const QString& path);
+    void pinRequested(const QString& label, const QString& kind, const QString& path);
+    void propertiesRequested(const QString& label, const QString& kind, const QString& path);
+
+private:
+    void startDriveRefresh();
+    static QVector<DriveListModel::DriveItem> queryDrives();
+    static QString formatCapacityText(qint64 usedBytes, qint64 totalBytes);
+    static QString driveLabelForPath(const QString& rootPath, const QString& displayName);
+    static QString iconForDrivePath(const QString& rootPath);
 
 private:
     SidebarTreeModel* m_treeModel;
@@ -67,7 +80,11 @@ private:
     QString m_contextLabel;
     QString m_contextIcon;
     QString m_contextKind;
+    QString m_contextPath;
 
     QString m_hoveredLabel;
     QString m_hoveredKind;
+
+    QTimer m_driveRefreshTimer;
+    QFutureWatcher<QVector<DriveListModel::DriveItem>> m_driveWatcher;
 };

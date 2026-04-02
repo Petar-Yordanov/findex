@@ -55,14 +55,13 @@ QHash<int, QByteArray> DriveListModel::roleNames() const
 void DriveListModel::loadDefaults()
 {
     beginResetModel();
-
     m_items.clear();
-    m_items = {
-        { "Local Disk (C:)", "C:/", "hard-drive", 500ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.5 TB used of 1 TB" },
-        { "Data (D:)", "D:/", "storage", 370ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.37 TB used of 1 TB" },
-        { "Backup (E:)", "E:/", "save", 910ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.91 TB used of 1 TB" },
-        { "USB Drive (F:)", "F:/", "usb", 180ll * 1024 * 1024 * 1024, 1000ll * 1024 * 1024 * 1024, "0.18 TB used of 1 TB" }
-    };
+    endResetModel();
+}
 
+void DriveListModel::setDrives(const QVector<DriveItem>& items)
+{
+    beginResetModel();
+    m_items = items;
     endResetModel();
 }

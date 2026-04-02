@@ -49,6 +49,7 @@ public:
 
     Q_INVOKABLE void beginPathEdit();
     Q_INVOKABLE void cancelPathEdit();
+    Q_INVOKABLE void updatePathText(const QString& text);
     Q_INVOKABLE void commitPathEdit(const QString& text);
     Q_INVOKABLE void navigateToBreadcrumb(int index);
 
@@ -61,6 +62,9 @@ signals:
     void currentSearchChanged();
     void searchScopeChanged();
     void navigationStateChanged();
+
+    void pathEdited(const QString& text);
+    void pathCommitted(const QString& text);
 
 private:
     void setBreadcrumbsFromPathText(const QString& text);

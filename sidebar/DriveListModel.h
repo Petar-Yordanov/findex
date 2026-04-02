@@ -37,6 +37,7 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     void loadDefaults();
+    void setDrives(const QVector<DriveItem>& items);
 
 private:
     QVector<DriveItem> m_items;

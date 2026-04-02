@@ -48,6 +48,14 @@ int main(int argc, char* argv[])
         tabsViewModel.setCurrentTabPath(workspaceViewModel.currentDirectoryPath());
     };
 
+    auto notify = [&](const QString& title,
+                      const QString& kind = QStringLiteral("info"),
+                      int progress = -1,
+                      bool autoClose = true)
+    {
+        statusBarViewModel.pushNotification(title, kind, progress, autoClose, true);
+    };
+
     commandBarViewModel.setViewMode(workspaceViewModel.viewMode());
     statusBarViewModel.setCurrentViewMode(workspaceViewModel.viewMode());
     statusBarViewModel.setTotalItems(workspaceViewModel.totalItems());
@@ -60,6 +68,7 @@ int main(int argc, char* argv[])
         [&]()
         {
             appSettings.setTheme(commandBarViewModel.themeMode());
+            notify(QStringLiteral("Theme changed to %1").arg(commandBarViewModel.themeMode()));
         });
 
     QObject::connect(
@@ -68,6 +77,9 @@ int main(int argc, char* argv[])
         [&]()
         {
             appSettings.setShowHiddenFiles(commandBarViewModel.showHiddenFiles());
+            notify(commandBarViewModel.showHiddenFiles()
+                       ? QStringLiteral("Hidden files shown")
+                       : QStringLiteral("Hidden files hidden"));
         });
 
     QObject::connect(
@@ -76,6 +88,9 @@ int main(int argc, char* argv[])
         [&]()
         {
             appSettings.setPreviewEnabled(previewPaneViewModel.previewEnabled());
+            notify(previewPaneViewModel.previewEnabled()
+                       ? QStringLiteral("Preview enabled")
+                       : QStringLiteral("Preview hidden"));
         });
 
     QObject::connect(
@@ -130,28 +145,46 @@ int main(int argc, char* argv[])
     QObject::connect(
         &workspaceViewModel,
         &WorkspaceViewModel::openFileRequested,
-        [](const QVariantMap& fileData)
+        [&](const QVariantMap& fileData)
         {
             qDebug() << "openFile:" << fileData;
+            notify(QStringLiteral("Open file: %1").arg(fileData.value(QStringLiteral("name")).toString()));
         });
 
     QObject::connect(
         &workspaceViewModel,
         &WorkspaceViewModel::openDirectoryRequested,
-        [](const QVariantMap& directoryData)
+        [&](const QVariantMap& directoryData)
         {
             qDebug() << "openDirectory:" << directoryData;
+            notify(QStringLiteral("Open folder: %1").arg(directoryData.value(QStringLiteral("name")).toString()));
         });
 
     QObject::connect(
         &workspaceViewModel,
         &WorkspaceViewModel::fileDropRequested,
-        [](const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind)
+        [&](const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind)
         {
             qDebug() << "fileDropRequested:";
             qDebug() << "  targetPath =" << targetPath;
             qDebug() << "  targetKind =" << targetKind;
             qDebug() << "  draggedItems =" << draggedItems;
+
+            notify(QStringLiteral("Dropped %1 item(s) to %2")
+                       .arg(draggedItems.size())
+                       .arg(targetPath));
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::fileDragFinished,
+        [&](bool accepted, const QString& targetPath, const QString& targetKind)
+        {
+            qDebug() << "fileDragFinished:" << accepted << targetPath << targetKind;
+
+            if (!accepted) {
+                notify(QStringLiteral("Drop cancelled"), QStringLiteral("warning"));
+            }
         });
 
     syncPathState();

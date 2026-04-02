@@ -51,6 +51,7 @@ signals:
     void themeModeChanged();
     void viewModeChanged();
     void showHiddenFilesChanged();
+    void actionRequested(const QString& action);
 
 private:
     void invokeNoArgs(const char* methodName);

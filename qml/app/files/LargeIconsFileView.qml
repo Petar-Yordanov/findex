@@ -6,56 +6,17 @@ import "../../components/theme" as Theme
 Rectangle {
     id: root
     required property var viewModel
+    required property var fileContextMenu
+    required property var dragOverlayHost
     color: "transparent"
 
-    function clamp(value, minValue, maxValue) {
-        return Math.max(minValue, Math.min(maxValue, value))
-    }
-
-    function columnsCount() {
-        return Math.max(1, Math.floor(fileGrid.width / fileGrid.cellWidth))
-    }
-
-    function rowsIntersectingSelection(x1, y1, x2, y2) {
-        if (!viewModel || !viewModel.fileModel)
-            return []
-
-        var count = viewModel.fileModel.rowCount()
-        if (count <= 0)
-            return []
-
-        var left = Math.min(x1, x2)
-        var right = Math.max(x1, x2)
-        var top = Math.min(y1, y2)
-        var bottom = Math.max(y1, y2)
-
-        var cols = columnsCount()
-        var rows = []
-
-        for (var i = 0; i < count; ++i) {
-            var col = i % cols
-            var row = Math.floor(i / cols)
-
-            var itemLeft = col * fileGrid.cellWidth
-            var itemTop = row * fileGrid.cellHeight
-            var itemRight = itemLeft + fileGrid.cellWidth
-            var itemBottom = itemTop + fileGrid.cellHeight
-
-            if (right > itemLeft && left < itemRight && bottom > itemTop && top < itemBottom)
-                rows.push(i)
-        }
-
-        return rows
-    }
-
-    GridView {
-        id: fileGrid
+    ListView {
+        id: fileList
         anchors.fill: parent
         anchors.margins: 12
         clip: true
+        spacing: 1
         model: viewModel ? viewModel.fileModel : null
-        cellWidth: 118
-        cellHeight: 102
         boundsBehavior: Flickable.StopAtBounds
         interactive: !(viewModel && viewModel.dragSelecting) && !overlay.pointerArmed
 
@@ -63,15 +24,15 @@ Rectangle {
 
         SelectionBand {
             id: selectionBand
-            parent: fileGrid.contentItem
+            parent: fileList.contentItem
             active: overlay.dragActive
             startX: overlay.startX
-            startY: overlay.startY
             currentX: overlay.currentX
+            startY: overlay.startY
             currentY: overlay.currentY
         }
 
-        delegate: Rectangle {
+        delegate: Item {
             required property int index
             required property string name
             required property string path
@@ -83,22 +44,8 @@ Rectangle {
                 return viewModel ? viewModel.isRowSelected(index) : false
             }
 
-            width: 104
-            height: 92
-            radius: 10
-
-            color: folderDropArea.containsDrag
-                   ? Theme.AppTheme.selected
-                   : selectedState
-                     ? Theme.AppTheme.selected
-                     : mouseArea.containsMouse
-                       ? Theme.AppTheme.selectedSoft
-                       : "transparent"
-
-            border.color: folderDropArea.containsDrag
-                          ? Theme.AppTheme.accent
-                          : selectedState ? Theme.AppTheme.accent : "transparent"
-            border.width: (folderDropArea.containsDrag || selectedState) ? 1 : 0
+            width: ListView.view.width
+            height: 30
 
             Item {
                 id: dragProxy
@@ -116,26 +63,45 @@ Rectangle {
                 }
             }
 
-            Column {
-                anchors.centerIn: parent
+            Rectangle {
+                anchors.fill: parent
+                radius: 6
+                color: folderDropArea.containsDrag
+                       ? Theme.AppTheme.selected
+                       : selectedState
+                         ? Theme.AppTheme.selected
+                         : mouseArea.containsMouse
+                           ? Theme.AppTheme.selectedSoft
+                           : "transparent"
+
+                border.color: folderDropArea.containsDrag
+                              ? Theme.AppTheme.accent
+                              : selectedState ? Theme.AppTheme.accent : "transparent"
+                border.width: (folderDropArea.containsDrag || selectedState) ? 1 : 0
+            }
+
+            Row {
+                anchors.left: parent.left
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.leftMargin: 12
+                anchors.rightMargin: 12
                 spacing: 8
 
                 AppIcon {
-                    anchors.horizontalCenter: parent.horizontalCenter
                     name: icon
                     darkTheme: Theme.AppTheme.isDark
-                    iconSize: 28
+                    iconSize: 14
+                    anchors.verticalCenter: parent.verticalCenter
                 }
 
                 Text {
-                    width: 88
-                    horizontalAlignment: Text.AlignHCenter
-                    wrapMode: Text.Wrap
-                    maximumLineCount: 2
-                    elide: Text.ElideRight
                     text: name
                     color: Theme.AppTheme.text
-                    font.pixelSize: 12
+                    font.pixelSize: 13
+                    elide: Text.ElideRight
+                    width: parent.width - 24
+                    anchors.verticalCenter: parent.verticalCenter
                 }
             }
 
@@ -178,9 +144,9 @@ Rectangle {
                 }
 
                 function pushDragPreview(mouse) {
-                    if (!viewModel)
+                    if (!viewModel || !root.dragOverlayHost)
                         return
-                    var p = mouseArea.mapToItem(null, mouse.x, mouse.y)
+                    var p = mouseArea.mapToItem(root.dragOverlayHost, mouse.x, mouse.y)
                     if (!viewModel.dragPreviewVisible)
                         viewModel.beginFileDragPreview(p.x, p.y, dragPreviewText(), icon)
                     else
@@ -188,6 +154,15 @@ Rectangle {
                 }
 
                 onPressed: function(mouse) {
+                    if (mouse.button === Qt.RightButton) {
+                        if (fileContextMenu) {
+                            fileContextMenu.rowIndex = index
+                            var p = mouseArea.mapToItem(fileContextMenu.parent, mouse.x, mouse.y)
+                            fileContextMenu.popupAt(p.x, p.y)
+                        }
+                        return
+                    }
+
                     if (mouse.button !== Qt.LeftButton)
                         return
 
@@ -319,14 +294,17 @@ Rectangle {
             property bool dragActive: false
             property bool pointerArmed: false
             property bool forcedMarquee: false
-            property bool pressedOnItem: false
+            property bool pressedInRealEmptyArea: false
             property int anchorIndex: -1
+
+            function isBelowItems(yInView) {
+                return yInView > (fileList.contentHeight - fileList.contentY)
+            }
 
             onPressed: function(mouse) {
                 forcedMarquee = (mouse.modifiers & Qt.AltModifier) !== 0
-                var idx = fileGrid.indexAt(mouse.x, mouse.y)
-                pressedOnItem = idx >= 0
-                pointerArmed = forcedMarquee || !pressedOnItem
+                pressedInRealEmptyArea = isBelowItems(mouse.y)
+                pointerArmed = forcedMarquee || pressedInRealEmptyArea
 
                 if (!pointerArmed) {
                     mouse.accepted = false
@@ -336,7 +314,7 @@ Rectangle {
                 pressX = mouse.x
                 pressY = mouse.y
 
-                var p = overlay.mapToItem(fileGrid.contentItem, mouse.x, mouse.y)
+                var p = overlay.mapToItem(fileList.contentItem, mouse.x, mouse.y)
                 startX = p.x
                 startY = p.y
                 currentX = p.x
@@ -357,11 +335,21 @@ Rectangle {
                 if (Math.abs(mouse.x - pressX) < 6 && Math.abs(mouse.y - pressY) < 6)
                     return
 
-                var p = overlay.mapToItem(fileGrid.contentItem, mouse.x, mouse.y)
+                var p = overlay.mapToItem(fileList.contentItem, mouse.x, mouse.y)
                 currentX = p.x
                 currentY = p.y
 
-                var rows = root.rowsIntersectingSelection(startX, startY, currentX, currentY)
+                var top = Math.min(startY, currentY)
+                var bottom = Math.max(startY, currentY)
+
+                var rows = []
+                for (var i = 0; i < fileList.count; ++i) {
+                    var itemY = i * 31
+                    var itemBottom = itemY + 30
+                    if (bottom > itemY && top < itemBottom)
+                        rows.push(i)
+                }
+
                 if (rows.length <= 0)
                     return
 
@@ -386,7 +374,7 @@ Rectangle {
                 dragActive = false
                 pointerArmed = false
                 forcedMarquee = false
-                pressedOnItem = false
+                pressedInRealEmptyArea = false
                 anchorIndex = -1
             }
 
@@ -397,7 +385,7 @@ Rectangle {
                 dragActive = false
                 pointerArmed = false
                 forcedMarquee = false
-                pressedOnItem = false
+                pressedInRealEmptyArea = false
                 anchorIndex = -1
             }
         }

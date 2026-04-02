@@ -6,6 +6,8 @@ import "../../components/theme" as Theme
 Rectangle {
     id: root
     required property var viewModel
+    required property var fileContextMenu
+    required property var dragOverlayHost
     color: "transparent"
 
     ListView {
@@ -142,9 +144,9 @@ Rectangle {
                 }
 
                 function pushDragPreview(mouse) {
-                    if (!viewModel)
+                    if (!viewModel || !root.dragOverlayHost)
                         return
-                    var p = mouseArea.mapToItem(null, mouse.x, mouse.y)
+                    var p = mouseArea.mapToItem(root.dragOverlayHost, mouse.x, mouse.y)
                     if (!viewModel.dragPreviewVisible)
                         viewModel.beginFileDragPreview(p.x, p.y, dragPreviewText(), icon)
                     else
@@ -152,6 +154,15 @@ Rectangle {
                 }
 
                 onPressed: function(mouse) {
+                    if (mouse.button === Qt.RightButton) {
+                        if (fileContextMenu) {
+                            fileContextMenu.rowIndex = index
+                            var p = mouseArea.mapToItem(fileContextMenu.parent, mouse.x, mouse.y)
+                            fileContextMenu.popupAt(p.x, p.y)
+                        }
+                        return
+                    }
+
                     if (mouse.button !== Qt.LeftButton)
                         return
 

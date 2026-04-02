@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QString>
+#include <QVariantList>
 
 #include "TabListModel.h"
 
@@ -24,6 +25,9 @@ public:
 
     void setEditingTitle(const QString& value);
 
+    QVariantList saveState() const;
+    void loadState(const QVariantList& tabs, int currentIndex);
+
     Q_INVOKABLE void addTab();
     Q_INVOKABLE void closeTab(int index);
     Q_INVOKABLE void activateTab(int index);
@@ -38,6 +42,13 @@ signals:
     void currentIndexChanged();
     void editingIndexChanged();
     void editingTitleChanged();
+    void tabsStateChanged();
+
+    void tabAdded(int index, const QString& title, const QString& path);
+    void tabClosed(int index, const QString& title);
+    void tabActivated(int index, const QString& title, const QString& path);
+    void tabRenamed(int index, const QString& title);
+    void tabMoved(int from, int to);
 
 private:
     void setCurrentIndexInternal(int index);

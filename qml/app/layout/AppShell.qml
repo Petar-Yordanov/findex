@@ -23,6 +23,7 @@ Rectangle {
     required property var sidebarContextMenu
     required property var tabContextMenu
     required property var breadcrumbContextMenu
+    required property var fileContextMenu
     required property var createMenu
     required property var moreActionsMenu
     required property var viewModeMenu
@@ -31,6 +32,7 @@ Rectangle {
 
     readonly property alias navigationBarRef: navigationBar
     readonly property alias titleBarRef: titleBar
+    readonly property alias dragOverlayLayerRef: dragOverlayLayer
 
     radius: (rootWindow.visibility === Window.Maximized || rootWindow.windowMoveActive) ? 0 : 14
     color: Theme.AppTheme.bg
@@ -85,6 +87,8 @@ Rectangle {
             previewViewModel: shell.previewViewModel
             statusBarViewModel: shell.statusBarViewModel
             notificationsPopup: shell.notificationsPopup
+            fileContextMenu: shell.fileContextMenu
+            dragOverlayHost: dragOverlayLayer
         }
     }
 
@@ -100,18 +104,18 @@ Rectangle {
             visible: dragOverlayLayer.visible
 
             property real edgePadding: 8
-            property real iconAnchorX: 18
-            property real iconAnchorY: height / 2
+            property real cursorOffsetX: 18
+            property real cursorOffsetY: 18
 
             x: {
                 const cursorX = shell.workspaceViewModel ? shell.workspaceViewModel.dragPreviewX : 0
-                const rawX = cursorX - iconAnchorX
+                const rawX = cursorX + 10
                 return Math.max(edgePadding, Math.min(rawX, dragOverlayLayer.width - width - edgePadding))
             }
 
             y: {
                 const cursorY = shell.workspaceViewModel ? shell.workspaceViewModel.dragPreviewY : 0
-                const rawY = cursorY - iconAnchorY
+                const rawY = cursorY - height / 2
                 return Math.max(edgePadding, Math.min(rawY, dragOverlayLayer.height - height - edgePadding))
             }
 

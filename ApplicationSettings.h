@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QString>
+#include <QVariantList>
 
 class ApplicationSettings final
 {
@@ -21,6 +22,12 @@ public:
 
     bool showHiddenFiles() const;
     void setShowHiddenFiles(bool enabled);
+
+    QVariantList tabs() const;
+    void setTabs(const QVariantList& tabs);
+
+    int currentTabIndex() const;
+    void setCurrentTabIndex(int index);
 
 private:
     void ensureDefaults() const;

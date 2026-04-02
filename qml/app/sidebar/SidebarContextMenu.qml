@@ -20,7 +20,8 @@ StyledMenu {
             viewModel.openLocation(
                 viewModel.contextLabel,
                 viewModel.contextIcon,
-                viewModel.contextKind
+                viewModel.contextKind,
+                viewModel.contextPath
             )
             menu.close()
         }

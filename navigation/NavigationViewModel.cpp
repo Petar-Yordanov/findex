@@ -142,6 +142,18 @@ void NavigationViewModel::cancelPathEdit()
     syncPathTextFromBreadcrumbs();
 }
 
+void NavigationViewModel::updatePathText(const QString& text)
+{
+    const QString normalized = normalizedPathText(text);
+
+    if (m_pathText == normalized)
+        return;
+
+    m_pathText = normalized;
+    emit pathTextChanged();
+    emit pathEdited(m_pathText);
+}
+
 void NavigationViewModel::commitPathEdit(const QString& text)
 {
     const QString normalized = normalizedPathText(text);
@@ -160,11 +172,15 @@ void NavigationViewModel::commitPathEdit(const QString& text)
         setBreadcrumbsFromPathText(normalized);
     }
 
-    m_pathText = normalized;
-    emit pathTextChanged();
+    if (m_pathText != normalized)
+    {
+        m_pathText = normalized;
+        emit pathTextChanged();
+    }
 
     setEditingPath(false);
     emit navigationStateChanged();
+    emit pathCommitted(normalized);
 }
 
 void NavigationViewModel::navigateToBreadcrumb(int index)

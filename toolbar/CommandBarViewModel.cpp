@@ -109,16 +109,20 @@ void CommandBarViewModel::setShowHiddenFiles(bool value)
 
 void CommandBarViewModel::createFolder()
 {
+    emit actionRequested(QStringLiteral("Create folder"));
     invokeNoArgs("createFolder");
 }
 
 void CommandBarViewModel::createFile()
 {
+    emit actionRequested(QStringLiteral("Create file"));
     invokeNoArgs("createFile");
 }
 
 void CommandBarViewModel::cutSelection()
 {
+    emit actionRequested(QStringLiteral("Cut"));
+
     if (!m_backend)
         return;
 
@@ -134,6 +138,8 @@ void CommandBarViewModel::cutSelection()
 
 void CommandBarViewModel::copySelection()
 {
+    emit actionRequested(QStringLiteral("Copy"));
+
     if (!m_backend)
         return;
 
@@ -149,11 +155,14 @@ void CommandBarViewModel::copySelection()
 
 void CommandBarViewModel::paste()
 {
+    emit actionRequested(QStringLiteral("Paste"));
     invokeNoArgs("pasteItems");
 }
 
 void CommandBarViewModel::renameSelection()
 {
+    emit actionRequested(QStringLiteral("Rename"));
+
     if (!m_backend)
         return;
 
@@ -169,6 +178,8 @@ void CommandBarViewModel::renameSelection()
 
 void CommandBarViewModel::deleteSelection()
 {
+    emit actionRequested(QStringLiteral("Delete"));
+
     if (!m_backend)
         return;
 
@@ -184,11 +195,14 @@ void CommandBarViewModel::deleteSelection()
 
 void CommandBarViewModel::refresh()
 {
+    emit actionRequested(QStringLiteral("Refresh"));
     invokeNoArgs("refresh");
 }
 
 void CommandBarViewModel::compressSelection()
 {
+    emit actionRequested(QStringLiteral("Compress"));
+
     if (!m_backend)
         return;
 
@@ -204,6 +218,8 @@ void CommandBarViewModel::compressSelection()
 
 void CommandBarViewModel::extractSelection()
 {
+    emit actionRequested(QStringLiteral("Extract here"));
+
     if (!m_backend)
         return;
 
@@ -219,6 +235,8 @@ void CommandBarViewModel::extractSelection()
 
 void CommandBarViewModel::selectAll()
 {
+    emit actionRequested(QStringLiteral("Select all"));
+
     if (!m_backend)
         return;
 
@@ -234,6 +252,8 @@ void CommandBarViewModel::selectAll()
 
 void CommandBarViewModel::showProperties()
 {
+    emit actionRequested(QStringLiteral("Properties"));
+
     if (!m_backend)
         return;
 
@@ -260,6 +280,7 @@ void CommandBarViewModel::applyTheme(const QString& mode)
     : mode.trimmed();
 
     setThemeMode(resolved);
+    emit actionRequested(QStringLiteral("Apply theme: %1").arg(resolved));
 
     if (!m_backend)
         return;
@@ -291,6 +312,7 @@ void CommandBarViewModel::applyViewMode(const QString& mode)
     : mode.trimmed();
 
     setViewMode(resolved);
+    emit actionRequested(QStringLiteral("Apply view mode: %1").arg(resolved));
 
     if (!m_backend)
         return;
@@ -319,6 +341,9 @@ void CommandBarViewModel::toggleHiddenFiles()
 {
     const bool next = !m_showHiddenFiles;
     setShowHiddenFiles(next);
+    emit actionRequested(next
+                             ? QStringLiteral("Show hidden files")
+                             : QStringLiteral("Hide hidden files"));
 
     if (!m_backend)
         return;

@@ -25,31 +25,27 @@ Rectangle {
 
     signal closeRequested(int notificationId)
 
-    width: 320
-    height: progress >= 0 ? 84 : 58
+    width: 340
+    implicitHeight: contentColumn.implicitHeight + Theme.Metrics.spacingXl * 2
     radius: Theme.Metrics.radiusXl
     color: control.bgColor
     border.color: control.borderColor
     border.width: Theme.Metrics.borderWidth
 
-    function restartTimer() {
-        if (autoClose)
-            closeTimer.restart()
-    }
-
     Timer {
         id: closeTimer
-        interval: 2600
+        interval: 5000
         repeat: false
         onTriggered: control.closeRequested(control.notificationId)
     }
 
     Component.onCompleted: {
-        if (control.autoClose)
+        if (control.autoClose && control.progress < 0)
             closeTimer.start()
     }
 
     Column {
+        id: contentColumn
         anchors.fill: parent
         anchors.margins: Theme.Metrics.spacingXl
         spacing: Theme.Metrics.spacingMd
@@ -73,13 +69,12 @@ Rectangle {
             }
 
             Text {
-                width: parent.width - 40
+                width: Math.max(0, parent.width - 54)
                 text: control.title
                 color: control.textColor
                 font.pixelSize: Theme.Typography.bodyLg
+                font.bold: true
                 wrapMode: Text.Wrap
-                elide: Text.ElideRight
-                maximumLineCount: control.progress >= 0 ? 2 : 1
             }
 
             Rectangle {

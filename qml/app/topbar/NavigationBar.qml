@@ -238,11 +238,18 @@ Rectangle {
                     verticalAlignment: TextInput.AlignVCenter
                     background: Rectangle { color: "transparent" }
 
+                    onTextEdited: {
+                        if (navBar.hasVm)
+                            navBar.viewModel.updatePathText(text)
+                    }
+
                     onAccepted: if (navBar.hasVm) navBar.viewModel.commitPathEdit(text)
+
                     onActiveFocusChanged: {
                         if (!activeFocus && navBar.hasVm && navBar.viewModel.editingPath)
                             navBar.viewModel.cancelPathEdit()
                     }
+
                     Keys.onEscapePressed: if (navBar.hasVm) navBar.viewModel.cancelPathEdit()
                 }
             }

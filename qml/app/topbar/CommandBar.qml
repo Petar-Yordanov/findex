@@ -135,6 +135,16 @@ Rectangle {
         }
 
         IconButton {
+            iconName: "sync"
+            tooltipText: "Test progress"
+            darkTheme: Theme.AppTheme.isDark
+            onClicked: {
+                if (appStatusBarViewModel)
+                    appStatusBarViewModel.startTestProgress()
+            }
+        }
+
+        IconButton {
             id: moreButton
             iconName: "more-horiz"
             tooltipText: "Show more"
