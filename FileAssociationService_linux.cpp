@@ -3,7 +3,21 @@
 #ifdef Q_OS_LINUX
 
 #include "FileAssociationService.h"
+
+#ifdef signals
+#undef signals
+#define FINDEX_RESTORE_QT_SIGNALS_MACRO
+#endif
+
 #include <gio/gio.h>
+
+#ifdef FINDEX_RESTORE_QT_SIGNALS_MACRO
+#ifndef Q_MOC_RUN
+#  define signals Q_SIGNALS
+#endif
+#undef FINDEX_RESTORE_QT_SIGNALS_MACRO
+#endif
+
 #include <QHash>
 #include <QList>
 
@@ -80,10 +94,11 @@ FileAssociationService::appsForMimeTypeImpl(const QString& mimeType, const QStri
         app.isDefault = (!defaultId.isEmpty() && app.id == defaultId);
 
         addUnique(apps, seen, app);
-        g_object_unref(info);
     }
 
-    g_list_free(list);
+    if (list) {
+        g_list_free_full(list, g_object_unref);
+    }
 
     if (defaultApp) {
         g_object_unref(defaultApp);
