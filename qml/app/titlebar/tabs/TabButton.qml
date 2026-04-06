@@ -89,7 +89,6 @@ Rectangle {
                 viewModel.activateTabForDrop(tabIndex)
 
             appWorkspaceViewModel.requestDropToPath(tabPath, "tab")
-            appWorkspaceViewModel.finishFileDrag(true)
             drop.accept(Qt.MoveAction)
         }
     }

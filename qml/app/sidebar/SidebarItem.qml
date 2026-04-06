@@ -31,6 +31,7 @@ Item {
     readonly property string itemPath: path || ""
     readonly property bool itemSection: section === true
     readonly property bool acceptsDrop: !itemSection && itemPath !== ""
+    readonly property int _selectionRevision: viewModel ? viewModel.selectionRevision : 0
 
     readonly property bool selectedState: viewModel
         ? viewModel.isSelected(itemLabel, itemKind)
@@ -62,13 +63,15 @@ Item {
 
         border.color: itemDropArea.containsDrag
                       ? Theme.AppTheme.accent
-                      : hoverState
+                      : selectedState
                         ? Theme.AppTheme.accent
-                        : tapArea.pressed
-                          ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
-                          : "transparent"
+                        : hoverState
+                          ? Theme.AppTheme.accent
+                          : tapArea.pressed
+                            ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
+                            : "transparent"
 
-        border.width: (itemDropArea.containsDrag || hoverState || tapArea.pressed) ? 1 : 0
+        border.width: (itemDropArea.containsDrag || selectedState || hoverState || tapArea.pressed) ? 1 : 0
     }
 
     Item {
@@ -137,7 +140,6 @@ Item {
             if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(itemPath))
                 return
             appWorkspaceViewModel.requestDropToPath(itemPath, itemKind)
-            appWorkspaceViewModel.finishFileDrag(true)
             drop.accept(Qt.MoveAction)
         }
     }

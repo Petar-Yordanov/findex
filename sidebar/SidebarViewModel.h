@@ -23,6 +23,7 @@ class SidebarViewModel final : public QObject
 
     Q_PROPERTY(QString hoveredLabel READ hoveredLabel NOTIFY hoveredChanged)
     Q_PROPERTY(QString hoveredKind READ hoveredKind NOTIFY hoveredChanged)
+    Q_PROPERTY(int selectionRevision READ selectionRevision NOTIFY selectionChanged)
 
 public:
     explicit SidebarViewModel(QObject* parent = nullptr);
@@ -37,6 +38,7 @@ public:
 
     QString hoveredLabel() const;
     QString hoveredKind() const;
+    int selectionRevision() const;
 
     Q_INVOKABLE void openLocation(const QString& label, const QString& icon, const QString& kind, const QString& path);
     Q_INVOKABLE void setContextItem(const QString& label, const QString& icon, const QString& kind, const QString& path);
@@ -84,6 +86,7 @@ private:
 
     QString m_hoveredLabel;
     QString m_hoveredKind;
+    int m_selectionRevision = 0;
 
     QTimer m_driveRefreshTimer;
     QFutureWatcher<QVector<DriveListModel::DriveItem>> m_driveWatcher;

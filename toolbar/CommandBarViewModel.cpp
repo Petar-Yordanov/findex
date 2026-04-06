@@ -23,17 +23,6 @@ void CommandBarViewModel::setBackend(QObject* backend)
     if (!m_backend)
         return;
 
-    if (hasMethod("savedTheme()"))
-    {
-        QString value;
-        QMetaObject::invokeMethod(
-            m_backend,
-            "savedTheme",
-            Qt::DirectConnection,
-            Q_RETURN_ARG(QString, value));
-        setThemeMode(value);
-    }
-
     if (hasMethod("savedViewMode()"))
     {
         QString value;
@@ -64,9 +53,9 @@ QString CommandBarViewModel::themeMode() const
 
 void CommandBarViewModel::setThemeMode(const QString& value)
 {
-    const QString resolved = value.trimmed().isEmpty()
-    ? QStringLiteral("Light")
-    : value.trimmed();
+    QString resolved = value.trimmed();
+    if (resolved != QStringLiteral("Dark"))
+        resolved = QStringLiteral("Light");
 
     if (m_themeMode == resolved)
         return;
@@ -275,34 +264,12 @@ void CommandBarViewModel::showProperties()
 
 void CommandBarViewModel::applyTheme(const QString& mode)
 {
-    const QString resolved = mode.trimmed().isEmpty()
-    ? QStringLiteral("Light")
-    : mode.trimmed();
+    QString resolved = mode.trimmed();
+    if (resolved != QStringLiteral("Dark"))
+        resolved = QStringLiteral("Light");
 
     setThemeMode(resolved);
     emit actionRequested(QStringLiteral("Apply theme: %1").arg(resolved));
-
-    if (!m_backend)
-        return;
-
-    if (hasMethod("setTheme(QString)"))
-    {
-        QMetaObject::invokeMethod(
-            m_backend,
-            "setTheme",
-            Qt::DirectConnection,
-            Q_ARG(QString, resolved));
-        return;
-    }
-
-    if (hasMethod("setAppTheme(QString)"))
-    {
-        QMetaObject::invokeMethod(
-            m_backend,
-            "setAppTheme",
-            Qt::DirectConnection,
-            Q_ARG(QString, resolved));
-    }
 }
 
 void CommandBarViewModel::applyViewMode(const QString& mode)

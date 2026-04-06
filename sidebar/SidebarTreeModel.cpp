@@ -1,5 +1,8 @@
 #include "SidebarTreeModel.h"
 
+#include <QDir>
+#include <QStandardPaths>
+
 SidebarTreeModel::SidebarTreeModel(QObject* parent)
     : QAbstractItemModel(parent)
     , m_root(new SidebarTreeItem)
@@ -168,17 +171,51 @@ void SidebarTreeModel::loadDefaults()
     qDeleteAll(m_root->children);
     m_root->children.clear();
 
+    auto norm = [](const QString& p) -> QString {
+        return QDir::fromNativeSeparators(QDir(p).absolutePath());
+    };
+
+    const QString home = norm(QDir::homePath());
+    const QString desktop = norm(QStandardPaths::writableLocation(QStandardPaths::DesktopLocation));
+    const QString documents = norm(QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation));
+    const QString downloads = norm(QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
+    const QString pictures = norm(QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
+    const QString music = norm(QStandardPaths::writableLocation(QStandardPaths::MusicLocation));
+    const QString videos = norm(QStandardPaths::writableLocation(QStandardPaths::MoviesLocation));
+
+#ifdef Q_OS_WINDOWS
+    const QString recent = norm(QStandardPaths::writableLocation(QStandardPaths::HomeLocation)
+                                + QStringLiteral("/AppData/Roaming/Microsoft/Windows/Recent"));
+#else
+    const QString recent;
+#endif
+
     auto* quickAccess = makeItem("Quick Access", "", "section", "", true, true, m_root);
     m_root->children.append(quickAccess);
 
-    quickAccess->children.append(makeItem("Recent", "history", "quick", "C:/Users/Petar/Recent", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Home", "home", "quick", "C:/Users/Petar", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Desktop", "desktop-windows", "quick", "C:/Users/Petar/Desktop", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Downloads", "download", "quick", "C:/Users/Petar/Downloads", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Documents", "description", "quick", "C:/Users/Petar/Documents", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Pictures", "image", "quick", "C:/Users/Petar/Pictures", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Music", "music-note", "quick", "C:/Users/Petar/Music", false, false, quickAccess));
-    quickAccess->children.append(makeItem("Videos", "movie", "quick", "C:/Users/Petar/Videos", false, false, quickAccess));
+    if (!recent.isEmpty())
+        quickAccess->children.append(makeItem("Recent", "history", "quick", recent, false, false, quickAccess));
+
+    if (!home.isEmpty())
+        quickAccess->children.append(makeItem("Home", "home", "quick", home, false, false, quickAccess));
+
+    if (!desktop.isEmpty())
+        quickAccess->children.append(makeItem("Desktop", "desktop-windows", "quick", desktop, false, false, quickAccess));
+
+    if (!downloads.isEmpty())
+        quickAccess->children.append(makeItem("Downloads", "download", "quick", downloads, false, false, quickAccess));
+
+    if (!documents.isEmpty())
+        quickAccess->children.append(makeItem("Documents", "description", "quick", documents, false, false, quickAccess));
+
+    if (!pictures.isEmpty())
+        quickAccess->children.append(makeItem("Pictures", "image", "quick", pictures, false, false, quickAccess));
+
+    if (!music.isEmpty())
+        quickAccess->children.append(makeItem("Music", "music-note", "quick", music, false, false, quickAccess));
+
+    if (!videos.isEmpty())
+        quickAccess->children.append(makeItem("Videos", "movie", "quick", videos, false, false, quickAccess));
 
     endResetModel();
 }

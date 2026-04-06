@@ -21,6 +21,10 @@ public:
     static QList<AssociatedApp> appsForExtension(const QString& extension);
     static QList<AssociatedApp> appsForMimeType(const QString& mimeType);
 
+    static bool openWithDefaultApp(const QString& filePath);
+    static bool openWithApp(const QString& filePath, const AssociatedApp& app);
+    static bool openWithAppId(const QString& filePath, const QString& appIdOrExecutable);
+
 private:
     static QString normalizeExtension(QString extension);
 

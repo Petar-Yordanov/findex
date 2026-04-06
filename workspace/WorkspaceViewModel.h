@@ -3,6 +3,7 @@
 #include <QObject>
 #include <QSet>
 #include <QString>
+#include <QStringList>
 #include <QVariantList>
 
 #include "ApplicationSettings.h"
@@ -33,6 +34,14 @@ class WorkspaceViewModel final : public QObject
     Q_PROPERTY(QString dragPreviewText READ dragPreviewText NOTIFY dragPreviewChanged)
     Q_PROPERTY(QString dragPreviewIcon READ dragPreviewIcon NOTIFY dragPreviewChanged)
 
+    Q_PROPERTY(int inlineEditRow READ inlineEditRow NOTIFY inlineEditStateChanged)
+    Q_PROPERTY(QString inlineEditText READ inlineEditText NOTIFY inlineEditTextChanged)
+    Q_PROPERTY(QString inlineEditError READ inlineEditError NOTIFY inlineEditErrorChanged)
+    Q_PROPERTY(bool inlineEditIsNew READ inlineEditIsNew NOTIFY inlineEditStateChanged)
+    Q_PROPERTY(int inlineEditFocusToken READ inlineEditFocusToken NOTIFY inlineEditFocusTokenChanged)
+
+    Q_PROPERTY(QVariantList openWithApps READ openWithApps NOTIFY openWithAppsChanged)
+
 public:
     explicit WorkspaceViewModel(QObject* parent = nullptr);
 
@@ -59,7 +68,27 @@ public:
     QString dragPreviewText() const;
     QString dragPreviewIcon() const;
 
+    int inlineEditRow() const;
+    QString inlineEditText() const;
+    QString inlineEditError() const;
+    bool inlineEditIsNew() const;
+    int inlineEditFocusToken() const;
+
+    QVariantList openWithApps() const;
+
     Q_INVOKABLE void setViewMode(const QString& value);
+
+    Q_INVOKABLE void goBack();
+    Q_INVOKABLE void goForward();
+    Q_INVOKABLE void goUp();
+    Q_INVOKABLE void refresh();
+    Q_INVOKABLE void navigateToPathString(const QString& path);
+    Q_INVOKABLE void search(const QString& query, const QString& scope);
+    Q_INVOKABLE void setShowHiddenFiles(bool value);
+
+    Q_INVOKABLE QString savedViewMode() const;
+    Q_INVOKABLE bool savedShowHiddenFiles() const;
+
     Q_INVOKABLE void activateRow(int row);
     Q_INVOKABLE void selectOnlyRow(int row);
     Q_INVOKABLE void toggleRowSelection(int row);
@@ -90,6 +119,26 @@ public:
 
     Q_INVOKABLE void requestFileContextAction(const QString& action, int row);
 
+    Q_INVOKABLE void createFolder();
+    Q_INVOKABLE void createFile();
+    Q_INVOKABLE void beginRenameRow(int row);
+    Q_INVOKABLE void renameSelectedItems();
+    Q_INVOKABLE void updateInlineEditText(const QString& text);
+    Q_INVOKABLE bool commitInlineEdit();
+    Q_INVOKABLE void cancelInlineEdit();
+
+    Q_INVOKABLE void cutSelectedItems();
+    Q_INVOKABLE void copySelectedItems();
+    Q_INVOKABLE void pasteItems();
+    Q_INVOKABLE void deleteSelectedItems();
+    Q_INVOKABLE void compressSelectedItems();
+    Q_INVOKABLE void extractSelectedItems();
+
+    Q_INVOKABLE void prepareOpenWithForRow(int row);
+    Q_INVOKABLE void prepareOpenWithForSelection();
+    Q_INVOKABLE bool openRowWithApp(int row, const QString& appIdOrExecutable);
+    Q_INVOKABLE bool openSelectionWithApp(const QString& appIdOrExecutable);
+
 signals:
     void viewModeChanged();
     void currentIndexChanged();
@@ -103,6 +152,13 @@ signals:
     void draggingItemsChanged();
     void dragPreviewChanged();
 
+    void inlineEditStateChanged();
+    void inlineEditTextChanged();
+    void inlineEditErrorChanged();
+    void inlineEditFocusTokenChanged();
+
+    void openWithAppsChanged();
+
     void openFileRequested(const QVariantMap& fileData);
     void openDirectoryRequested(const QVariantMap& directoryData);
 
@@ -110,7 +166,17 @@ signals:
     void fileContextActionRequested(const QString& action, const QVariantMap& item);
     void fileDragFinished(bool accepted, const QString& targetPath, const QString& targetKind);
 
+    void operationCompleted(const QString& message);
+    void operationFailed(const QString& message);
+
 private:
+    enum class ClipboardMode
+    {
+        None,
+        Copy,
+        Cut
+    };
+
     QString normalizeViewMode(const QString& value) const;
     QString iconForViewMode(const QString& mode) const;
     void emitSelectionSignals(int previousSelected, const QString& previousItemsText, bool selectionChanged);
@@ -120,6 +186,27 @@ private:
     bool isValidRow(int row) const;
     void clearDragState();
     void clearDragPreview();
+
+    void createPendingItem(bool isDir);
+    QString validateInlineEditText(const QString& text) const;
+    FileListModel::FileItem buildItemFromName(const QString& name, bool isDir) const;
+    void setInlineEditState(int row, const QString& text, bool isNew);
+    void setInlineEditError(const QString& error);
+    void clearInlineEditState();
+
+    QString normalizePath(QString value) const;
+    void loadLocation(const QString& path, bool pushHistory = true);
+    void reloadListing();
+    QVector<FileListModel::FileItem> listDirectoryItems(const QString& path) const;
+    QVector<FileListModel::FileItem> searchItems(const QString& basePath,
+                                                 const QString& query,
+                                                 const QString& scope) const;
+    void resetSelectionToFirstItem();
+
+    QVariantList selectedItemsAsMaps() const;
+    QStringList selectedPaths() const;
+    QString currentSelectedFilePath() const;
+    void setOpenWithAppsForPath(const QString& filePath);
 
 private:
     ApplicationSettings m_settings;
@@ -131,7 +218,7 @@ private:
     bool m_dragSelecting = false;
     int m_selectionRevision = 0;
 
-    QString m_currentDirectoryPath = QStringLiteral("C:/Projects/Findex");
+    QString m_currentDirectoryPath;
     bool m_draggingItems = false;
     QVariantList m_draggedItems;
 
@@ -143,4 +230,21 @@ private:
 
     QString m_lastDropTargetPath;
     QString m_lastDropTargetKind;
+
+    int m_inlineEditRow = -1;
+    QString m_inlineEditText;
+    QString m_inlineEditError;
+    bool m_inlineEditIsNew = false;
+    int m_inlineEditFocusToken = 0;
+
+    QStringList m_history;
+    int m_historyIndex = -1;
+
+    QString m_activeSearch;
+    QString m_activeSearchScope = QStringLiteral("folder");
+
+    ClipboardMode m_clipboardMode = ClipboardMode::None;
+    QStringList m_clipboardPaths;
+
+    QVariantList m_openWithApps;
 };

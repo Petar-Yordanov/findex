@@ -2,6 +2,10 @@
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QDebug>
+#include <QVariantMap>
+#include <QVector>
+#include <QSettings>
+#include <QCoreApplication>
 
 #include "ApplicationSettings.h"
 
@@ -16,6 +20,12 @@
 int main(int argc, char* argv[])
 {
     QGuiApplication app(argc, argv);
+
+    QCoreApplication::setOrganizationName(QStringLiteral("Findex"));
+    QCoreApplication::setOrganizationDomain(QStringLiteral("findex.local"));
+    QCoreApplication::setApplicationName(QStringLiteral("Findex"));
+    QSettings::setDefaultFormat(QSettings::IniFormat);
+
     QQmlApplicationEngine engine;
 
     ApplicationSettings appSettings;
@@ -28,10 +38,24 @@ int main(int argc, char* argv[])
     StatusBarViewModel statusBarViewModel;
     WorkspaceViewModel workspaceViewModel;
 
+    commandBarViewModel.setBackend(&workspaceViewModel);
+    navigationViewModel.setBackend(&workspaceViewModel);
+
     commandBarViewModel.setThemeMode(appSettings.theme());
     commandBarViewModel.setShowHiddenFiles(appSettings.showHiddenFiles());
-
+    navigationViewModel.setSearchScope(appSettings.searchScope());
     previewPaneViewModel.setPreviewEnabled(appSettings.previewEnabled());
+
+    tabsViewModel.loadState(appSettings.tabs(), appSettings.currentTabIndex());
+
+    {
+        const QVector<TabListModel::TabItem> restoredTabs = tabsViewModel.tabsModel()->tabs();
+        if (!restoredTabs.isEmpty()) {
+            const int current = qBound(0, tabsViewModel.currentIndex(), restoredTabs.size() - 1);
+            workspaceViewModel.navigateToPathString(restoredTabs.at(current).path);
+            tabsViewModel.syncCurrentTabToPath(restoredTabs.at(current).path);
+        }
+    }
 
     auto refreshPreview = [&]()
     {
@@ -44,8 +68,8 @@ int main(int argc, char* argv[])
 
     auto syncPathState = [&]()
     {
-        navigationViewModel.commitPathEdit(workspaceViewModel.currentDirectoryPath());
-        tabsViewModel.setCurrentTabPath(workspaceViewModel.currentDirectoryPath());
+        navigationViewModel.setPathFromBackend(workspaceViewModel.currentDirectoryPath());
+        tabsViewModel.syncCurrentTabToPath(workspaceViewModel.currentDirectoryPath());
     };
 
     auto notify = [&](const QString& title,
@@ -80,6 +104,14 @@ int main(int argc, char* argv[])
             notify(commandBarViewModel.showHiddenFiles()
                        ? QStringLiteral("Hidden files shown")
                        : QStringLiteral("Hidden files hidden"));
+        });
+
+    QObject::connect(
+        &navigationViewModel,
+        &NavigationViewModel::searchScopeChanged,
+        [&]()
+        {
+            appSettings.setSearchScope(navigationViewModel.searchScope());
         });
 
     QObject::connect(
@@ -148,7 +180,6 @@ int main(int argc, char* argv[])
         [&](const QVariantMap& fileData)
         {
             qDebug() << "openFile:" << fileData;
-            notify(QStringLiteral("Open file: %1").arg(fileData.value(QStringLiteral("name")).toString()));
         });
 
     QObject::connect(
@@ -158,6 +189,14 @@ int main(int argc, char* argv[])
         {
             qDebug() << "openDirectory:" << directoryData;
             notify(QStringLiteral("Open folder: %1").arg(directoryData.value(QStringLiteral("name")).toString()));
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::fileContextActionRequested,
+        [&](const QString& action, const QVariantMap& item)
+        {
+            notify(QStringLiteral("%1: %2").arg(action, item.value(QStringLiteral("name")).toString()));
         });
 
     QObject::connect(
@@ -185,6 +224,91 @@ int main(int argc, char* argv[])
             if (!accepted) {
                 notify(QStringLiteral("Drop cancelled"), QStringLiteral("warning"));
             }
+        });
+
+    QObject::connect(
+        &sidebarViewModel,
+        &SidebarViewModel::openRequested,
+        [&](const QString& label, const QString& icon, const QString& kind, const QString& path)
+        {
+            Q_UNUSED(label);
+            Q_UNUSED(icon);
+            Q_UNUSED(kind);
+
+            if (!workspaceViewModel.commitInlineEdit())
+                return;
+
+            workspaceViewModel.navigateToPathString(path);
+
+            statusBarViewModel.setTotalItems(workspaceViewModel.totalItems());
+            statusBarViewModel.setSelectedItems(workspaceViewModel.selectedItems());
+
+            syncPathState();
+            refreshPreview();
+
+            notify(QStringLiteral("Open location: %1").arg(path));
+        });
+
+    QObject::connect(
+        &sidebarViewModel,
+        &SidebarViewModel::openInNewTabRequested,
+        [&](const QString& label, const QString& icon, const QString& kind, const QString& path)
+        {
+            Q_UNUSED(icon);
+            Q_UNUSED(kind);
+
+            if (!workspaceViewModel.commitInlineEdit())
+                return;
+
+            tabsViewModel.addTab();
+            workspaceViewModel.navigateToPathString(path);
+            tabsViewModel.syncCurrentTabToPath(path);
+
+            syncPathState();
+            refreshPreview();
+
+            notify(QStringLiteral("Opened in new tab: %1").arg(label.isEmpty() ? path : label));
+        });
+
+    QObject::connect(
+        &tabsViewModel,
+        &TabsViewModel::tabsStateChanged,
+        [&]()
+        {
+            appSettings.setTabs(tabsViewModel.saveState());
+            appSettings.setCurrentTabIndex(tabsViewModel.currentIndex());
+        });
+
+    QObject::connect(
+        &tabsViewModel,
+        &TabsViewModel::tabActivated,
+        [&](int index, const QString& title, const QString& path)
+        {
+            Q_UNUSED(index);
+            Q_UNUSED(title);
+
+            if (!workspaceViewModel.commitInlineEdit())
+                return;
+
+            workspaceViewModel.navigateToPathString(path);
+            tabsViewModel.syncCurrentTabToPath(path);
+            refreshPreview();
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::operationCompleted,
+        [&](const QString& message)
+        {
+            notify(message, QStringLiteral("success"));
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::operationFailed,
+        [&](const QString& message)
+        {
+            notify(message, QStringLiteral("error"));
         });
 
     syncPathState();

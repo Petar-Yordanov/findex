@@ -31,6 +31,9 @@ Window {
     property var themeMenu: overlays.themeMenu
     property var notificationsPopupRef: overlays.notificationsPopup
 
+    property int resizeMargin: 6
+    property int resizeCornerSize: 12
+
     Binding {
         target: Theme.AppTheme
         property: "mode"
@@ -80,5 +83,156 @@ Window {
         tabsViewModel: root.tabsVm
         statusBarViewModel: root.statusBarVm
         workspaceViewModel: root.workspaceVm
+    }
+
+    Item {
+        id: resizeLayer
+        anchors.fill: parent
+        z: 200000
+        visible: root.visibility !== Window.Maximized
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.top: parent.top
+            height: root.resizeMargin
+            color: "transparent"
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.SizeVerCursor
+                onPressed: function(mouse) {
+                    mouse.accepted = root.startSystemResize(Qt.TopEdge)
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            height: root.resizeMargin
+            color: "transparent"
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.SizeVerCursor
+                onPressed: function(mouse) {
+                    mouse.accepted = root.startSystemResize(Qt.BottomEdge)
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: root.resizeMargin
+            color: "transparent"
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.SizeHorCursor
+                onPressed: function(mouse) {
+                    mouse.accepted = root.startSystemResize(Qt.LeftEdge)
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.right: parent.right
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            width: root.resizeMargin
+            color: "transparent"
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.SizeHorCursor
+                onPressed: function(mouse) {
+                    mouse.accepted = root.startSystemResize(Qt.RightEdge)
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.top: parent.top
+            width: root.resizeCornerSize
+            height: root.resizeCornerSize
+            color: "transparent"
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.SizeFDiagCursor
+                onPressed: function(mouse) {
+                    mouse.accepted = root.startSystemResize(Qt.LeftEdge | Qt.TopEdge)
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.right: parent.right
+            anchors.top: parent.top
+            width: root.resizeCornerSize
+            height: root.resizeCornerSize
+            color: "transparent"
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.SizeBDiagCursor
+                onPressed: function(mouse) {
+                    mouse.accepted = root.startSystemResize(Qt.RightEdge | Qt.TopEdge)
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.left: parent.left
+            anchors.bottom: parent.bottom
+            width: root.resizeCornerSize
+            height: root.resizeCornerSize
+            color: "transparent"
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.SizeBDiagCursor
+                onPressed: function(mouse) {
+                    mouse.accepted = root.startSystemResize(Qt.LeftEdge | Qt.BottomEdge)
+                }
+            }
+        }
+
+        Rectangle {
+            anchors.right: parent.right
+            anchors.bottom: parent.bottom
+            width: root.resizeCornerSize
+            height: root.resizeCornerSize
+            color: "transparent"
+
+            MouseArea {
+                anchors.fill: parent
+                hoverEnabled: true
+                acceptedButtons: Qt.LeftButton
+                cursorShape: Qt.SizeFDiagCursor
+                onPressed: function(mouse) {
+                    mouse.accepted = root.startSystemResize(Qt.RightEdge | Qt.BottomEdge)
+                }
+            }
+        }
     }
 }

@@ -57,14 +57,14 @@ Rectangle {
                 height: 56
                 radius: Theme.Metrics.radiusMd
 
+                readonly property int _selectionRevision: root.viewModel ? root.viewModel.selectionRevision : 0
                 readonly property real usedPct: total > 0 ? (used / total) : 0
                 readonly property color usedColor: usedPct >= 0.85
                     ? Theme.AppTheme.driveUsedRed
                     : Theme.AppTheme.driveUsedBlue
-                readonly property bool selectedState: {
-                    const _selectionRefresh = root.viewModel ? root.viewModel.selectionChanged : undefined
-                    return root.viewModel ? root.viewModel.isSelected(label, "drive") : false
-                }
+                readonly property bool selectedState: root.viewModel
+                    ? root.viewModel.isSelected(label, "drive")
+                    : false
 
                 color: driveDropArea.containsDrag
                     ? Theme.AppTheme.selected
@@ -78,11 +78,13 @@ Rectangle {
 
                 border.color: driveDropArea.containsDrag
                     ? Theme.AppTheme.accent
-                    : driveMouseArea.pressed
-                      ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
-                      : "transparent"
+                    : selectedState
+                      ? Theme.AppTheme.accent
+                      : driveMouseArea.pressed
+                        ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
+                        : "transparent"
 
-                border.width: (driveDropArea.containsDrag || driveMouseArea.pressed) ? 1 : 0
+                border.width: (driveDropArea.containsDrag || selectedState || driveMouseArea.pressed) ? 1 : 0
 
                 Column {
                     anchors.fill: parent
@@ -148,7 +150,6 @@ Rectangle {
                         if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(path))
                             return
                         appWorkspaceViewModel.requestDropToPath(path, "drive")
-                        appWorkspaceViewModel.finishFileDrag(true)
                         drop.accept(Qt.MoveAction)
                     }
                 }

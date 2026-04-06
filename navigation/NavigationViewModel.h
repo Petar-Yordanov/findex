@@ -52,6 +52,7 @@ public:
     Q_INVOKABLE void updatePathText(const QString& text);
     Q_INVOKABLE void commitPathEdit(const QString& text);
     Q_INVOKABLE void navigateToBreadcrumb(int index);
+    Q_INVOKABLE void setPathFromBackend(const QString& text);
 
     Q_INVOKABLE void submitSearch();
 

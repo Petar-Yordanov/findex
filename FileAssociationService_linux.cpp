@@ -1,10 +1,9 @@
-#include <gio/gio.h>
 #include <QtSystemDetection>
 
 #ifdef Q_OS_LINUX
 
 #include "FileAssociationService.h"
-
+#include <gio/gio.h>
 #include <QHash>
 #include <QList>
 

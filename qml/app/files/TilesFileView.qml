@@ -49,20 +49,25 @@ Rectangle {
                 return viewModel ? viewModel.isRowSelected(index) : false
             }
 
+            readonly property bool editingState: viewModel && viewModel.inlineEditRow === index
+            readonly property string editError: editingState && viewModel ? viewModel.inlineEditError : ""
+
             width: ListView.view.width
-            height: 82
+            height: editingState && editError !== "" ? 110 : 82
 
             Item {
                 id: dragProxy
                 visible: false
                 width: 1
                 height: 1
+                x: mouseArea.mouseX
+                y: mouseArea.mouseY
 
                 Drag.active: mouseArea.fileDragActive
                 Drag.dragType: Drag.Internal
                 Drag.supportedActions: Qt.MoveAction
-                Drag.hotSpot.x: mouseArea.pressX
-                Drag.hotSpot.y: mouseArea.pressY
+                Drag.hotSpot.x: 0
+                Drag.hotSpot.y: 0
                 Drag.mimeData: {
                     "text/plain": viewModel ? viewModel.draggedPathsText : ""
                 }
@@ -81,8 +86,10 @@ Rectangle {
 
                 border.color: folderDropArea.containsDrag
                               ? Theme.AppTheme.accent
-                              : selectedState ? Theme.AppTheme.accent : "transparent"
-                border.width: (folderDropArea.containsDrag || selectedState) ? 1 : 0
+                              : editingState
+                                ? (editError !== "" ? Theme.AppTheme.danger : Theme.AppTheme.accent)
+                                : selectedState ? Theme.AppTheme.accent : "transparent"
+                border.width: (folderDropArea.containsDrag || selectedState || editingState) ? 1 : 0
             }
 
             Row {
@@ -106,11 +113,65 @@ Rectangle {
                     spacing: 4
 
                     Text {
+                        visible: !editingState
                         text: name
                         color: Theme.AppTheme.text
                         font.pixelSize: 14
                         elide: Text.ElideRight
                         width: parent.width
+                    }
+
+                    Column {
+                        visible: editingState
+                        width: parent.width
+                        spacing: 2
+
+                        InlineRenameField {
+                            id: inlineField
+                            width: parent.width
+                            height: 24
+                            darkTheme: Theme.AppTheme.isDark
+                            textColor: Theme.AppTheme.text
+                            bgColor: Theme.AppTheme.popupBg
+                            accentColor: editError !== "" ? Theme.AppTheme.danger : Theme.AppTheme.accent
+                            text: editingState && viewModel ? viewModel.inlineEditText : name
+
+                            onVisibleChanged: {
+                                if (visible) {
+                                    forceActiveFocus()
+                                    selectAll()
+                                }
+                            }
+
+                            onTextChanged: {
+                                if (visible && viewModel)
+                                    viewModel.updateInlineEditText(text)
+                            }
+
+                            onAccepted: {
+                                if (viewModel && !viewModel.commitInlineEdit())
+                                    Qt.callLater(function() { inlineField.forceActiveFocus() })
+                            }
+
+                            onActiveFocusChanged: {
+                                if (!activeFocus && visible && viewModel && !viewModel.commitInlineEdit())
+                                    Qt.callLater(function() { inlineField.forceActiveFocus() })
+                            }
+
+                            Keys.onEscapePressed: {
+                                if (viewModel)
+                                    viewModel.cancelInlineEdit()
+                            }
+                        }
+
+                        Text {
+                            visible: editError !== ""
+                            width: parent.width
+                            text: editError
+                            color: Theme.AppTheme.danger
+                            font.pixelSize: 10
+                            wrapMode: Text.Wrap
+                        }
                     }
 
                     Text {
@@ -148,13 +209,12 @@ Rectangle {
             DropArea {
                 id: folderDropArea
                 anchors.fill: parent
-                enabled: isDir && viewModel && viewModel.draggingItems && !viewModel.isOnlyDraggingRow(index)
+                enabled: !editingState && isDir && viewModel && viewModel.draggingItems && !viewModel.isOnlyDraggingRow(index)
 
                 onDropped: function(drop) {
                     if (!viewModel || !viewModel.canDropOnRow(index))
                         return
                     viewModel.dropOnRow(index)
-                    viewModel.finishFileDrag(true)
                     drop.accept(Qt.MoveAction)
                 }
             }
@@ -162,6 +222,7 @@ Rectangle {
             MouseArea {
                 id: mouseArea
                 anchors.fill: parent
+                enabled: !editingState
                 hoverEnabled: true
                 acceptedButtons: Qt.LeftButton | Qt.RightButton
                 preventStealing: true
@@ -250,8 +311,11 @@ Rectangle {
                         fileDragActive = true
                     }
 
-                    if (fileDragActive)
+                    if (fileDragActive) {
+                        dragProxy.x = mouse.x
+                        dragProxy.y = mouse.y
                         pushDragPreview(mouse)
+                    }
                 }
 
                 onReleased: function(mouse) {
@@ -266,8 +330,11 @@ Rectangle {
                         return
                     }
 
-                    if (fileDragActive && viewModel)
-                        viewModel.finishFileDrag(false)
+                    if (fileDragActive) {
+                        var action = dragProxy.Drag.drop()
+                        if (viewModel)
+                            viewModel.finishFileDrag(action !== Qt.IgnoreAction)
+                    }
 
                     fileDragActive = false
                     dragStarted = false
@@ -372,8 +439,8 @@ Rectangle {
                 if (!(mouse.buttons & Qt.LeftButton))
                     return
 
-                    if (Math.abs(mouse.x - pressX) < 6 && Math.abs(mouse.y - pressY) < 6)
-                        return
+                if (Math.abs(mouse.x - pressX) < 6 && Math.abs(mouse.y - pressY) < 6)
+                    return
 
                 var p = overlay.mapToItem(fileList.contentItem, mouse.x, mouse.y)
                 currentX = p.x
@@ -384,10 +451,13 @@ Rectangle {
 
                 var rows = []
                 for (var i = 0; i < fileList.count; ++i) {
-                    var itemY = i * 84
-                    var itemBottom = itemY + 82
-                    if (bottom > itemY && top < itemBottom)
-                        rows.push(i)
+                    var item = fileList.itemAtIndex(i)
+                    if (item) {
+                        var itemY = item.y
+                        var itemBottom = item.y + item.height
+                        if (bottom > itemY && top < itemBottom)
+                            rows.push(i)
+                    }
                 }
 
                 if (rows.length <= 0)

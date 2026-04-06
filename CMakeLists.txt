@@ -49,7 +49,30 @@ qt_add_executable(Findex
     workspace/FileListModel.cpp
     workspace/WorkspaceViewModel.h
     workspace/WorkspaceViewModel.cpp
+    FileAssociationService.h
+    FileAssociationService.cpp
 )
+
+if (WIN32)
+    target_sources(Findex PRIVATE
+        FileAssociationService_win.cpp
+    )
+elseif(APPLE)
+    target_sources(Findex PRIVATE
+        FileAssociationService_mac.cpp
+    )
+elseif(UNIX)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(GIO REQUIRED gio-2.0)
+
+    target_sources(Findex PRIVATE
+        FileAssociationService_linux.cpp
+    )
+
+    target_include_directories(Findex PRIVATE ${GIO_INCLUDE_DIRS})
+    target_link_libraries(Findex PRIVATE ${GIO_LIBRARIES})
+    target_compile_options(Findex PRIVATE ${GIO_CFLAGS_OTHER})
+endif()
 
 target_include_directories(Findex PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}

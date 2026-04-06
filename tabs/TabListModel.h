@@ -24,6 +24,7 @@ public:
         QString icon;
         QString path;
         bool active = false;
+        bool customTitle = false;
     };
 
     explicit TabListModel(QObject* parent = nullptr);
@@ -33,11 +34,15 @@ public:
     QHash<int, QByteArray> roleNames() const override;
 
     void setTabs(const QVector<TabItem>& tabs);
-    void addTab(const QString& title, const QString& icon = QStringLiteral("folder"), const QString& path = QStringLiteral("C:/"));
+    void addTab(const QString& title,
+                const QString& icon = QStringLiteral("folder"),
+                const QString& path = QStringLiteral("C:/"),
+                bool customTitle = false);
     void closeTab(int index);
     void activateTab(int index);
-    void renameTab(int index, const QString& title);
+    void renameTab(int index, const QString& title, bool customTitle);
     void setTabPath(int index, const QString& path);
+    void setTabTitle(int index, const QString& title, bool customTitle);
     void moveTab(int from, int to);
 
     QVector<TabItem> tabs() const;

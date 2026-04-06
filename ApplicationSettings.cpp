@@ -49,12 +49,14 @@ void ApplicationSettings::ensureDefaults() const
         tab1.insert(QStringLiteral("title"), QStringLiteral("Home"));
         tab1.insert(QStringLiteral("icon"), QStringLiteral("home"));
         tab1.insert(QStringLiteral("path"), QStringLiteral("C:/Users/Petar"));
+        tab1.insert(QStringLiteral("customTitle"), false);
         defaultTabs.push_back(tab1);
 
         QVariantMap tab2;
         tab2.insert(QStringLiteral("title"), QStringLiteral("Local Disk (C:)"));
         tab2.insert(QStringLiteral("icon"), QStringLiteral("hard-drive"));
         tab2.insert(QStringLiteral("path"), QStringLiteral("C:/"));
+        tab2.insert(QStringLiteral("customTitle"), false);
         defaultTabs.push_back(tab2);
 
         settings.setValue(kTabsKey, defaultTabs);
@@ -62,22 +64,28 @@ void ApplicationSettings::ensureDefaults() const
 
     if (!settings.contains(kCurrentTabIndexKey))
         settings.setValue(kCurrentTabIndexKey, 0);
+
+    settings.sync();
 }
 
 QString ApplicationSettings::theme() const
 {
     QSettings settings;
-    return settings.value(kThemeKey, kDefaultTheme).toString();
+    const QString value = settings.value(kThemeKey, kDefaultTheme).toString().trimmed();
+    return value == QStringLiteral("Dark")
+               ? QStringLiteral("Dark")
+               : QStringLiteral("Light");
 }
 
 void ApplicationSettings::setTheme(const QString& theme)
 {
-    const QString normalized = theme.trimmed().isEmpty()
-    ? kDefaultTheme
-    : theme.trimmed();
+    const QString normalized = theme.trimmed() == QStringLiteral("Dark")
+    ? QStringLiteral("Dark")
+    : QStringLiteral("Light");
 
     QSettings settings;
     settings.setValue(kThemeKey, normalized);
+    settings.sync();
 }
 
 bool ApplicationSettings::previewEnabled() const
@@ -90,22 +98,27 @@ void ApplicationSettings::setPreviewEnabled(bool enabled)
 {
     QSettings settings;
     settings.setValue(kPreviewEnabledKey, enabled);
+    settings.sync();
 }
 
 QString ApplicationSettings::searchScope() const
 {
     QSettings settings;
-    return settings.value(kSearchScopeKey, kDefaultSearchScope).toString();
+    const QString value = settings.value(kSearchScopeKey, kDefaultSearchScope).toString().trimmed();
+    return value == QStringLiteral("global")
+               ? QStringLiteral("global")
+               : QStringLiteral("folder");
 }
 
 void ApplicationSettings::setSearchScope(const QString& scope)
 {
-    const QString normalized = scope.trimmed().isEmpty()
-    ? kDefaultSearchScope
-    : scope.trimmed();
+    const QString normalized = scope.trimmed() == QStringLiteral("global")
+    ? QStringLiteral("global")
+    : QStringLiteral("folder");
 
     QSettings settings;
     settings.setValue(kSearchScopeKey, normalized);
+    settings.sync();
 }
 
 QString ApplicationSettings::viewMode() const
@@ -122,6 +135,7 @@ void ApplicationSettings::setViewMode(const QString& viewMode)
 
     QSettings settings;
     settings.setValue(kViewModeKey, normalized);
+    settings.sync();
 }
 
 bool ApplicationSettings::showHiddenFiles() const
@@ -134,6 +148,7 @@ void ApplicationSettings::setShowHiddenFiles(bool enabled)
 {
     QSettings settings;
     settings.setValue(kShowHiddenFilesKey, enabled);
+    settings.sync();
 }
 
 QVariantList ApplicationSettings::tabs() const
@@ -146,6 +161,7 @@ void ApplicationSettings::setTabs(const QVariantList& tabs)
 {
     QSettings settings;
     settings.setValue(kTabsKey, tabs);
+    settings.sync();
 }
 
 int ApplicationSettings::currentTabIndex() const
@@ -158,4 +174,5 @@ void ApplicationSettings::setCurrentTabIndex(int index)
 {
     QSettings settings;
     settings.setValue(kCurrentTabIndexKey, qMax(0, index));
+    settings.sync();
 }

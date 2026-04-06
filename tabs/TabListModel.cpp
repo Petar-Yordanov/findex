@@ -52,7 +52,7 @@ void TabListModel::setTabs(const QVector<TabItem>& tabs)
     endResetModel();
 }
 
-void TabListModel::addTab(const QString& title, const QString& icon, const QString& path)
+void TabListModel::addTab(const QString& title, const QString& icon, const QString& path, bool customTitle)
 {
     const int previousCount = m_tabs.size();
 
@@ -64,7 +64,7 @@ void TabListModel::addTab(const QString& title, const QString& icon, const QStri
 
     const int row = m_tabs.size();
     beginInsertRows(QModelIndex(), row, row);
-    m_tabs.push_back(TabItem{ title, icon, path, true });
+    m_tabs.push_back(TabItem{ title, icon, path, true, customTitle });
     endInsertRows();
 }
 
@@ -81,7 +81,7 @@ void TabListModel::closeTab(int index)
 
     if (m_tabs.isEmpty())
     {
-        addTab(QStringLiteral("Home"), QStringLiteral("home"), QStringLiteral("C:/Users/Petar"));
+        addTab(QStringLiteral("Home"), QStringLiteral("home"), QStringLiteral("C:/Users/Petar"), false);
         return;
     }
 
@@ -109,15 +109,20 @@ void TabListModel::activateTab(int index)
     }
 }
 
-void TabListModel::renameTab(int index, const QString& title)
+void TabListModel::renameTab(int index, const QString& title, bool customTitle)
 {
     if (index < 0 || index >= m_tabs.size())
         return;
 
-    if (m_tabs[index].title == title)
+    const bool titleChanged = m_tabs[index].title != title;
+    const bool customChanged = m_tabs[index].customTitle != customTitle;
+
+    if (!titleChanged && !customChanged)
         return;
 
     m_tabs[index].title = title;
+    m_tabs[index].customTitle = customTitle;
+
     const QModelIndex modelIndex = this->index(index, 0);
     emit dataChanged(modelIndex, modelIndex, { TitleRole });
 }
@@ -133,6 +138,11 @@ void TabListModel::setTabPath(int index, const QString& path)
     m_tabs[index].path = path;
     const QModelIndex modelIndex = this->index(index, 0);
     emit dataChanged(modelIndex, modelIndex, { PathRole });
+}
+
+void TabListModel::setTabTitle(int index, const QString& title, bool customTitle)
+{
+    renameTab(index, title, customTitle);
 }
 
 void TabListModel::moveTab(int from, int to)

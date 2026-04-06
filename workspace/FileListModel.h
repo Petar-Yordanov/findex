@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QAbstractListModel>
+#include <QFileInfo>
 #include <QString>
 #include <QVector>
 
@@ -41,8 +42,11 @@ public:
     void setItems(const QVector<FileItem>& items);
     QVector<FileItem> items() const;
 
+    bool insertItem(int row, const FileItem& item);
+    bool removeItem(int row);
+    bool updateItem(int row, const FileItem& item);
+
     Q_INVOKABLE QVariantMap get(int row) const;
-    Q_INVOKABLE void loadDefaults(const QString& basePath = QStringLiteral("C:/Projects/Findex"));
 
 private:
     QVector<FileItem> m_items;

@@ -37,6 +37,7 @@ public:
     Q_INVOKABLE void cancelRenameTab();
     Q_INVOKABLE void moveTab(int from, int to);
     Q_INVOKABLE void setCurrentTabPath(const QString& path);
+    Q_INVOKABLE void syncCurrentTabToPath(const QString& path);
 
 signals:
     void currentIndexChanged();
@@ -53,6 +54,7 @@ signals:
 private:
     void setCurrentIndexInternal(int index);
     void setEditingIndexInternal(int index);
+    QString defaultTitleForPath(const QString& path) const;
 
 private:
     TabListModel m_tabsModel;

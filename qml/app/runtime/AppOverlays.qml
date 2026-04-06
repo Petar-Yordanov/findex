@@ -146,16 +146,6 @@ Item {
                 themeMenu.close()
             }
         }
-
-        StyledMenuItem {
-            text: "System"
-            darkTheme: Theme.AppTheme.isDark
-            onTriggered: {
-                if (root.rootWindow.commandBarVm)
-                    root.rootWindow.commandBarVm.applyTheme("System")
-                themeMenu.close()
-            }
-        }
     }
 
     StyledMenu {

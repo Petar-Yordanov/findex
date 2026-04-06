@@ -157,7 +157,6 @@ Rectangle {
                                                 if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(path))
                                                     return
                                                 appWorkspaceViewModel.requestDropToPath(path, "breadcrumb")
-                                                appWorkspaceViewModel.finishFileDrag(true)
                                                 drop.accept(Qt.MoveAction)
                                             }
                                         }

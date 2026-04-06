@@ -66,6 +66,11 @@ QString SidebarViewModel::hoveredKind() const
     return m_hoveredKind;
 }
 
+int SidebarViewModel::selectionRevision() const
+{
+    return m_selectionRevision;
+}
+
 void SidebarViewModel::openLocation(const QString& label, const QString& icon, const QString& kind, const QString& path)
 {
     const bool selectionChangedNow =
@@ -74,8 +79,10 @@ void SidebarViewModel::openLocation(const QString& label, const QString& icon, c
     m_selectedLabel = label;
     m_selectedKind = kind;
 
-    if (selectionChangedNow)
+    if (selectionChangedNow) {
+        ++m_selectionRevision;
         emit selectionChanged();
+    }
 
     emit openRequested(label, icon, kind, path);
     emit hoveredChanged();

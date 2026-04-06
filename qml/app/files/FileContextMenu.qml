@@ -10,6 +10,11 @@ StyledMenu {
 
     darkTheme: Theme.AppTheme.isDark
 
+    onRowIndexChanged: {
+        if (viewModel && rowIndex >= 0)
+            viewModel.prepareOpenWithForRow(rowIndex)
+    }
+
     StyledMenuItem {
         text: "Open"
         darkTheme: Theme.AppTheme.isDark
@@ -21,6 +26,29 @@ StyledMenu {
             menu.close()
         }
     }
+
+    Repeater {
+        model: viewModel ? viewModel.openWithApps : []
+
+        delegate: StyledMenuItem {
+            required property var modelData
+
+            text: (modelData.isDefault ? "Open with " : "Open in ")
+                  + (modelData.name || modelData.id || "App")
+            darkTheme: Theme.AppTheme.isDark
+            enabled: rowIndex >= 0
+
+            onTriggered: {
+                if (viewModel && rowIndex >= 0) {
+                    const appKey = modelData.id || modelData.executable || modelData.name
+                    viewModel.openRowWithApp(rowIndex, appKey)
+                }
+                menu.close()
+            }
+        }
+    }
+
+    StyledMenuSeparator {}
 
     StyledMenuItem {
         text: "Rename"
@@ -66,20 +94,6 @@ StyledMenu {
         onTriggered: {
             if (viewModel && rowIndex >= 0)
                 viewModel.requestFileContextAction("Delete", rowIndex)
-            menu.close()
-        }
-    }
-
-    StyledMenuSeparator {}
-
-    StyledMenuItem {
-        text: "Properties"
-        darkTheme: Theme.AppTheme.isDark
-        enabled: rowIndex >= 0
-
-        onTriggered: {
-            if (viewModel && rowIndex >= 0)
-                viewModel.requestFileContextAction("Properties", rowIndex)
             menu.close()
         }
     }

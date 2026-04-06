@@ -222,10 +222,9 @@ Rectangle {
                 spacing: Theme.Metrics.spacingMd
 
                 AppIcon {
-                    name: !commandBar.viewModel ? "sun"
-                        : commandBar.viewModel.themeMode === "Dark" ? "moon"
-                        : commandBar.viewModel.themeMode === "Light" ? "sun"
-                        : "computer"
+                    name: !commandBar.viewModel
+                        ? "sun"
+                        : commandBar.viewModel.themeMode === "Dark" ? "moon" : "sun"
                     darkTheme: Theme.AppTheme.isDark
                     iconSize: Theme.Metrics.iconSm
                 }

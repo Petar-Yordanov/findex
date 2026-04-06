@@ -3,6 +3,34 @@
 #include <QMetaObject>
 #include <QVariant>
 #include <QStringList>
+#include <QDir>
+#include <QRegularExpression>
+
+namespace
+{
+QString normalizePathSeparators(QString value)
+{
+    value = value.trimmed();
+    value.replace('\\', '/');
+
+    while (value.contains(QStringLiteral("//")))
+        value.replace(QStringLiteral("//"), QStringLiteral("/"));
+
+    return value;
+}
+
+bool isWindowsDriveRootPath(const QString& value)
+{
+    static const QRegularExpression re(QStringLiteral("^[A-Za-z]:/$"));
+    return re.match(value).hasMatch();
+}
+
+bool isWindowsDriveToken(const QString& value)
+{
+    static const QRegularExpression re(QStringLiteral("^[A-Za-z]:$"));
+    return re.match(value).hasMatch();
+}
+}
 
 NavigationViewModel::NavigationViewModel(QObject* parent)
     : QObject(parent)
@@ -188,42 +216,40 @@ void NavigationViewModel::navigateToBreadcrumb(int index)
     if (index < 0 || index >= m_breadcrumbModel.rowCount())
         return;
 
+    const auto items = m_breadcrumbModel.items();
+    if (index < 0 || index >= items.size())
+        return;
+
+    const QString targetPath = normalizedPathText(items.at(index).path);
+    if (targetPath.isEmpty())
+        return;
+
     if (m_backend)
-    {
-        QVariant returnedValue;
-        QMetaObject::invokeMethod(
-            m_backend,
-            "copyBreadcrumbPath",
-            Qt::DirectConnection,
-            Q_RETURN_ARG(QVariant, returnedValue),
-            Q_ARG(int, index));
-
-        if (m_backend->metaObject()->indexOfMethod("navigateToPathParts(QVariantList)") >= 0)
-        {
-            QVariantList parts;
-            const auto items = m_breadcrumbModel.items();
-            for (int i = 0; i <= index; ++i)
-            {
-                QVariantMap item;
-                item.insert(QStringLiteral("label"), items.at(i).label);
-                item.insert(QStringLiteral("icon"), items.at(i).icon);
-                item.insert(QStringLiteral("path"), items.at(i).path);
-                parts.push_back(item);
-            }
-
-            QMetaObject::invokeMethod(
-                m_backend,
-                "navigateToPathParts",
-                Qt::DirectConnection,
-                Q_ARG(QVariantList, parts));
-        }
-    }
+        invokeBackendOneStringArg("navigateToPathString", targetPath);
     else
     {
-        auto items = m_breadcrumbModel.items();
-        items.resize(index + 1);
-        m_breadcrumbModel.setItems(items);
+        auto resizedItems = items;
+        resizedItems.resize(index + 1);
+        m_breadcrumbModel.setItems(resizedItems);
         syncPathTextFromBreadcrumbs();
+    }
+
+    setEditingPath(false);
+    emit navigationStateChanged();
+}
+
+void NavigationViewModel::setPathFromBackend(const QString& text)
+{
+    const QString normalized = normalizedPathText(text);
+    if (normalized.isEmpty())
+        return;
+
+    setBreadcrumbsFromPathText(normalized);
+
+    if (m_pathText != normalized)
+    {
+        m_pathText = normalized;
+        emit pathTextChanged();
     }
 
     setEditingPath(false);
@@ -238,22 +264,78 @@ void NavigationViewModel::submitSearch()
 void NavigationViewModel::setBreadcrumbsFromPathText(const QString& text)
 {
     const QString normalized = normalizedPathText(text);
-    const QStringList parts = normalized.split('/', Qt::SkipEmptyParts);
+    if (normalized.isEmpty())
+    {
+        m_breadcrumbModel.clear();
+        syncPathTextFromBreadcrumbs();
+        return;
+    }
 
     QVector<NavigationBreadcrumbModel::Item> items;
-    items.reserve(parts.size());
 
+#ifdef Q_OS_WINDOWS
+    QString working = normalized;
+    if (isWindowsDriveRootPath(working))
+    {
+        const QString driveLabel = working.left(2);
+        items.push_back({
+            driveLabel,
+            QStringLiteral("hard-drive"),
+            working
+        });
+
+        m_breadcrumbModel.setItems(items);
+        syncPathTextFromBreadcrumbs();
+        return;
+    }
+
+    static const QRegularExpression drivePrefixRe(QStringLiteral("^([A-Za-z]:)(/.*)?$"));
+    const QRegularExpressionMatch driveMatch = drivePrefixRe.match(working);
+    if (driveMatch.hasMatch())
+    {
+        const QString driveLabel = driveMatch.captured(1);
+        const QString tail = driveMatch.captured(2);
+
+        items.push_back({
+            driveLabel,
+            QStringLiteral("hard-drive"),
+            driveLabel + QStringLiteral("/")
+        });
+
+        const QStringList parts = tail.split('/', Qt::SkipEmptyParts);
+        QString cumulativePath = driveLabel + QStringLiteral("/");
+
+        for (const QString& part : parts)
+        {
+            if (!cumulativePath.endsWith('/'))
+                cumulativePath += QStringLiteral("/");
+
+            cumulativePath += part;
+
+            items.push_back({
+                part,
+                QStringLiteral("folder"),
+                cumulativePath
+            });
+        }
+
+        m_breadcrumbModel.setItems(items);
+        syncPathTextFromBreadcrumbs();
+        return;
+    }
+#endif
+
+    const QStringList parts = normalized.split('/', Qt::SkipEmptyParts);
     QString cumulativePath;
+
     for (int i = 0; i < parts.size(); ++i)
     {
         NavigationBreadcrumbModel::Item item;
         item.label = parts.at(i);
-        item.icon = (i == 0 && item.label.contains(':'))
-                        ? QStringLiteral("hard-drive")
-                        : QStringLiteral("folder");
+        item.icon = (i == 0) ? QStringLiteral("hard-drive") : QStringLiteral("folder");
 
         if (i == 0)
-            cumulativePath = item.label;
+            cumulativePath = QStringLiteral("/") + item.label;
         else
             cumulativePath += QStringLiteral("/") + item.label;
 
@@ -271,7 +353,7 @@ void NavigationViewModel::seedDefaultBreadcrumbsIfEmpty()
         return;
 
     QVector<NavigationBreadcrumbModel::Item> items;
-    items.push_back({ QStringLiteral("C:"), QStringLiteral("hard-drive"), QStringLiteral("C:") });
+    items.push_back({ QStringLiteral("C:"), QStringLiteral("hard-drive"), QStringLiteral("C:/") });
     items.push_back({ QStringLiteral("Projects"), QStringLiteral("folder"), QStringLiteral("C:/Projects") });
     items.push_back({ QStringLiteral("Findex"), QStringLiteral("folder"), QStringLiteral("C:/Projects/Findex") });
     m_breadcrumbModel.setItems(items);
@@ -279,11 +361,19 @@ void NavigationViewModel::seedDefaultBreadcrumbsIfEmpty()
 
 QString NavigationViewModel::normalizedPathText(const QString& text) const
 {
-    QString value = text.trimmed();
-    value.replace('\\', '/');
+    QString value = normalizePathSeparators(text);
+    if (value.isEmpty())
+        return value;
 
-    while (value.contains("//"))
-        value.replace("//", "/");
+#ifdef Q_OS_WINDOWS
+    if (isWindowsDriveToken(value))
+        value += QStringLiteral("/");
+
+    static const QRegularExpression driveRootRe(QStringLiteral("^([A-Za-z]:)/?$"));
+    const QRegularExpressionMatch driveRootMatch = driveRootRe.match(value);
+    if (driveRootMatch.hasMatch())
+        return driveRootMatch.captured(1) + QStringLiteral("/");
+#endif
 
     return value;
 }
@@ -301,7 +391,7 @@ void NavigationViewModel::syncPathTextFromBreadcrumbs()
         return;
     }
 
-    const QString next = items.last().path;
+    const QString next = normalizedPathText(items.last().path);
 
     if (m_pathText == next)
         return;
