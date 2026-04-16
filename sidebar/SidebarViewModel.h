@@ -6,14 +6,16 @@
 #include <QTimer>
 #include <QVector>
 #include "DriveListModel.h"
+#include "QuickAccessModel.h"
 
-class SidebarTreeModel;
+class WslModel;
 
 class SidebarViewModel final : public QObject
 {
     Q_OBJECT
 
-    Q_PROPERTY(QObject* treeModel READ treeModel CONSTANT)
+    Q_PROPERTY(QObject* quickAccessModel READ quickAccessModel CONSTANT)
+    Q_PROPERTY(QObject* wslModel READ wslModel CONSTANT)
     Q_PROPERTY(QObject* drivesModel READ drivesModel CONSTANT)
 
     Q_PROPERTY(QString contextLabel READ contextLabel NOTIFY contextChanged)
@@ -28,7 +30,8 @@ class SidebarViewModel final : public QObject
 public:
     explicit SidebarViewModel(QObject* parent = nullptr);
 
-    QObject* treeModel() const;
+    QObject* quickAccessModel() const;
+    QObject* wslModel() const;
     QObject* drivesModel() const;
 
     QString contextLabel() const;
@@ -43,11 +46,11 @@ public:
     Q_INVOKABLE void openLocation(const QString& label, const QString& icon, const QString& kind, const QString& path);
     Q_INVOKABLE void setContextItem(const QString& label, const QString& icon, const QString& kind, const QString& path);
 
-    Q_INVOKABLE bool isSelected(const QString& label, const QString& kind) const;
+    Q_INVOKABLE bool isSelected(const QString& label, const QString& kind, const QString& path) const;
 
-    Q_INVOKABLE void setHoveredItem(const QString& label, const QString& kind);
-    Q_INVOKABLE void clearHoveredItem(const QString& label, const QString& kind);
-    Q_INVOKABLE bool isHovered(const QString& label, const QString& kind) const;
+    Q_INVOKABLE void setHoveredItem(const QString& label, const QString& kind, const QString& path);
+    Q_INVOKABLE void clearHoveredItem(const QString& label, const QString& kind, const QString& path);
+    Q_INVOKABLE bool isHovered(const QString& label, const QString& kind, const QString& path) const;
 
     Q_INVOKABLE void requestOpenContextInNewTab();
     Q_INVOKABLE void requestCopyContextPath();
@@ -73,11 +76,13 @@ private:
     static QString iconForDrivePath(const QString& rootPath);
 
 private:
-    SidebarTreeModel* m_treeModel;
+    QuickAccessModel* m_quickAccessModel;
+    WslModel* m_wslModel;
     DriveListModel* m_drivesModel;
 
     QString m_selectedLabel;
     QString m_selectedKind;
+    QString m_selectedPath;
 
     QString m_contextLabel;
     QString m_contextIcon;
@@ -86,6 +91,7 @@ private:
 
     QString m_hoveredLabel;
     QString m_hoveredKind;
+    QString m_hoveredPath;
     int m_selectionRevision = 0;
 
     QTimer m_driveRefreshTimer;

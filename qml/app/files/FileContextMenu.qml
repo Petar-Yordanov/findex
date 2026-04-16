@@ -11,8 +11,42 @@ StyledMenu {
     darkTheme: Theme.AppTheme.isDark
 
     onRowIndexChanged: {
+        openWithHoverTimer.stop()
+        openWithSubmenu.close()
         if (viewModel && rowIndex >= 0)
             viewModel.prepareOpenWithForRow(rowIndex)
+    }
+
+    onClosed: {
+        openWithHoverTimer.stop()
+        openWithSubmenu.close()
+    }
+
+    function hasOpenWithApps() {
+        return viewModel && viewModel.openWithApps && viewModel.openWithApps.length > 0
+    }
+
+    function openOpenWithSubmenu() {
+        if (!openWithItem.enabled)
+            return
+
+        var itemPos = openWithItem.mapToItem(menu.parent, 0, 0)
+        var openRight = true
+
+        if (menu.parent) {
+            var estimatedSubmenuWidth = openWithSubmenu.width
+            if (itemPos.x + menu.width + estimatedSubmenuWidth + 12 > menu.parent.width)
+                openRight = false
+        }
+
+        openWithSubmenu.popupBeside(openWithItem, openRight, -8)
+    }
+
+    Timer {
+        id: openWithHoverTimer
+        interval: 120
+        repeat: false
+        onTriggered: menu.openOpenWithSubmenu()
     }
 
     StyledMenuItem {
@@ -23,28 +57,34 @@ StyledMenu {
         onTriggered: {
             if (viewModel && rowIndex >= 0)
                 viewModel.openRow(rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
             menu.close()
         }
     }
 
-    Repeater {
-        model: viewModel ? viewModel.openWithApps : []
+    StyledMenuItem {
+        id: openWithItem
+        text: "Open with..."
+        darkTheme: Theme.AppTheme.isDark
+        enabled: rowIndex >= 0 && menu.hasOpenWithApps()
 
-        delegate: StyledMenuItem {
-            required property var modelData
+        onHoverStateChanged: function(hovered) {
+            if (!enabled)
+                return
 
-            text: (modelData.isDefault ? "Open with " : "Open in ")
-                  + (modelData.name || modelData.id || "App")
-            darkTheme: Theme.AppTheme.isDark
-            enabled: rowIndex >= 0
+            if (hovered)
+                openWithHoverTimer.restart()
+            else
+                openWithHoverTimer.stop()
+        }
 
-            onTriggered: {
-                if (viewModel && rowIndex >= 0) {
-                    const appKey = modelData.id || modelData.executable || modelData.name
-                    viewModel.openRowWithApp(rowIndex, appKey)
-                }
-                menu.close()
-            }
+        onTriggered: {
+            if (!enabled)
+                return
+
+            openWithHoverTimer.stop()
+            menu.openOpenWithSubmenu()
         }
     }
 
@@ -58,6 +98,8 @@ StyledMenu {
         onTriggered: {
             if (viewModel && rowIndex >= 0)
                 viewModel.requestFileContextAction("Rename", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
             menu.close()
         }
     }
@@ -70,6 +112,8 @@ StyledMenu {
         onTriggered: {
             if (viewModel && rowIndex >= 0)
                 viewModel.requestFileContextAction("Copy", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
             menu.close()
         }
     }
@@ -82,6 +126,8 @@ StyledMenu {
         onTriggered: {
             if (viewModel && rowIndex >= 0)
                 viewModel.requestFileContextAction("Cut", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
             menu.close()
         }
     }
@@ -94,7 +140,70 @@ StyledMenu {
         onTriggered: {
             if (viewModel && rowIndex >= 0)
                 viewModel.requestFileContextAction("Delete", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
             menu.close()
+        }
+    }
+
+    StyledMenuSeparator {}
+
+    StyledMenuItem {
+        text: "Compress"
+        darkTheme: Theme.AppTheme.isDark
+        enabled: rowIndex >= 0
+
+        onTriggered: {
+            if (viewModel && rowIndex >= 0)
+                viewModel.requestFileContextAction("Compress", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
+            menu.close()
+        }
+    }
+
+    StyledMenuItem {
+        text: "Extract here"
+        darkTheme: Theme.AppTheme.isDark
+        enabled: rowIndex >= 0
+
+        onTriggered: {
+            if (viewModel && rowIndex >= 0)
+                viewModel.requestFileContextAction("Extract here", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
+            menu.close()
+        }
+    }
+
+    StyledMenu {
+        id: openWithSubmenu
+        parent: menu.parent
+        darkTheme: Theme.AppTheme.isDark
+        menuWidth: 240
+
+        Repeater {
+            model: viewModel ? viewModel.openWithApps : []
+
+            delegate: StyledMenuItem {
+                required property var modelData
+
+                text: modelData.isDefault
+                      ? ((modelData.name || modelData.id || "App") + " (default)")
+                      : (modelData.name || modelData.id || "App")
+                darkTheme: Theme.AppTheme.isDark
+                enabled: menu.rowIndex >= 0
+
+                onTriggered: {
+                    if (viewModel && menu.rowIndex >= 0) {
+                        const appKey = modelData.id || modelData.executable || modelData.name
+                        viewModel.openRowWithApp(menu.rowIndex, appKey)
+                    }
+                    openWithHoverTimer.stop()
+                    openWithSubmenu.close()
+                    menu.close()
+                }
+            }
         }
     }
 }

@@ -3,7 +3,7 @@
 #include <QAbstractItemModel>
 #include "SidebarTreeItem.h"
 
-class SidebarTreeModel final : public QAbstractItemModel
+class WslModel final : public QAbstractItemModel
 {
     Q_OBJECT
 
@@ -20,8 +20,8 @@ public:
     };
     Q_ENUM(Roles)
 
-    explicit SidebarTreeModel(QObject* parent = nullptr);
-    ~SidebarTreeModel() override;
+    explicit WslModel(QObject* parent = nullptr);
+    ~WslModel() override;
 
     QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
     QModelIndex parent(const QModelIndex& child) const override;

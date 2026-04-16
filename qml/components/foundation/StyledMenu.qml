@@ -53,12 +53,32 @@ Popup {
             nextY = Math.max(edgeMargin, Math.min(nextY, parent.height - popupHeight - edgeMargin))
         }
 
-        x = nextX
-        y = nextY
-        open()
+        if (control.visible) {
+            if (control.x !== nextX)
+                control.x = nextX
+            if (control.y !== nextY)
+                control.y = nextY
+            return
+        }
+
+        control.x = nextX
+        control.y = nextY
+        control.open()
+    }
+
+    function popupBeside(item, offsetX, offsetY) {
+        if (!item || !parent)
+            return
+
+        var dx = offsetX === undefined ? 0 : offsetX
+        var dy = offsetY === undefined ? 0 : offsetY
+
+        var p = item.mapToItem(parent, item.width + dx, dy)
+        popupAt(p.x, p.y)
     }
 
     function popup() {
-        open()
+        if (!control.visible)
+            control.open()
     }
 }

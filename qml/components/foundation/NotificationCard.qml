@@ -9,6 +9,7 @@ Rectangle {
 
     property int notificationId: -1
     property string title: ""
+    property string details: ""
     property string kind: "info"
     property int progress: -1
     property bool autoClose: false
@@ -99,6 +100,15 @@ Rectangle {
             }
         }
 
+        Text {
+            visible: control.details !== ""
+            width: parent.width
+            text: control.details
+            color: control.mutedColor
+            font.pixelSize: Theme.Typography.caption
+            wrapMode: Text.Wrap
+        }
+
         ThinProgressBar {
             visible: control.progress >= 0
             width: parent.width
@@ -109,7 +119,7 @@ Rectangle {
         }
 
         Text {
-            visible: control.progress >= 0
+            visible: control.progress >= 0 && control.details === ""
             text: control.done ? "Completed" : (control.progress + "%")
             color: control.mutedColor
             font.pixelSize: Theme.Typography.caption

@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(Findex VERSION 0.1 LANGUAGES CXX)
+project(Findex VERSION 0.0.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -17,14 +17,16 @@ qt_add_executable(Findex
 
     sidebar/DriveListModel.cpp
     sidebar/DriveListModel.h
+    sidebar/QuickAccessModel.cpp
+    sidebar/QuickAccessModel.h
     sidebar/SidebarItemData.cpp
     sidebar/SidebarItemData.h
     sidebar/SidebarTreeItem.cpp
     sidebar/SidebarTreeItem.h
-    sidebar/SidebarTreeModel.cpp
-    sidebar/SidebarTreeModel.h
     sidebar/SidebarViewModel.cpp
     sidebar/SidebarViewModel.h
+    sidebar/WslModel.cpp
+    sidebar/WslModel.h
 
     navigation/NavigationBreadcrumbModel.cpp
     navigation/NavigationBreadcrumbModel.h
@@ -89,6 +91,7 @@ qt_add_qml_module(Findex
         qml/app/layout/SplitWorkspace.qml
         qml/app/runtime/AppOverlays.qml
         qml/app/sidebar/SidebarContextMenu.qml
+        qml/app/sidebar/QuickAccessPane.qml
         qml/app/sidebar/SidebarItem.qml
         qml/app/sidebar/SidebarTreePane.qml
         qml/app/sidebar/DriveListPane.qml
@@ -260,6 +263,7 @@ qt_add_qml_module(Findex
         QML_FILES qml/app/files/LargeIconsFileView.qml
         QML_FILES
         QML_FILES qml/app/files/FileContextMenu.qml
+        SOURCES FileOperationWorker.h FileOperationWorker.cpp
 )
 
 target_link_libraries(Findex

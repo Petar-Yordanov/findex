@@ -6,8 +6,10 @@ Rectangle {
 
     property bool darkTheme: Theme.AppTheme.isDark
     property string text: ""
+    readonly property bool hovered: mouseArea.containsMouse
 
     signal triggered()
+    signal hoverStateChanged(bool hovered)
 
     width: parent && parent.width > 0 ? parent.width : implicitWidth
     implicitWidth: 184
@@ -48,5 +50,6 @@ Rectangle {
         cursorShape: control.enabled ? Qt.PointingHandCursor : Qt.ArrowCursor
 
         onClicked: control.triggered()
+        onContainsMouseChanged: control.hoverStateChanged(containsMouse)
     }
 }

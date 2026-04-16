@@ -8,12 +8,18 @@
 #include <QDirIterator>
 #include <QFile>
 #include <QFileInfo>
+#include <QFutureWatcher>
 #include <QGuiApplication>
+#include <QMetaObject>
 #include <QMimeDatabase>
+#include <QMimeType>
+#include <QPointer>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSet>
 #include <QVariantList>
+#include <QtConcurrent>
+#include <QElapsedTimer>
 #include <algorithm>
 
 #include <Qt>
@@ -40,6 +46,25 @@ QString formatBytes(qint64 bytes)
     return QString::number(bytes) + QStringLiteral(" B");
 }
 
+bool isWindowsShortcutLikeSuffix(const QString& suffix)
+{
+    const QString lower = suffix.toLower();
+    return lower == QStringLiteral("url") || lower == QStringLiteral("lnk");
+}
+
+QString displayNameForFileInfo(const QFileInfo& info)
+{
+    if (info.isDir())
+        return info.fileName();
+
+#ifdef Q_OS_WINDOWS
+    if (isWindowsShortcutLikeSuffix(info.suffix()))
+        return info.completeBaseName();
+#endif
+
+    return info.fileName();
+}
+
 QString iconForFileInfo(const QFileInfo& info)
 {
     if (info.isDir())
@@ -47,31 +72,267 @@ QString iconForFileInfo(const QFileInfo& info)
 
     const QString suffix = info.suffix().toLower();
 
-    if (suffix == QStringLiteral("txt") || suffix == QStringLiteral("doc") || suffix == QStringLiteral("docx"))
+#ifdef Q_OS_WINDOWS
+    if (suffix == QStringLiteral("url") || suffix == QStringLiteral("lnk"))
+        return QStringLiteral("launch");
+#endif
+
+    if (suffix == QStringLiteral("txt") || suffix == QStringLiteral("md")
+        || suffix == QStringLiteral("rst") || suffix == QStringLiteral("doc")
+        || suffix == QStringLiteral("docx"))
         return QStringLiteral("description");
+
     if (suffix == QStringLiteral("pdf"))
         return QStringLiteral("picture-as-pdf");
+
     if (suffix == QStringLiteral("png") || suffix == QStringLiteral("jpg")
         || suffix == QStringLiteral("jpeg") || suffix == QStringLiteral("svg")
-        || suffix == QStringLiteral("gif") || suffix == QStringLiteral("webp"))
+        || suffix == QStringLiteral("gif") || suffix == QStringLiteral("webp")
+        || suffix == QStringLiteral("bmp") || suffix == QStringLiteral("ico"))
         return QStringLiteral("image");
-    if (suffix == QStringLiteral("mp3") || suffix == QStringLiteral("wav") || suffix == QStringLiteral("flac"))
+
+    if (suffix == QStringLiteral("mp3") || suffix == QStringLiteral("wav")
+        || suffix == QStringLiteral("flac") || suffix == QStringLiteral("ogg")
+        || suffix == QStringLiteral("m4a"))
         return QStringLiteral("music-note");
+
     if (suffix == QStringLiteral("mp4") || suffix == QStringLiteral("mkv")
-        || suffix == QStringLiteral("avi") || suffix == QStringLiteral("mov"))
+        || suffix == QStringLiteral("avi") || suffix == QStringLiteral("mov")
+        || suffix == QStringLiteral("wmv") || suffix == QStringLiteral("webm"))
         return QStringLiteral("movie");
-    if (suffix == QStringLiteral("zip") || suffix == QStringLiteral("7z") || suffix == QStringLiteral("rar")
-        || suffix == QStringLiteral("tar") || suffix == QStringLiteral("gz"))
+
+    if (suffix == QStringLiteral("zip") || suffix == QStringLiteral("7z")
+        || suffix == QStringLiteral("rar") || suffix == QStringLiteral("tar")
+        || suffix == QStringLiteral("gz") || suffix == QStringLiteral("bz2")
+        || suffix == QStringLiteral("xz"))
         return QStringLiteral("zip");
-    if (suffix == QStringLiteral("cpp") || suffix == QStringLiteral("h") || suffix == QStringLiteral("hpp")
-        || suffix == QStringLiteral("c") || suffix == QStringLiteral("qml")
-        || suffix == QStringLiteral("json") || suffix == QStringLiteral("yaml")
-        || suffix == QStringLiteral("yml") || suffix == QStringLiteral("xml"))
-        return QStringLiteral("code");
-    if (suffix == QStringLiteral("ps1") || suffix == QStringLiteral("bat") || suffix == QStringLiteral("sh"))
+
+    if (suffix == QStringLiteral("ps1") || suffix == QStringLiteral("bat")
+        || suffix == QStringLiteral("cmd") || suffix == QStringLiteral("sh")
+        || suffix == QStringLiteral("bash") || suffix == QStringLiteral("zsh")
+        || suffix == QStringLiteral("fish"))
         return QStringLiteral("terminal");
 
+    if (suffix == QStringLiteral("exe") || suffix == QStringLiteral("msi"))
+        return QStringLiteral("launch");
+
+    if (suffix == QStringLiteral("torrent"))
+        return QStringLiteral("download");
+
+    if (suffix == QStringLiteral("c") || suffix == QStringLiteral("h")
+        || suffix == QStringLiteral("cpp") || suffix == QStringLiteral("cxx")
+        || suffix == QStringLiteral("cc") || suffix == QStringLiteral("hpp")
+        || suffix == QStringLiteral("hh") || suffix == QStringLiteral("hxx")
+        || suffix == QStringLiteral("cs") || suffix == QStringLiteral("java")
+        || suffix == QStringLiteral("kt") || suffix == QStringLiteral("kts")
+        || suffix == QStringLiteral("swift") || suffix == QStringLiteral("go")
+        || suffix == QStringLiteral("rs") || suffix == QStringLiteral("py")
+        || suffix == QStringLiteral("rb") || suffix == QStringLiteral("php")
+        || suffix == QStringLiteral("pl") || suffix == QStringLiteral("lua")
+        || suffix == QStringLiteral("r") || suffix == QStringLiteral("m")
+        || suffix == QStringLiteral("mm") || suffix == QStringLiteral("scala")
+        || suffix == QStringLiteral("dart") || suffix == QStringLiteral("jl")
+        || suffix == QStringLiteral("zig") || suffix == QStringLiteral("nim")
+        || suffix == QStringLiteral("js") || suffix == QStringLiteral("mjs")
+        || suffix == QStringLiteral("cjs") || suffix == QStringLiteral("ts")
+        || suffix == QStringLiteral("tsx") || suffix == QStringLiteral("jsx")
+        || suffix == QStringLiteral("qml") || suffix == QStringLiteral("json")
+        || suffix == QStringLiteral("xml") || suffix == QStringLiteral("yaml")
+        || suffix == QStringLiteral("yml") || suffix == QStringLiteral("toml")
+        || suffix == QStringLiteral("ini") || suffix == QStringLiteral("conf")
+        || suffix == QStringLiteral("cfg") || suffix == QStringLiteral("sql")
+        || suffix == QStringLiteral("css") || suffix == QStringLiteral("scss")
+        || suffix == QStringLiteral("sass") || suffix == QStringLiteral("less")
+        || suffix == QStringLiteral("html") || suffix == QStringLiteral("htm")
+        || suffix == QStringLiteral("vue") || suffix == QStringLiteral("svelte")
+        || suffix == QStringLiteral("dockerfile"))
+        return QStringLiteral("code");
+
     return QStringLiteral("insert-drive-file");
+}
+
+QString fallbackTypeFromSuffix(const QFileInfo& info)
+{
+    const QString suffix = info.suffix().toLower();
+
+    if (suffix.isEmpty())
+        return QStringLiteral("File");
+
+#ifdef Q_OS_WINDOWS
+    if (suffix == QStringLiteral("url"))
+        return QStringLiteral("Internet Shortcut");
+    if (suffix == QStringLiteral("lnk"))
+        return QStringLiteral("Shortcut");
+    if (suffix == QStringLiteral("exe"))
+        return QStringLiteral("Application");
+    if (suffix == QStringLiteral("msi"))
+        return QStringLiteral("Windows Installer Package");
+#endif
+
+    if (suffix == QStringLiteral("txt"))
+        return QStringLiteral("Text Document");
+    if (suffix == QStringLiteral("md"))
+        return QStringLiteral("Markdown Document");
+    if (suffix == QStringLiteral("rst"))
+        return QStringLiteral("reStructuredText Document");
+    if (suffix == QStringLiteral("log"))
+        return QStringLiteral("Log File");
+    if (suffix == QStringLiteral("pdf"))
+        return QStringLiteral("PDF Document");
+
+    if (suffix == QStringLiteral("zip"))
+        return QStringLiteral("Compressed Archive File");
+    if (suffix == QStringLiteral("7z"))
+        return QStringLiteral("7-Zip Archive");
+    if (suffix == QStringLiteral("rar"))
+        return QStringLiteral("RAR Archive");
+    if (suffix == QStringLiteral("tar"))
+        return QStringLiteral("TAR Archive");
+    if (suffix == QStringLiteral("gz"))
+        return QStringLiteral("GZip Archive");
+    if (suffix == QStringLiteral("bz2"))
+        return QStringLiteral("BZip2 Archive");
+    if (suffix == QStringLiteral("xz"))
+        return QStringLiteral("XZ Archive");
+    if (suffix == QStringLiteral("torrent"))
+        return QStringLiteral("Torrent File");
+
+    if (suffix == QStringLiteral("png") || suffix == QStringLiteral("jpg")
+        || suffix == QStringLiteral("jpeg") || suffix == QStringLiteral("gif")
+        || suffix == QStringLiteral("webp") || suffix == QStringLiteral("svg")
+        || suffix == QStringLiteral("bmp") || suffix == QStringLiteral("ico"))
+        return QStringLiteral("Image File");
+
+    if (suffix == QStringLiteral("mp3") || suffix == QStringLiteral("wav")
+        || suffix == QStringLiteral("flac") || suffix == QStringLiteral("ogg")
+        || suffix == QStringLiteral("m4a"))
+        return QStringLiteral("Audio File");
+
+    if (suffix == QStringLiteral("mp4") || suffix == QStringLiteral("mkv")
+        || suffix == QStringLiteral("avi") || suffix == QStringLiteral("mov")
+        || suffix == QStringLiteral("wmv") || suffix == QStringLiteral("webm"))
+        return QStringLiteral("Video File");
+
+    if (suffix == QStringLiteral("c"))
+        return QStringLiteral("C Source File");
+    if (suffix == QStringLiteral("h"))
+        return QStringLiteral("C Header File");
+    if (suffix == QStringLiteral("cpp") || suffix == QStringLiteral("cc")
+        || suffix == QStringLiteral("cxx"))
+        return QStringLiteral("C++ Source File");
+    if (suffix == QStringLiteral("hpp") || suffix == QStringLiteral("hh")
+        || suffix == QStringLiteral("hxx"))
+        return QStringLiteral("C++ Header File");
+    if (suffix == QStringLiteral("cs"))
+        return QStringLiteral("C# Source File");
+    if (suffix == QStringLiteral("java"))
+        return QStringLiteral("Java Source File");
+    if (suffix == QStringLiteral("kt") || suffix == QStringLiteral("kts"))
+        return QStringLiteral("Kotlin Source File");
+    if (suffix == QStringLiteral("swift"))
+        return QStringLiteral("Swift Source File");
+    if (suffix == QStringLiteral("go"))
+        return QStringLiteral("Go Source File");
+    if (suffix == QStringLiteral("rs"))
+        return QStringLiteral("Rust Source File");
+    if (suffix == QStringLiteral("py"))
+        return QStringLiteral("Python Source File");
+    if (suffix == QStringLiteral("rb"))
+        return QStringLiteral("Ruby Source File");
+    if (suffix == QStringLiteral("php"))
+        return QStringLiteral("PHP Source File");
+    if (suffix == QStringLiteral("pl"))
+        return QStringLiteral("Perl Source File");
+    if (suffix == QStringLiteral("lua"))
+        return QStringLiteral("Lua Source File");
+    if (suffix == QStringLiteral("r"))
+        return QStringLiteral("R Source File");
+    if (suffix == QStringLiteral("m"))
+        return QStringLiteral("Objective-C Source File");
+    if (suffix == QStringLiteral("mm"))
+        return QStringLiteral("Objective-C++ Source File");
+    if (suffix == QStringLiteral("scala"))
+        return QStringLiteral("Scala Source File");
+    if (suffix == QStringLiteral("dart"))
+        return QStringLiteral("Dart Source File");
+    if (suffix == QStringLiteral("jl"))
+        return QStringLiteral("Julia Source File");
+    if (suffix == QStringLiteral("zig"))
+        return QStringLiteral("Zig Source File");
+    if (suffix == QStringLiteral("nim"))
+        return QStringLiteral("Nim Source File");
+
+    if (suffix == QStringLiteral("js") || suffix == QStringLiteral("mjs")
+        || suffix == QStringLiteral("cjs"))
+        return QStringLiteral("JavaScript File");
+    if (suffix == QStringLiteral("ts"))
+        return QStringLiteral("TypeScript File");
+    if (suffix == QStringLiteral("jsx"))
+        return QStringLiteral("React JSX File");
+    if (suffix == QStringLiteral("tsx"))
+        return QStringLiteral("React TSX File");
+    if (suffix == QStringLiteral("qml"))
+        return QStringLiteral("QML File");
+    if (suffix == QStringLiteral("json"))
+        return QStringLiteral("JSON File");
+    if (suffix == QStringLiteral("xml"))
+        return QStringLiteral("XML File");
+    if (suffix == QStringLiteral("yaml") || suffix == QStringLiteral("yml"))
+        return QStringLiteral("YAML File");
+    if (suffix == QStringLiteral("toml"))
+        return QStringLiteral("TOML File");
+    if (suffix == QStringLiteral("ini") || suffix == QStringLiteral("cfg")
+        || suffix == QStringLiteral("conf"))
+        return QStringLiteral("Configuration File");
+    if (suffix == QStringLiteral("sql"))
+        return QStringLiteral("SQL File");
+    if (suffix == QStringLiteral("html") || suffix == QStringLiteral("htm"))
+        return QStringLiteral("HTML Document");
+    if (suffix == QStringLiteral("css"))
+        return QStringLiteral("CSS File");
+    if (suffix == QStringLiteral("scss"))
+        return QStringLiteral("SCSS File");
+    if (suffix == QStringLiteral("sass"))
+        return QStringLiteral("Sass File");
+    if (suffix == QStringLiteral("less"))
+        return QStringLiteral("LESS File");
+    if (suffix == QStringLiteral("vue"))
+        return QStringLiteral("Vue Component");
+    if (suffix == QStringLiteral("svelte"))
+        return QStringLiteral("Svelte Component");
+    if (suffix == QStringLiteral("sh"))
+        return QStringLiteral("Shell Script");
+    if (suffix == QStringLiteral("bash"))
+        return QStringLiteral("Bash Script");
+    if (suffix == QStringLiteral("zsh"))
+        return QStringLiteral("Zsh Script");
+    if (suffix == QStringLiteral("fish"))
+        return QStringLiteral("Fish Script");
+    if (suffix == QStringLiteral("bat"))
+        return QStringLiteral("Batch File");
+    if (suffix == QStringLiteral("cmd"))
+        return QStringLiteral("Command Script");
+    if (suffix == QStringLiteral("ps1"))
+        return QStringLiteral("PowerShell Script");
+
+    return QStringLiteral("%1 File").arg(suffix.toUpper());
+}
+
+bool looksLikeUselessMimeComment(const QString& value)
+{
+    const QString trimmed = value.trimmed();
+    if (trimmed.isEmpty())
+        return true;
+
+    const QString lower = trimmed.toLower();
+
+    return lower == QStringLiteral("application/octet-stream")
+           || lower == QStringLiteral("text/plain")
+           || lower == QStringLiteral("application/x-msdownload")
+           || lower == QStringLiteral("application/x-bittorrent")
+           || lower == QStringLiteral("application/rls-services+xml")
+           || lower.startsWith(QStringLiteral("application/"))
+           || lower.startsWith(QStringLiteral("text/"));
 }
 
 QString typeForFileInfo(const QFileInfo& info)
@@ -79,23 +340,24 @@ QString typeForFileInfo(const QFileInfo& info)
     if (info.isDir())
         return QStringLiteral("File folder");
 
+    const QString fallback = fallbackTypeFromSuffix(info);
+
     QMimeDatabase db;
-    const QMimeType mime = db.mimeTypeForFile(info);
+    const QMimeType mime = db.mimeTypeForFile(info, QMimeDatabase::MatchContent);
 
-    if (mime.isValid() && !mime.comment().trimmed().isEmpty())
-        return mime.comment().trimmed();
+    if (mime.isValid()) {
+        const QString comment = mime.comment().trimmed();
+        if (!looksLikeUselessMimeComment(comment))
+            return comment;
+    }
 
-    const QString suffix = info.suffix().toLower();
-    if (!suffix.isEmpty())
-        return QStringLiteral("%1 File").arg(suffix.toUpper());
-
-    return QStringLiteral("File");
+    return fallback;
 }
 
 FileListModel::FileItem buildItemFromInfo(const QFileInfo& info)
 {
     FileListModel::FileItem item;
-    item.name = info.fileName();
+    item.name = displayNameForFileInfo(info);
     item.path = QDir::fromNativeSeparators(info.absoluteFilePath());
     item.dateModified = info.lastModified().toString(QStringLiteral("dd/MM/yyyy HH:mm"));
     item.type = typeForFileInfo(info);
@@ -134,35 +396,6 @@ QString uniquePathInDirectory(const QString& directoryPath, const QString& origi
     return dir.filePath(candidate);
 }
 
-bool copyRecursively(const QString& sourcePath, const QString& destPath)
-{
-    QFileInfo sourceInfo(sourcePath);
-    if (!sourceInfo.exists())
-        return false;
-
-    if (sourceInfo.isDir()) {
-        QDir destDir;
-        if (!destDir.mkpath(destPath))
-            return false;
-
-        QDir srcDir(sourcePath);
-        const QFileInfoList entries = srcDir.entryInfoList(
-            QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
-
-        for (const QFileInfo& entry : entries) {
-            const QString nextSource = entry.absoluteFilePath();
-            const QString nextDest = QDir(destPath).filePath(entry.fileName());
-            if (!copyRecursively(nextSource, nextDest))
-                return false;
-        }
-
-        return true;
-    }
-
-    QFile::remove(destPath);
-    return QFile::copy(sourcePath, destPath);
-}
-
 bool removeRecursively(const QString& path)
 {
     QFileInfo info(path);
@@ -175,17 +408,6 @@ bool removeRecursively(const QString& path)
     }
 
     return QFile::remove(path);
-}
-
-bool movePathSmart(const QString& sourcePath, const QString& destPath)
-{
-    if (QFile::rename(sourcePath, destPath))
-        return true;
-
-    if (!copyRecursively(sourcePath, destPath))
-        return false;
-
-    return removeRecursively(sourcePath);
 }
 
 bool isArchivePath(const QString& path)
@@ -203,6 +425,252 @@ QString quotePs(const QString& value)
     QString v = value;
     v.replace('\'', QStringLiteral("''"));
     return QStringLiteral("'") + v + QStringLiteral("'");
+}
+
+qint64 totalBytesForPath(const QString& path)
+{
+    QFileInfo info(path);
+    if (!info.exists())
+        return 0;
+
+    if (info.isFile())
+        return qMax<qint64>(0, info.size());
+
+    qint64 total = 0;
+    QDirIterator it(
+        path,
+        QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System,
+        QDirIterator::Subdirectories);
+
+    while (it.hasNext()) {
+        it.next();
+        const QFileInfo current = it.fileInfo();
+        if (current.isFile())
+            total += qMax<qint64>(0, current.size());
+    }
+
+    return total;
+}
+
+struct AsyncOperationResult
+{
+    bool ok = false;
+    int affectedCount = 0;
+    QString successMessage;
+    QString errorMessage;
+};
+
+class ProgressReporter
+{
+public:
+    ProgressReporter() = default;
+
+    ProgressReporter(QPointer<WorkspaceViewModel> target,
+                     QString title,
+                     qint64 totalBytes)
+        : m_target(target)
+        , m_title(std::move(title))
+        , m_totalBytes(qMax<qint64>(1, totalBytes))
+    {
+        m_elapsed.start();
+    }
+
+    void advance(qint64 bytesHandledNow)
+    {
+        m_handledBytes += qMax<qint64>(0, bytesHandledNow);
+        post(false);
+    }
+
+    void finish()
+    {
+        m_handledBytes = qMax(m_handledBytes, m_totalBytes);
+        post(true);
+    }
+
+private:
+    void post(bool done)
+    {
+        if (!m_target)
+            return;
+
+        const qint64 boundedHandled = qMin(m_handledBytes, m_totalBytes);
+        const int progress = static_cast<int>(
+            (100.0 * static_cast<double>(boundedHandled))
+            / static_cast<double>(m_totalBytes));
+
+        const bool percentChanged = (progress != m_lastProgress);
+        const bool timeElapsedEnough = !m_elapsed.isValid() || m_elapsed.elapsed() >= 75;
+
+        if (!done && !percentChanged && !timeElapsedEnough)
+            return;
+
+        m_lastProgress = progress;
+        if (m_elapsed.isValid())
+            m_elapsed.restart();
+
+        const QString details = QStringLiteral("%1 of %2")
+                                    .arg(formatBytes(boundedHandled),
+                                         formatBytes(m_totalBytes));
+
+        QMetaObject::invokeMethod(
+            m_target.data(),
+            [target = m_target, title = m_title, details, progress, done]() {
+                if (!target)
+                    return;
+                emit target->operationProgress(title, details, progress, done);
+            },
+            Qt::QueuedConnection);
+    }
+
+    QPointer<WorkspaceViewModel> m_target;
+    QString m_title;
+    qint64 m_totalBytes = 1;
+    qint64 m_handledBytes = 0;
+    int m_lastProgress = -1;
+    QElapsedTimer m_elapsed;
+};
+
+bool copyFileChunked(const QString& sourcePath,
+                     const QString& destPath,
+                     ProgressReporter& reporter,
+                     QString* errorMessage)
+{
+    QFileInfo destInfo(destPath);
+    QDir().mkpath(destInfo.dir().absolutePath());
+    QFile::remove(destPath);
+
+    QFile source(sourcePath);
+    if (!source.open(QIODevice::ReadOnly)) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("Failed to open source file: %1").arg(sourcePath);
+        return false;
+    }
+
+    QFile dest(destPath);
+    if (!dest.open(QIODevice::WriteOnly)) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("Failed to create destination file: %1").arg(destPath);
+        return false;
+    }
+
+    constexpr qint64 chunkSize = 1024 * 1024;
+    while (!source.atEnd()) {
+        const QByteArray chunk = source.read(chunkSize);
+        if (chunk.isEmpty() && source.error() != QFile::NoError) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("Failed while reading file: %1").arg(sourcePath);
+            return false;
+        }
+
+        const qint64 written = dest.write(chunk);
+        if (written != chunk.size()) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("Failed while writing file: %1").arg(destPath);
+            return false;
+        }
+
+        reporter.advance(written);
+    }
+
+    dest.close();
+    source.close();
+    return true;
+}
+
+bool copyRecursivelyChunked(const QString& sourcePath,
+                            const QString& destPath,
+                            ProgressReporter& reporter,
+                            QString* errorMessage)
+{
+    QFileInfo sourceInfo(sourcePath);
+    if (!sourceInfo.exists()) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("Source item does not exist: %1").arg(sourcePath);
+        return false;
+    }
+
+    if (sourceInfo.isDir()) {
+        if (!QDir().mkpath(destPath)) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("Failed to create destination folder: %1").arg(destPath);
+            return false;
+        }
+
+        QDir srcDir(sourcePath);
+        const QFileInfoList entries = srcDir.entryInfoList(
+            QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+
+        for (const QFileInfo& entry : entries) {
+            const QString nextSource = entry.absoluteFilePath();
+            const QString nextDest = QDir(destPath).filePath(entry.fileName());
+            if (!copyRecursivelyChunked(nextSource, nextDest, reporter, errorMessage))
+                return false;
+        }
+
+        return true;
+    }
+
+    return copyFileChunked(sourcePath, destPath, reporter, errorMessage);
+}
+
+bool movePathSmartChunked(const QString& sourcePath,
+                          const QString& destPath,
+                          ProgressReporter& reporter,
+                          QString* errorMessage)
+{
+    if (QFile::rename(sourcePath, destPath)) {
+        reporter.advance(totalBytesForPath(destPath));
+        return true;
+    }
+
+    if (!copyRecursivelyChunked(sourcePath, destPath, reporter, errorMessage))
+        return false;
+
+    if (!removeRecursively(sourcePath)) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("Copied item but failed to remove source: %1").arg(sourcePath);
+        return false;
+    }
+
+    return true;
+}
+
+bool deletePathWithProgress(const QString& path,
+                            ProgressReporter& reporter,
+                            QString* errorMessage)
+{
+    QFileInfo info(path);
+    if (!info.exists())
+        return true;
+
+    if (info.isDir()) {
+        QDir dir(path);
+        const QFileInfoList entries = dir.entryInfoList(
+            QDir::AllEntries | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+
+        for (const QFileInfo& entry : entries) {
+            if (!deletePathWithProgress(entry.absoluteFilePath(), reporter, errorMessage))
+                return false;
+        }
+
+        if (!QDir().rmdir(path)) {
+            if (errorMessage)
+                *errorMessage = QStringLiteral("Failed to remove folder: %1").arg(path);
+            return false;
+        }
+
+        return true;
+    }
+
+    const qint64 fileBytes = qMax<qint64>(0, info.size());
+    if (!QFile::remove(path)) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("Failed to delete file: %1").arg(path);
+        return false;
+    }
+
+    reporter.advance(fileBytes);
+    return true;
 }
 }
 
@@ -301,8 +769,7 @@ QString WorkspaceViewModel::draggedPathsText() const
     QStringList paths;
     paths.reserve(m_draggedItems.size());
 
-    for (const QVariant& entry : m_draggedItems)
-    {
+    for (const QVariant& entry : m_draggedItems) {
         const QVariantMap item = entry.toMap();
         const QString path = item.value(QStringLiteral("path")).toString();
         if (!path.isEmpty())
@@ -471,8 +938,7 @@ void WorkspaceViewModel::selectOnlyRow(int row)
     m_selectedRows.insert(row);
     m_selectionAnchorRow = row;
 
-    if (m_currentIndex != row)
-    {
+    if (m_currentIndex != row) {
         m_currentIndex = row;
         emit currentIndexChanged();
     }
@@ -489,20 +955,16 @@ void WorkspaceViewModel::toggleRowSelection(int row)
     const QString previousItemsText = itemsText();
     const QSet<int> previousRows = m_selectedRows;
 
-    if (m_selectedRows.contains(row))
-    {
+    if (m_selectedRows.contains(row)) {
         if (m_selectedRows.size() > 1)
             m_selectedRows.remove(row);
-    }
-    else
-    {
+    } else {
         m_selectedRows.insert(row);
     }
 
     m_selectionAnchorRow = row;
 
-    if (m_currentIndex != row)
-    {
+    if (m_currentIndex != row) {
         m_currentIndex = row;
         emit currentIndexChanged();
     }
@@ -529,8 +991,7 @@ void WorkspaceViewModel::selectRange(int startRow, int endRow)
 
     m_selectionAnchorRow = startRow;
 
-    if (m_currentIndex != endRow)
-    {
+    if (m_currentIndex != endRow) {
         m_currentIndex = endRow;
         emit currentIndexChanged();
     }
@@ -546,8 +1007,7 @@ void WorkspaceViewModel::clickRow(int row, int modifiers)
     const Qt::KeyboardModifiers keyboardModifiers =
         static_cast<Qt::KeyboardModifiers>(modifiers);
 
-    if (keyboardModifiers.testFlag(Qt::ShiftModifier))
-    {
+    if (keyboardModifiers.testFlag(Qt::ShiftModifier)) {
         const int anchor =
             (m_selectionAnchorRow >= 0 && m_selectionAnchorRow < m_fileModel.rowCount())
                 ? m_selectionAnchorRow
@@ -556,8 +1016,7 @@ void WorkspaceViewModel::clickRow(int row, int modifiers)
         return;
     }
 
-    if (keyboardModifiers.testFlag(Qt::ControlModifier))
-    {
+    if (keyboardModifiers.testFlag(Qt::ControlModifier)) {
         toggleRowSelection(row);
         return;
     }
@@ -578,8 +1037,7 @@ void WorkspaceViewModel::openRow(int row)
     const QVariantMap item = fileAt(row);
     const QString path = item.value(QStringLiteral("path")).toString();
 
-    if (item.value(QStringLiteral("isDir")).toBool())
-    {
+    if (item.value(QStringLiteral("isDir")).toBool()) {
         loadLocation(path, true);
         emit openDirectoryRequested(item);
         return;
@@ -619,8 +1077,7 @@ QVariantMap WorkspaceViewModel::previewData() const
     int fileCount = 0;
     QVariantList lines;
 
-    for (int row : rows)
-    {
+    for (int row : rows) {
         const QVariantMap item = fileAt(row);
         const QString name = item.value(QStringLiteral("name")).toString();
         const QString type = item.value(QStringLiteral("type")).toString();
@@ -653,8 +1110,7 @@ void WorkspaceViewModel::beginDragSelection(int anchorRow)
     if (!isValidRow(anchorRow))
         return;
 
-    if (!m_dragSelecting)
-    {
+    if (!m_dragSelecting) {
         m_dragSelecting = true;
         emit dragSelectingChanged();
     }
@@ -690,8 +1146,7 @@ void WorkspaceViewModel::replaceSelectionRows(const QVariantList& rows, int curr
     QSet<int> nextRows;
     const int count = m_fileModel.rowCount();
 
-    for (const QVariant& value : rows)
-    {
+    for (const QVariant& value : rows) {
         const int row = value.toInt();
         if (row >= 0 && row < count)
             nextRows.insert(row);
@@ -705,8 +1160,7 @@ void WorkspaceViewModel::replaceSelectionRows(const QVariantList& rows, int curr
     if (anchorRow >= 0 && anchorRow < count)
         m_selectionAnchorRow = anchorRow;
 
-    if (currentRow >= 0 && currentRow < count && m_currentIndex != currentRow)
-    {
+    if (currentRow >= 0 && currentRow < count && m_currentIndex != currentRow) {
         m_currentIndex = currentRow;
         emit currentIndexChanged();
     }
@@ -739,8 +1193,7 @@ void WorkspaceViewModel::startFileDrag(int row, int modifiers)
 
     if (keyboardModifiers.testFlag(Qt::ControlModifier)
         || keyboardModifiers.testFlag(Qt::ShiftModifier)
-        || keyboardModifiers.testFlag(Qt::AltModifier))
-    {
+        || keyboardModifiers.testFlag(Qt::AltModifier)) {
         return;
     }
 
@@ -808,17 +1261,33 @@ bool WorkspaceViewModel::canDropToPath(const QString& targetPath) const
     if (!m_draggingItems)
         return false;
 
-    QString normalized = targetPath.trimmed();
+    const QString normalized = normalizePath(targetPath);
     if (normalized.isEmpty())
         return false;
 
-    normalized.replace('\\', '/');
-
-    for (const QVariant& entry : m_draggedItems)
-    {
+    for (const QVariant& entry : m_draggedItems) {
         const QVariantMap item = entry.toMap();
-        const QString draggedPath = item.value(QStringLiteral("path")).toString();
+        const QString draggedPath = normalizePath(item.value(QStringLiteral("path")).toString());
+        if (draggedPath.isEmpty())
+            continue;
+
         if (draggedPath.compare(normalized, Qt::CaseInsensitive) == 0)
+            return false;
+
+        const QString parentPath = normalizePath(QFileInfo(draggedPath).dir().absolutePath());
+        if (parentPath.compare(normalized, Qt::CaseInsensitive) == 0)
+            return false;
+
+        QFileInfo draggedInfo(draggedPath);
+        if (draggedInfo.isDir()) {
+            const QString descendantPrefix = draggedPath.endsWith(QLatin1Char('/'))
+                                                 ? draggedPath
+                                                 : draggedPath + QLatin1Char('/');
+            if (normalized.startsWith(descendantPrefix, Qt::CaseInsensitive))
+                return false;
+        }
+
+        if (!draggedInfo.exists())
             return false;
     }
 
@@ -846,6 +1315,105 @@ void WorkspaceViewModel::requestDropToPath(const QString& targetPath, const QStr
         m_draggedItems,
         m_lastDropTargetPath,
         m_lastDropTargetKind);
+}
+
+void WorkspaceViewModel::performDropOperation(const QVariantList& draggedItems, const QString& targetPath)
+{
+    const QString destinationDirectory = normalizePath(targetPath);
+    if (destinationDirectory.isEmpty()) {
+        emit operationFailed(QStringLiteral("Drop target is invalid."));
+        return;
+    }
+
+    QFileInfo destinationInfo(destinationDirectory);
+    if (!destinationInfo.exists() || !destinationInfo.isDir()) {
+        emit operationFailed(QStringLiteral("Drop target is unavailable."));
+        return;
+    }
+
+    QStringList sourcePaths;
+    QSet<QString> seenPaths;
+    qint64 totalBytes = 0;
+
+    for (const QVariant& entry : draggedItems) {
+        const QVariantMap item = entry.toMap();
+        const QString sourcePath = normalizePath(item.value(QStringLiteral("path")).toString());
+        if (sourcePath.isEmpty() || seenPaths.contains(sourcePath))
+            continue;
+
+        QFileInfo sourceInfo(sourcePath);
+        if (!sourceInfo.exists())
+            continue;
+
+        seenPaths.insert(sourcePath);
+        sourcePaths.push_back(sourcePath);
+        totalBytes += totalBytesForPath(sourcePath);
+    }
+
+    if (sourcePaths.isEmpty()) {
+        emit operationFailed(QStringLiteral("Nothing to move."));
+        return;
+    }
+
+    emit operationProgress(
+        QStringLiteral("Moving items"),
+        QStringLiteral("0 B of %1").arg(formatBytes(totalBytes)),
+        0,
+        false);
+
+    auto* watcher = new QFutureWatcher<AsyncOperationResult>(this);
+
+    connect(watcher, &QFutureWatcher<AsyncOperationResult>::finished, this, [this, watcher]() {
+        const AsyncOperationResult result = watcher->result();
+        watcher->deleteLater();
+
+        reloadListing();
+
+        if (result.ok)
+            emit operationCompleted(result.successMessage);
+        else
+            emit operationFailed(result.errorMessage);
+    });
+
+    watcher->setFuture(QtConcurrent::run([target = QPointer<WorkspaceViewModel>(this),
+                                          sourcePaths,
+                                          destinationDirectory,
+                                          totalBytes]() -> AsyncOperationResult {
+        AsyncOperationResult result;
+        ProgressReporter reporter(target, QStringLiteral("Moving items"), totalBytes);
+
+        int movedCount = 0;
+        for (const QString& sourcePath : sourcePaths) {
+            QFileInfo srcInfo(sourcePath);
+            if (!srcInfo.exists())
+                continue;
+
+            const QString destPath = uniquePathInDirectory(destinationDirectory, srcInfo.fileName());
+
+            QString error;
+            if (!movePathSmartChunked(sourcePath, destPath, reporter, &error)) {
+                result.ok = false;
+                result.errorMessage = error.isEmpty()
+                                          ? QStringLiteral("Move failed.")
+                                          : error;
+                return result;
+            }
+
+            ++movedCount;
+        }
+
+        reporter.finish();
+
+        result.ok = movedCount > 0;
+        result.affectedCount = movedCount;
+
+        if (result.ok)
+            result.successMessage = QStringLiteral("Moved %1 item(s)").arg(movedCount);
+        else
+            result.errorMessage = QStringLiteral("Move failed.");
+
+        return result;
+    }));
 }
 
 bool WorkspaceViewModel::isOnlyDraggingRow(int row) const
@@ -889,8 +1457,7 @@ void WorkspaceViewModel::updateFileDragPreview(qreal overlayX, qreal overlayY)
         return;
 
     if (qFuzzyCompare(m_dragPreviewX + 1.0, overlayX + 1.0)
-        && qFuzzyCompare(m_dragPreviewY + 1.0, overlayY + 1.0))
-    {
+        && qFuzzyCompare(m_dragPreviewY + 1.0, overlayY + 1.0)) {
         return;
     }
 
@@ -914,26 +1481,38 @@ void WorkspaceViewModel::requestFileContextAction(const QString& action, int row
 
     const QString trimmedAction = action.trimmed();
 
+    const bool rowAlreadySelected = m_selectedRows.contains(row);
+    if (!rowAlreadySelected)
+        selectOnlyRow(row);
+
     if (trimmedAction.compare(QStringLiteral("Rename"), Qt::CaseInsensitive) == 0) {
         beginRenameRow(row);
         return;
     }
 
     if (trimmedAction.compare(QStringLiteral("Copy"), Qt::CaseInsensitive) == 0) {
-        selectOnlyRow(row);
         copySelectedItems();
         return;
     }
 
     if (trimmedAction.compare(QStringLiteral("Cut"), Qt::CaseInsensitive) == 0) {
-        selectOnlyRow(row);
         cutSelectedItems();
         return;
     }
 
     if (trimmedAction.compare(QStringLiteral("Delete"), Qt::CaseInsensitive) == 0) {
-        selectOnlyRow(row);
         deleteSelectedItems();
+        return;
+    }
+
+    if (trimmedAction.compare(QStringLiteral("Compress"), Qt::CaseInsensitive) == 0) {
+        compressSelectedItems();
+        return;
+    }
+
+    if (trimmedAction.compare(QStringLiteral("Extract here"), Qt::CaseInsensitive) == 0
+        || trimmedAction.compare(QStringLiteral("Extract"), Qt::CaseInsensitive) == 0) {
+        extractSelectedItems();
         return;
     }
 
@@ -955,8 +1534,7 @@ void WorkspaceViewModel::beginRenameRow(int row)
     if (!isValidRow(row))
         return;
 
-    if (m_inlineEditRow >= 0 && m_inlineEditRow != row)
-    {
+    if (m_inlineEditRow >= 0 && m_inlineEditRow != row) {
         if (!commitInlineEdit())
             return;
     }
@@ -1054,14 +1632,11 @@ void WorkspaceViewModel::cancelInlineEdit()
 
         m_selectedRows.clear();
 
-        if (m_fileModel.rowCount() > 0)
-        {
+        if (m_fileModel.rowCount() > 0) {
             m_selectedRows.insert(0);
             m_selectionAnchorRow = 0;
             m_currentIndex = 0;
-        }
-        else
-        {
+        } else {
             m_selectionAnchorRow = -1;
             m_currentIndex = -1;
         }
@@ -1116,36 +1691,97 @@ void WorkspaceViewModel::pasteItems()
         return;
     }
 
-    int successCount = 0;
+    const QStringList sourcePaths = m_clipboardPaths;
+    const QString destinationDirectory = m_currentDirectoryPath;
+    const ClipboardMode clipboardMode = m_clipboardMode;
 
-    for (const QString& sourcePath : m_clipboardPaths) {
-        QFileInfo srcInfo(sourcePath);
-        if (!srcInfo.exists())
-            continue;
-
-        const QString destPath = uniquePathInDirectory(m_currentDirectoryPath, srcInfo.fileName());
-
-        bool ok = false;
-        if (m_clipboardMode == ClipboardMode::Copy)
-            ok = copyRecursively(sourcePath, destPath);
-        else
-            ok = movePathSmart(sourcePath, destPath);
-
-        if (ok)
-            ++successCount;
-    }
-
-    if (m_clipboardMode == ClipboardMode::Cut) {
+    if (clipboardMode == ClipboardMode::Cut) {
         m_clipboardMode = ClipboardMode::None;
         m_clipboardPaths.clear();
     }
 
-    reloadListing();
+    qint64 totalBytes = 0;
+    for (const QString& path : sourcePaths)
+        totalBytes += totalBytesForPath(path);
 
-    if (successCount > 0)
-        emit operationCompleted(QStringLiteral("Pasted %1 item(s)").arg(successCount));
-    else
-        emit operationFailed(QStringLiteral("Paste failed."));
+    const QString progressTitle =
+        clipboardMode == ClipboardMode::Copy
+            ? QStringLiteral("Copying items")
+            : QStringLiteral("Moving items");
+
+    emit operationProgress(
+        progressTitle,
+        QStringLiteral("0 B of %1").arg(formatBytes(totalBytes)),
+        0,
+        false);
+
+    auto* watcher = new QFutureWatcher<AsyncOperationResult>(this);
+
+    connect(watcher, &QFutureWatcher<AsyncOperationResult>::finished, this, [this, watcher]() {
+        const AsyncOperationResult result = watcher->result();
+        watcher->deleteLater();
+
+        reloadListing();
+
+        if (result.ok)
+            emit operationCompleted(result.successMessage);
+        else
+            emit operationFailed(result.errorMessage);
+    });
+
+    watcher->setFuture(QtConcurrent::run([target = QPointer<WorkspaceViewModel>(this),
+                                          sourcePaths,
+                                          destinationDirectory,
+                                          clipboardMode,
+                                          totalBytes,
+                                          progressTitle]() -> AsyncOperationResult {
+        AsyncOperationResult result;
+        ProgressReporter reporter(target, progressTitle, totalBytes);
+
+        int successCount = 0;
+
+        for (const QString& sourcePath : sourcePaths) {
+            QFileInfo srcInfo(sourcePath);
+            if (!srcInfo.exists())
+                continue;
+
+            const QString destPath = uniquePathInDirectory(destinationDirectory, srcInfo.fileName());
+
+            QString error;
+            bool ok = false;
+
+            if (clipboardMode == ClipboardMode::Copy)
+                ok = copyRecursivelyChunked(sourcePath, destPath, reporter, &error);
+            else
+                ok = movePathSmartChunked(sourcePath, destPath, reporter, &error);
+
+            if (!ok) {
+                result.ok = false;
+                result.errorMessage = error.isEmpty()
+                                          ? QStringLiteral("Paste failed.")
+                                          : error;
+                return result;
+            }
+
+            ++successCount;
+        }
+
+        reporter.finish();
+
+        result.ok = successCount > 0;
+        result.affectedCount = successCount;
+
+        if (result.ok) {
+            result.successMessage =
+                clipboardMode == ClipboardMode::Copy
+                    ? QStringLiteral("Pasted %1 item(s)").arg(successCount)
+                    : QStringLiteral("Moved %1 item(s)").arg(successCount);
+        } else {
+            result.errorMessage = QStringLiteral("Paste failed.");
+        }
+
+        return result;
+    }));
 }
 
 void WorkspaceViewModel::deleteSelectedItems()
@@ -1156,18 +1792,62 @@ void WorkspaceViewModel::deleteSelectedItems()
         return;
     }
 
-    int deleted = 0;
-    for (const QString& path : paths) {
-        if (removeRecursively(path))
+    qint64 totalBytes = 0;
+    for (const QString& path : paths)
+        totalBytes += totalBytesForPath(path);
+
+    emit operationProgress(
+        QStringLiteral("Deleting items"),
+        QStringLiteral("0 B of %1").arg(formatBytes(totalBytes)),
+        0,
+        false);
+
+    auto* watcher = new QFutureWatcher<AsyncOperationResult>(this);
+
+    connect(watcher, &QFutureWatcher<AsyncOperationResult>::finished, this, [this, watcher]() {
+        const AsyncOperationResult result = watcher->result();
+        watcher->deleteLater();
+
+        reloadListing();
+
+        if (result.ok)
+            emit operationCompleted(result.successMessage);
+        else
+            emit operationFailed(result.errorMessage);
+    });
+
+    watcher->setFuture(QtConcurrent::run([target = QPointer<WorkspaceViewModel>(this),
+                                          paths,
+                                          totalBytes]() -> AsyncOperationResult {
+        AsyncOperationResult result;
+        ProgressReporter reporter(target, QStringLiteral("Deleting items"), totalBytes);
+
+        int deleted = 0;
+        for (const QString& path : paths) {
+            QString error;
+            if (!deletePathWithProgress(path, reporter, &error)) {
+                result.ok = false;
+                result.errorMessage = error.isEmpty()
+                                          ? QStringLiteral("Delete failed.")
+                                          : error;
+                return result;
+            }
+
             ++deleted;
-    }
+        }
 
-    reloadListing();
+        reporter.finish();
 
-    if (deleted > 0)
-        emit operationCompleted(QStringLiteral("Deleted %1 item(s)").arg(deleted));
-    else
-        emit operationFailed(QStringLiteral("Delete failed."));
+        result.ok = deleted > 0;
+        result.affectedCount = deleted;
+
+        if (result.ok)
+            result.successMessage = QStringLiteral("Deleted %1 item(s)").arg(deleted);
+        else
+            result.errorMessage = QStringLiteral("Delete failed.");
+
+        return result;
+    }));
 }
 
 void WorkspaceViewModel::compressSelectedItems()
@@ -1359,8 +2039,7 @@ void WorkspaceViewModel::emitSelectionSignals(int previousSelected, const QStrin
     if (previousItemsText != itemsText())
         emit itemsTextChanged();
 
-    if (selectionChanged)
-    {
+    if (selectionChanged) {
         ++m_selectionRevision;
         emit selectionStateChanged();
     }
@@ -1372,8 +2051,7 @@ int WorkspaceViewModel::firstSelectedRow() const
         return -1;
 
     int result = -1;
-    for (int row : m_selectedRows)
-    {
+    for (int row : m_selectedRows) {
         if (result < 0 || row < result)
             result = row;
     }
@@ -1550,8 +2228,7 @@ QString WorkspaceViewModel::validateInlineEditText(const QString& text) const
         return QStringLiteral("This name is reserved by Windows.");
 
     const QVector<FileListModel::FileItem> items = m_fileModel.items();
-    for (int i = 0; i < items.size(); ++i)
-    {
+    for (int i = 0; i < items.size(); ++i) {
         if (i == m_inlineEditRow)
             continue;
 
@@ -1575,77 +2252,16 @@ FileListModel::FileItem WorkspaceViewModel::buildItemFromName(const QString& nam
     item.dateModified = QDateTime::currentDateTime().toString(QStringLiteral("dd/MM/yyyy HH:mm"));
     item.isDir = isDir;
 
-    if (isDir)
-    {
+    if (isDir) {
         item.type = QStringLiteral("File folder");
         item.size.clear();
         item.icon = QStringLiteral("folder");
         return item;
     }
 
-    const QString lower = item.name.toLower();
-
-    if (lower.endsWith(QStringLiteral(".txt")))
-    {
-        item.type = QStringLiteral("Text Document");
-        item.icon = QStringLiteral("description");
-    }
-    else if (lower.endsWith(QStringLiteral(".json")))
-    {
-        item.type = QStringLiteral("JSON Source File");
-        item.icon = QStringLiteral("code");
-    }
-    else if (lower.endsWith(QStringLiteral(".yaml")) || lower.endsWith(QStringLiteral(".yml")))
-    {
-        item.type = QStringLiteral("YAML Document");
-        item.icon = QStringLiteral("code");
-    }
-    else if (lower.endsWith(QStringLiteral(".cpp")) || lower.endsWith(QStringLiteral(".h")) || lower.endsWith(QStringLiteral(".hpp")))
-    {
-        item.type = QStringLiteral("C++ Source File");
-        item.icon = QStringLiteral("code");
-    }
-    else if (lower.endsWith(QStringLiteral(".qml")))
-    {
-        item.type = QStringLiteral("QML File");
-        item.icon = QStringLiteral("code");
-    }
-    else if (lower.endsWith(QStringLiteral(".png")) || lower.endsWith(QStringLiteral(".jpg")) || lower.endsWith(QStringLiteral(".jpeg")) || lower.endsWith(QStringLiteral(".svg")))
-    {
-        item.type = QStringLiteral("Image File");
-        item.icon = QStringLiteral("image");
-    }
-    else if (lower.endsWith(QStringLiteral(".pdf")))
-    {
-        item.type = QStringLiteral("PDF Document");
-        item.icon = QStringLiteral("picture-as-pdf");
-    }
-    else if (lower.endsWith(QStringLiteral(".zip")) || lower.endsWith(QStringLiteral(".7z")))
-    {
-        item.type = QStringLiteral("Archive");
-        item.icon = QStringLiteral("zip");
-    }
-    else if (lower.endsWith(QStringLiteral(".mp3")))
-    {
-        item.type = QStringLiteral("MP3 File");
-        item.icon = QStringLiteral("music-note");
-    }
-    else if (lower.endsWith(QStringLiteral(".mp4")))
-    {
-        item.type = QStringLiteral("MP4 Video");
-        item.icon = QStringLiteral("movie");
-    }
-    else if (lower.endsWith(QStringLiteral(".ps1")) || lower.endsWith(QStringLiteral(".bat")))
-    {
-        item.type = QStringLiteral("Script File");
-        item.icon = QStringLiteral("terminal");
-    }
-    else
-    {
-        item.type = QStringLiteral("File");
-        item.icon = QStringLiteral("insert-drive-file");
-    }
-
+    QFileInfo info(name);
+    item.type = fallbackTypeFromSuffix(info);
+    item.icon = iconForFileInfo(info);
     item.size.clear();
     return item;
 }
@@ -1689,8 +2305,7 @@ void WorkspaceViewModel::clearInlineEditState()
     m_inlineEditText.clear();
     m_inlineEditError.clear();
 
-    if (hadState)
-    {
+    if (hadState) {
         emit inlineEditStateChanged();
         emit inlineEditTextChanged();
         emit inlineEditErrorChanged();
@@ -1704,10 +2319,20 @@ QString WorkspaceViewModel::normalizePath(QString value) const
         return {};
 
     value.replace('\\', '/');
-    while (value.contains(QStringLiteral("//")))
-        value.replace(QStringLiteral("//"), QStringLiteral("/"));
 
 #ifdef Q_OS_WINDOWS
+    const bool isUncPath =
+        value.startsWith(QStringLiteral("//"))
+        && !value.startsWith(QStringLiteral("///"));
+
+    if (isUncPath) {
+        QString tail = value.mid(2);
+        while (tail.contains(QStringLiteral("//")))
+            tail.replace(QStringLiteral("//"), QStringLiteral("/"));
+
+        return QStringLiteral("//") + tail;
+    }
+
     static const QRegularExpression driveOnlyRe(QStringLiteral("^([A-Za-z]:)$"));
     static const QRegularExpression driveRootRe(QStringLiteral("^([A-Za-z]:)/$"));
 
@@ -1719,6 +2344,9 @@ QString WorkspaceViewModel::normalizePath(QString value) const
     if (m.hasMatch())
         return m.captured(1) + QStringLiteral("/");
 #endif
+
+    while (value.contains(QStringLiteral("//")))
+        value.replace(QStringLiteral("//"), QStringLiteral("/"));
 
     return QDir::fromNativeSeparators(QFileInfo(value).absoluteFilePath());
 }
@@ -1785,8 +2413,7 @@ QVector<FileListModel::FileItem> WorkspaceViewModel::listDirectoryItems(const QS
         QDir::DirsFirst | QDir::IgnoreCase | QDir::Name);
 
     result.reserve(entries.size());
-    for (const QFileInfo& info : entries)
-    {
+    for (const QFileInfo& info : entries) {
         if (!shouldIncludeInfo(info, m_settings.showHiddenFiles()))
             continue;
 
@@ -1821,8 +2448,10 @@ QVector<FileListModel::FileItem> WorkspaceViewModel::searchItems(const QString& 
             if (!shouldIncludeInfo(info, m_settings.showHiddenFiles()))
                 continue;
 
-            if (info.fileName().contains(trimmedQuery, Qt::CaseInsensitive))
+            if (displayNameForFileInfo(info).contains(trimmedQuery, Qt::CaseInsensitive)
+                || info.fileName().contains(trimmedQuery, Qt::CaseInsensitive)) {
                 result.push_back(buildItemFromInfo(info));
+            }
         }
     } else {
         const QVector<FileListModel::FileItem> all = listDirectoryItems(basePath);

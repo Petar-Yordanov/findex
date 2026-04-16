@@ -4,16 +4,22 @@
 #include <QStorageInfo>
 #include <QtConcurrent>
 
-#include "SidebarTreeModel.h"
+#include "WslModel.h"
 #include "DriveListModel.h"
 
 SidebarViewModel::SidebarViewModel(QObject* parent)
     : QObject(parent)
-    , m_treeModel(new SidebarTreeModel(this))
+    , m_quickAccessModel(new QuickAccessModel(this))
+    , m_wslModel(new WslModel(this))
     , m_drivesModel(new DriveListModel(this))
 {
     connect(&m_driveWatcher, &QFutureWatcher<QVector<DriveListModel::DriveItem>>::finished, this, [this]() {
-        m_drivesModel->setDrives(m_driveWatcher.result());
+        const QVector<DriveListModel::DriveItem> next = m_driveWatcher.result();
+
+        if (m_drivesModel->items() == next)
+            return;
+
+        m_drivesModel->setDrives(next);
     });
 
     connect(&m_driveRefreshTimer, &QTimer::timeout, this, [this]() {
@@ -26,9 +32,14 @@ SidebarViewModel::SidebarViewModel(QObject* parent)
     startDriveRefresh();
 }
 
-QObject* SidebarViewModel::treeModel() const
+QObject* SidebarViewModel::quickAccessModel() const
 {
-    return m_treeModel;
+    return m_quickAccessModel;
+}
+
+QObject* SidebarViewModel::wslModel() const
+{
+    return m_wslModel;
 }
 
 QObject* SidebarViewModel::drivesModel() const
@@ -74,10 +85,11 @@ int SidebarViewModel::selectionRevision() const
 void SidebarViewModel::openLocation(const QString& label, const QString& icon, const QString& kind, const QString& path)
 {
     const bool selectionChangedNow =
-        (m_selectedLabel != label) || (m_selectedKind != kind);
+        (m_selectedLabel != label) || (m_selectedKind != kind) || (m_selectedPath != path);
 
     m_selectedLabel = label;
     m_selectedKind = kind;
+    m_selectedPath = path;
 
     if (selectionChangedNow) {
         ++m_selectionRevision;
@@ -103,34 +115,36 @@ void SidebarViewModel::setContextItem(const QString& label, const QString& icon,
     emit contextChanged();
 }
 
-bool SidebarViewModel::isSelected(const QString& label, const QString& kind) const
+bool SidebarViewModel::isSelected(const QString& label, const QString& kind, const QString& path) const
 {
-    return m_selectedLabel == label && m_selectedKind == kind;
+    return m_selectedLabel == label && m_selectedKind == kind && m_selectedPath == path;
 }
 
-void SidebarViewModel::setHoveredItem(const QString& label, const QString& kind)
+void SidebarViewModel::setHoveredItem(const QString& label, const QString& kind, const QString& path)
 {
-    if (m_hoveredLabel == label && m_hoveredKind == kind)
+    if (m_hoveredLabel == label && m_hoveredKind == kind && m_hoveredPath == path)
         return;
 
     m_hoveredLabel = label;
     m_hoveredKind = kind;
+    m_hoveredPath = path;
     emit hoveredChanged();
 }
 
-void SidebarViewModel::clearHoveredItem(const QString& label, const QString& kind)
+void SidebarViewModel::clearHoveredItem(const QString& label, const QString& kind, const QString& path)
 {
-    if (m_hoveredLabel != label || m_hoveredKind != kind)
+    if (m_hoveredLabel != label || m_hoveredKind != kind || m_hoveredPath != path)
         return;
 
     m_hoveredLabel.clear();
     m_hoveredKind.clear();
+    m_hoveredPath.clear();
     emit hoveredChanged();
 }
 
-bool SidebarViewModel::isHovered(const QString& label, const QString& kind) const
+bool SidebarViewModel::isHovered(const QString& label, const QString& kind, const QString& path) const
 {
-    return m_hoveredLabel == label && m_hoveredKind == kind;
+    return m_hoveredLabel == label && m_hoveredKind == kind && m_hoveredPath == path;
 }
 
 void SidebarViewModel::requestOpenContextInNewTab()

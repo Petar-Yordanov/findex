@@ -34,11 +34,11 @@ Item {
     readonly property int _selectionRevision: viewModel ? viewModel.selectionRevision : 0
 
     readonly property bool selectedState: viewModel
-        ? viewModel.isSelected(itemLabel, itemKind)
+        ? viewModel.isSelected(itemLabel, itemKind, itemPath)
         : false
 
     readonly property bool hoverState: viewModel
-        ? viewModel.isHovered(itemLabel, itemKind)
+        ? viewModel.isHovered(itemLabel, itemKind, itemPath)
         : false
 
     width: treeView ? treeView.availableWidth : 0
@@ -86,6 +86,7 @@ Item {
             spacing: Theme.Metrics.spacingSm
 
             Item {
+                id: expanderHit
                 width: 12
                 height: 12
 
@@ -101,8 +102,24 @@ Item {
                 MouseArea {
                     anchors.fill: parent
                     visible: hasChildren
+                    enabled: hasChildren
+                    z: 2
                     acceptedButtons: Qt.LeftButton
-                    onClicked: treeView.toggleExpanded(row)
+                    hoverEnabled: true
+                    preventStealing: true
+
+                    onPressed: function(mouse) {
+                        mouse.accepted = true
+                    }
+
+                    onClicked: function(mouse) {
+                        treeView.toggleExpanded(row)
+                        mouse.accepted = true
+                    }
+
+                    onDoubleClicked: function(mouse) {
+                        mouse.accepted = true
+                    }
                 }
             }
 
@@ -149,15 +166,16 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         acceptedButtons: Qt.LeftButton | Qt.RightButton
+        preventStealing: true
 
         onEntered: {
             if (viewModel && !itemSection)
-                viewModel.setHoveredItem(itemLabel, itemKind)
+                viewModel.setHoveredItem(itemLabel, itemKind, itemPath)
         }
 
         onExited: {
             if (viewModel && !itemSection)
-                viewModel.clearHoveredItem(itemLabel, itemKind)
+                viewModel.clearHoveredItem(itemLabel, itemKind, itemPath)
         }
 
         onClicked: function(mouse) {

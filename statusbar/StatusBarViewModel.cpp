@@ -106,6 +106,7 @@ void StatusBarViewModel::setCurrentViewMode(const QString& value)
 }
 
 int StatusBarViewModel::pushNotification(const QString& title,
+                                         const QString& details,
                                          const QString& kind,
                                          int progress,
                                          bool autoClose,
@@ -116,6 +117,7 @@ int StatusBarViewModel::pushNotification(const QString& title,
     QVariantMap item;
     item.insert(QStringLiteral("id"), id);
     item.insert(QStringLiteral("title"), title);
+    item.insert(QStringLiteral("details"), details);
     item.insert(QStringLiteral("kind"), kind.trimmed().isEmpty() ? QStringLiteral("info") : kind.trimmed());
     item.insert(QStringLiteral("progress"), progress);
     item.insert(QStringLiteral("autoClose"), autoClose);
@@ -156,17 +158,21 @@ void StatusBarViewModel::dismissToast(int id)
         emit toastNotificationsChanged();
 }
 
-void StatusBarViewModel::updateNotificationProgress(int id, int progress, bool done)
+void StatusBarViewModel::updateNotificationProgress(int id,
+                                                    int progress,
+                                                    bool done,
+                                                    const QString& details,
+                                                    const QString& title)
 {
     bool foundPersistent = false;
-    updateListEntry(m_notifications, id, progress, done, &foundPersistent);
+    updateListEntry(m_notifications, id, progress, done, details, title, &foundPersistent);
     if (foundPersistent) {
         emit notificationsChanged();
         updateNotificationCountFromList();
     }
 
     bool foundToast = false;
-    updateListEntry(m_toastNotifications, id, progress, done, &foundToast);
+    updateListEntry(m_toastNotifications, id, progress, done, details, title, &foundToast);
     if (foundToast)
         emit toastNotificationsChanged();
 
@@ -180,6 +186,7 @@ void StatusBarViewModel::updateNotificationProgress(int id, int progress, bool d
 void StatusBarViewModel::startTestProgress()
 {
     const int id = pushNotification(QStringLiteral("Test operation in progress"),
+                                    QStringLiteral("0 B of 100 B"),
                                     QStringLiteral("progress"),
                                     0,
                                     false,
@@ -192,7 +199,12 @@ void StatusBarViewModel::startTestProgress()
     connect(timer, &QTimer::timeout, this, [this, timer, progress, id]() {
         *progress += 5;
         const bool done = *progress >= 100;
-        updateNotificationProgress(id, done ? 100 : *progress, done);
+        updateNotificationProgress(
+            id,
+            done ? 100 : *progress,
+            done,
+            QStringLiteral("%1 B of 100 B").arg(done ? 100 : *progress),
+            QStringLiteral("Test operation in progress"));
 
         if (done) {
             timer->stop();
@@ -267,6 +279,8 @@ void StatusBarViewModel::updateListEntry(QVariantList& list,
                                          int id,
                                          int progress,
                                          bool done,
+                                         const QString& details,
+                                         const QString& title,
                                          bool* found)
 {
     if (found)
@@ -280,6 +294,12 @@ void StatusBarViewModel::updateListEntry(QVariantList& list,
         item.insert(QStringLiteral("progress"), qBound(0, progress, 100));
         item.insert(QStringLiteral("done"), done);
         item.insert(QStringLiteral("autoClose"), done);
+
+        if (!details.isNull())
+            item.insert(QStringLiteral("details"), details);
+
+        if (!title.isEmpty())
+            item.insert(QStringLiteral("title"), title);
 
         list[i] = item;
 

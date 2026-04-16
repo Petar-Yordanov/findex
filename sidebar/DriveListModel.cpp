@@ -61,7 +61,15 @@ void DriveListModel::loadDefaults()
 
 void DriveListModel::setDrives(const QVector<DriveItem>& items)
 {
+    if (m_items == items)
+        return;
+
     beginResetModel();
     m_items = items;
     endResetModel();
+}
+
+QVector<DriveListModel::DriveItem> DriveListModel::items() const
+{
+    return m_items;
 }

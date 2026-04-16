@@ -12,7 +12,7 @@ Rectangle {
 
     Layout.fillWidth: true
     Layout.preferredHeight: 220
-    Layout.minimumHeight: 120
+    Layout.minimumHeight: 150
 
     radius: Theme.Metrics.radiusXl
     color: Theme.AppTheme.isDark ? "#171d27" : "#fbfcfd"
@@ -57,34 +57,26 @@ Rectangle {
                 height: 56
                 radius: Theme.Metrics.radiusMd
 
-                readonly property int _selectionRevision: root.viewModel ? root.viewModel.selectionRevision : 0
                 readonly property real usedPct: total > 0 ? (used / total) : 0
                 readonly property color usedColor: usedPct >= 0.85
                     ? Theme.AppTheme.driveUsedRed
                     : Theme.AppTheme.driveUsedBlue
-                readonly property bool selectedState: root.viewModel
-                    ? root.viewModel.isSelected(label, "drive")
-                    : false
 
                 color: driveDropArea.containsDrag
                     ? Theme.AppTheme.selected
                     : driveMouseArea.pressed
                       ? (Theme.AppTheme.isDark ? "#3a475d" : "#cadbf8")
-                      : selectedState
-                        ? Theme.AppTheme.selected
-                        : driveMouseArea.containsMouse
-                          ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
-                          : "transparent"
+                      : driveMouseArea.containsMouse
+                        ? (Theme.AppTheme.isDark ? "#2a3444" : "#e6eefb")
+                        : "transparent"
 
                 border.color: driveDropArea.containsDrag
                     ? Theme.AppTheme.accent
-                    : selectedState
-                      ? Theme.AppTheme.accent
-                      : driveMouseArea.pressed
-                        ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
-                        : "transparent"
+                    : driveMouseArea.pressed
+                      ? (Theme.AppTheme.isDark ? "#4a5a72" : "#b7caf0")
+                      : "transparent"
 
-                border.width: (driveDropArea.containsDrag || selectedState || driveMouseArea.pressed) ? 1 : 0
+                border.width: (driveDropArea.containsDrag || driveMouseArea.pressed) ? 1 : 0
 
                 Column {
                     anchors.fill: parent

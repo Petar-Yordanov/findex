@@ -4,33 +4,24 @@
 #include <QString>
 #include <QVector>
 
-class DriveListModel final : public QAbstractListModel
+class QuickAccessModel final : public QAbstractListModel
 {
     Q_OBJECT
 
 public:
-    struct DriveItem
+    struct QuickAccessItem
     {
         QString label;
         QString path;
         QString icon;
-        qint64 used = 0;
-        qint64 total = 0;
-        QString usedText;
+        QString kind;
 
-        bool operator==(const DriveItem& other) const
+        bool operator==(const QuickAccessItem& other) const
         {
             return label == other.label
                    && path == other.path
                    && icon == other.icon
-                   && used == other.used
-                   && total == other.total
-                   && usedText == other.usedText;
-        }
-
-        bool operator!=(const DriveItem& other) const
-        {
-            return !(*this == other);
+                   && kind == other.kind;
         }
     };
 
@@ -39,23 +30,18 @@ public:
         LabelRole = Qt::UserRole + 1,
         PathRole,
         IconRole,
-        UsedRole,
-        TotalRole,
-        UsedTextRole
+        KindRole
     };
     Q_ENUM(Roles)
 
-    explicit DriveListModel(QObject* parent = nullptr);
+    explicit QuickAccessModel(QObject* parent = nullptr);
 
     int rowCount(const QModelIndex& parent = QModelIndex()) const override;
     QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
     QHash<int, QByteArray> roleNames() const override;
 
     void loadDefaults();
-    void setDrives(const QVector<DriveItem>& items);
-
-    QVector<DriveItem> items() const;
 
 private:
-    QVector<DriveItem> m_items;
+    QVector<QuickAccessItem> m_items;
 };

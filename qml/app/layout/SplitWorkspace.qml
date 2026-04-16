@@ -84,14 +84,28 @@ Item {
             anchors.margins: Theme.Metrics.spacingMd
             spacing: Theme.Metrics.spacingLg
 
+            QuickAccessPane {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 280
+                Layout.minimumHeight: 180
+                Layout.maximumHeight: 320
+                viewModel: splitViewHost.sidebarViewModel
+                sidebarContextMenu: splitViewHost.sidebarContextMenu
+            }
+
             SidebarTreePane {
                 Layout.fillWidth: true
                 Layout.fillHeight: true
+                Layout.minimumHeight: 180
                 viewModel: splitViewHost.sidebarViewModel
                 sidebarContextMenu: splitViewHost.sidebarContextMenu
             }
 
             DriveListPane {
+                Layout.fillWidth: true
+                Layout.preferredHeight: 220
+                Layout.minimumHeight: 150
+                Layout.maximumHeight: 280
                 viewModel: splitViewHost.sidebarViewModel
                 sidebarContextMenu: splitViewHost.sidebarContextMenu
             }

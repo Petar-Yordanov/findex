@@ -220,7 +220,7 @@ Item {
         anchors.rightMargin: 14
         anchors.bottomMargin: 42
         z: 60000
-        width: 360
+        width: 380
         height: parent.height
         clip: false
 
@@ -236,11 +236,12 @@ Item {
                 delegate: NotificationCard {
                     required property var modelData
 
-                    width: 340
+                    width: 360
                     darkTheme: Theme.AppTheme.isDark
 
                     notificationId: modelData.id
                     title: modelData.title || ""
+                    details: modelData.details || ""
                     kind: modelData.kind || "info"
                     progress: modelData.progress === undefined ? -1 : modelData.progress
                     autoClose: modelData.autoClose === undefined ? true : !!modelData.autoClose

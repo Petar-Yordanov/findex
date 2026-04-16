@@ -35,6 +35,7 @@ public:
     Q_INVOKABLE void setCurrentViewMode(const QString& value);
 
     Q_INVOKABLE int pushNotification(const QString& title,
+                                     const QString& details = QString(),
                                      const QString& kind = QStringLiteral("info"),
                                      int progress = -1,
                                      bool autoClose = true,
@@ -42,7 +43,11 @@ public:
 
     Q_INVOKABLE void dismissNotification(int id);
     Q_INVOKABLE void dismissToast(int id);
-    Q_INVOKABLE void updateNotificationProgress(int id, int progress, bool done = false);
+    Q_INVOKABLE void updateNotificationProgress(int id,
+                                                int progress,
+                                                bool done = false,
+                                                const QString& details = QString(),
+                                                const QString& title = QString());
     Q_INVOKABLE void startTestProgress();
 
 signals:
@@ -61,7 +66,13 @@ private:
 
     void upsertToastFromNotification(const QVariantMap& item);
     void dismissFromList(QVariantList& list, int id, bool* removed = nullptr);
-    void updateListEntry(QVariantList& list, int id, int progress, bool done, bool* found = nullptr);
+    void updateListEntry(QVariantList& list,
+                         int id,
+                         int progress,
+                         bool done,
+                         const QString& details,
+                         const QString& title,
+                         bool* found = nullptr);
 
 private:
     int m_totalItems = 0;

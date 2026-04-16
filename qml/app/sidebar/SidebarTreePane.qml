@@ -18,41 +18,52 @@ Rectangle {
     border.width: Theme.Metrics.borderWidth
     clip: true
 
-    TreeView {
-        id: sidebarTree
+    ColumnLayout {
         anchors.fill: parent
         anchors.margins: Theme.Metrics.spacingSm
+        spacing: Theme.Metrics.spacingSm
 
-        model: root.viewModel ? root.viewModel.treeModel : null
-        clip: true
-        alternatingRows: false
-        boundsBehavior: Flickable.StopAtBounds
-        flickableDirection: Flickable.VerticalFlick
-        contentWidth: availableWidth
-
-        readonly property real availableWidth: Math.max(
-            0,
-            width - (verticalScrollBar.visible ? verticalScrollBar.width + 4 : 0)
-        )
-
-        columnWidthProvider: function(column) {
-            return sidebarTree.availableWidth
+        Text {
+            text: "WSL"
+            color: Theme.AppTheme.muted
+            font.pixelSize: 11
+            font.bold: true
+            Layout.leftMargin: Theme.Metrics.spacingSm
+            Layout.rightMargin: Theme.Metrics.spacingSm
+            Layout.topMargin: Theme.Metrics.spacingXs
         }
 
-        ScrollBar.vertical: ExplorerScrollbarV {
-            id: verticalScrollBar
-        }
+        TreeView {
+            id: sidebarTree
+            Layout.fillWidth: true
+            Layout.fillHeight: true
 
-        ScrollBar.horizontal: null
+            model: root.viewModel ? root.viewModel.wslModel : null
+            clip: true
+            alternatingRows: false
+            boundsBehavior: Flickable.StopAtBounds
+            flickableDirection: Flickable.VerticalFlick
+            contentWidth: availableWidth
 
-        delegate: SidebarItem {
-            viewModel: root.viewModel
-            sidebarContextMenu: root.sidebarContextMenu
-        }
+            readonly property real availableWidth: Math.max(
+                0,
+                width - (verticalScrollBar.visible ? verticalScrollBar.width + 4 : 0)
+            )
 
-        Component.onCompleted: {
-            if (model && model.rowCount() > 0)
-                expand(0)
+            columnWidthProvider: function(column) {
+                return sidebarTree.availableWidth
+            }
+
+            ScrollBar.vertical: ExplorerScrollbarV {
+                id: verticalScrollBar
+            }
+
+            ScrollBar.horizontal: null
+
+            delegate: SidebarItem {
+                viewModel: root.viewModel
+                sidebarContextMenu: root.sidebarContextMenu
+            }
         }
     }
 }

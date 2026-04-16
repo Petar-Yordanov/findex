@@ -13,6 +13,20 @@ QString normalizePathSeparators(QString value)
     value = value.trimmed();
     value.replace('\\', '/');
 
+#ifdef Q_OS_WINDOWS
+    const bool isUncPath =
+        value.startsWith(QStringLiteral("//"))
+        && !value.startsWith(QStringLiteral("///"));
+
+    if (isUncPath) {
+        QString tail = value.mid(2);
+        while (tail.contains(QStringLiteral("//")))
+            tail.replace(QStringLiteral("//"), QStringLiteral("/"));
+
+        return QStringLiteral("//") + tail;
+    }
+#endif
+
     while (value.contains(QStringLiteral("//")))
         value.replace(QStringLiteral("//"), QStringLiteral("/"));
 

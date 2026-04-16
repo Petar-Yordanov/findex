@@ -77,7 +77,7 @@ int main(int argc, char* argv[])
                       int progress = -1,
                       bool autoClose = true)
     {
-        statusBarViewModel.pushNotification(title, kind, progress, autoClose, true);
+        statusBarViewModel.pushNotification(title, QString(), kind, progress, autoClose, true);
     };
 
     commandBarViewModel.setViewMode(workspaceViewModel.viewMode());
@@ -176,31 +176,6 @@ int main(int argc, char* argv[])
 
     QObject::connect(
         &workspaceViewModel,
-        &WorkspaceViewModel::openFileRequested,
-        [&](const QVariantMap& fileData)
-        {
-            qDebug() << "openFile:" << fileData;
-        });
-
-    QObject::connect(
-        &workspaceViewModel,
-        &WorkspaceViewModel::openDirectoryRequested,
-        [&](const QVariantMap& directoryData)
-        {
-            qDebug() << "openDirectory:" << directoryData;
-            notify(QStringLiteral("Open folder: %1").arg(directoryData.value(QStringLiteral("name")).toString()));
-        });
-
-    QObject::connect(
-        &workspaceViewModel,
-        &WorkspaceViewModel::fileContextActionRequested,
-        [&](const QString& action, const QVariantMap& item)
-        {
-            notify(QStringLiteral("%1: %2").arg(action, item.value(QStringLiteral("name")).toString()));
-        });
-
-    QObject::connect(
-        &workspaceViewModel,
         &WorkspaceViewModel::fileDropRequested,
         [&](const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind)
         {
@@ -208,10 +183,7 @@ int main(int argc, char* argv[])
             qDebug() << "  targetPath =" << targetPath;
             qDebug() << "  targetKind =" << targetKind;
             qDebug() << "  draggedItems =" << draggedItems;
-
-            notify(QStringLiteral("Dropped %1 item(s) to %2")
-                       .arg(draggedItems.size())
-                       .arg(targetPath));
+            workspaceViewModel.performDropOperation(draggedItems, targetPath);
         });
 
     QObject::connect(
@@ -310,6 +282,40 @@ int main(int argc, char* argv[])
         {
             notify(message, QStringLiteral("error"));
         });
+
+    {
+        auto* progressNotificationId = new int(-1);
+
+        QObject::connect(
+            &workspaceViewModel,
+            &WorkspaceViewModel::operationProgress,
+            &statusBarViewModel,
+            [&, progressNotificationId](const QString& title,
+                                        const QString& details,
+                                        int progress,
+                                        bool done)
+            {
+                if (*progressNotificationId < 0) {
+                    *progressNotificationId = statusBarViewModel.pushNotification(
+                        title,
+                        details,
+                        QStringLiteral("progress"),
+                        progress,
+                        false,
+                        true);
+                } else {
+                    statusBarViewModel.updateNotificationProgress(
+                        *progressNotificationId,
+                        progress,
+                        done,
+                        details,
+                        title);
+                }
+
+                if (done)
+                    *progressNotificationId = -1;
+            });
+    }
 
     syncPathState();
     refreshPreview();

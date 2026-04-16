@@ -5,7 +5,90 @@
 #include <QMimeDatabase>
 #include <QMimeType>
 #include <QProcess>
+#include <QRegularExpression>
 #include <QUrl>
+
+namespace
+{
+QString fallbackDisplayNameFromExecutable(const QString& executable)
+{
+    if (executable.trimmed().isEmpty())
+        return {};
+
+    QFileInfo fi(executable);
+    QString base = fi.completeBaseName().trimmed();
+    if (!base.isEmpty())
+        return base;
+
+    base = fi.fileName().trimmed();
+    return base;
+}
+
+bool looksLikeOpaqueAppId(const QString& value)
+{
+    const QString trimmed = value.trimmed();
+    if (trimmed.isEmpty())
+        return false;
+
+    static const QRegularExpression windowsAppxLike(
+        QStringLiteral("^[A-Za-z0-9]+(?:\\.[A-Za-z0-9]+)*_[A-Za-z0-9]+![A-Za-z0-9.]+$"));
+
+    static const QRegularExpression longOpaqueToken(
+        QStringLiteral("^[A-Za-z0-9._-]{24,}$"));
+
+    return windowsAppxLike.match(trimmed).hasMatch()
+           || longOpaqueToken.match(trimmed).hasMatch();
+}
+
+bool hasUsableDisplayName(const FileAssociationService::AssociatedApp& app)
+{
+    const QString name = app.name.trimmed();
+    if (name.isEmpty())
+        return false;
+
+    if (looksLikeOpaqueAppId(name)) {
+        const QString exeDisplay = fallbackDisplayNameFromExecutable(app.executable);
+        if (exeDisplay.isEmpty())
+            return false;
+    }
+
+    return true;
+}
+
+FileAssociationService::AssociatedApp normalizeApp(FileAssociationService::AssociatedApp app)
+{
+    QString name = app.name.trimmed();
+
+    if (name.isEmpty())
+        name = fallbackDisplayNameFromExecutable(app.executable);
+
+    if (looksLikeOpaqueAppId(name)) {
+        const QString exeDisplay = fallbackDisplayNameFromExecutable(app.executable);
+        if (!exeDisplay.isEmpty())
+            name = exeDisplay;
+    }
+
+    app.name = name.trimmed();
+    return app;
+}
+
+QList<FileAssociationService::AssociatedApp>
+sanitizeApps(QList<FileAssociationService::AssociatedApp> apps)
+{
+    QList<FileAssociationService::AssociatedApp> out;
+    out.reserve(apps.size());
+
+    for (auto app : apps) {
+        app = normalizeApp(std::move(app));
+        if (!hasUsableDisplayName(app))
+            continue;
+
+        out.push_back(std::move(app));
+    }
+
+    return out;
+}
+}
 
 QString FileAssociationService::normalizeExtension(QString extension)
 {
@@ -36,7 +119,7 @@ FileAssociationService::appsForFile(const QString& filePath)
     if (apps.isEmpty() && !ext.isEmpty())
         apps = appsForExtension(ext);
 
-    return apps;
+    return sanitizeApps(std::move(apps));
 }
 
 QList<FileAssociationService::AssociatedApp>
@@ -48,13 +131,13 @@ FileAssociationService::appsForExtension(const QString& extension)
 
     QMimeDatabase db;
     const QMimeType mime = db.mimeTypeForFile("dummy" + ext, QMimeDatabase::MatchExtension);
-    return appsForMimeTypeImpl(mime.name(), ext);
+    return sanitizeApps(appsForMimeTypeImpl(mime.name(), ext));
 }
 
 QList<FileAssociationService::AssociatedApp>
 FileAssociationService::appsForMimeType(const QString& mimeType)
 {
-    return appsForMimeTypeImpl(mimeType, {});
+    return sanitizeApps(appsForMimeTypeImpl(mimeType, {}));
 }
 
 bool FileAssociationService::openWithDefaultApp(const QString& filePath)

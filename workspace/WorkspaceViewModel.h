@@ -4,10 +4,13 @@
 #include <QSet>
 #include <QString>
 #include <QStringList>
+#include <QThread>
 #include <QVariantList>
 
 #include "ApplicationSettings.h"
 #include "workspace/FileListModel.h"
+
+class FileOperationWorker;
 
 class WorkspaceViewModel final : public QObject
 {
@@ -112,6 +115,7 @@ public:
     Q_INVOKABLE void dropOnRow(int row);
     Q_INVOKABLE void requestDropToPath(const QString& targetPath, const QString& targetKind);
     Q_INVOKABLE bool isOnlyDraggingRow(int row) const;
+    void performDropOperation(const QVariantList& draggedItems, const QString& targetPath);
 
     Q_INVOKABLE void beginFileDragPreview(qreal overlayX, qreal overlayY, const QString& text, const QString& icon);
     Q_INVOKABLE void updateFileDragPreview(qreal overlayX, qreal overlayY);
@@ -168,6 +172,10 @@ signals:
 
     void operationCompleted(const QString& message);
     void operationFailed(const QString& message);
+    void operationProgress(const QString& title,
+                           const QString& details,
+                           int progress,
+                           bool done);
 
 private:
     enum class ClipboardMode
@@ -208,6 +216,11 @@ private:
     QString currentSelectedFilePath() const;
     void setOpenWithAppsForPath(const QString& filePath);
 
+    bool operationInProgress() const;
+    void startAsyncPasteOperation(ClipboardMode mode, const QStringList& sourcePaths);
+    void startAsyncDeleteOperation(const QStringList& paths);
+    void attachWorker(FileOperationWorker* worker, QThread* thread);
+
 private:
     ApplicationSettings m_settings;
     FileListModel m_fileModel;
@@ -247,4 +260,6 @@ private:
     QStringList m_clipboardPaths;
 
     QVariantList m_openWithApps;
+
+    QThread* m_operationThread = nullptr;
 };

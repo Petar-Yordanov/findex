@@ -7,10 +7,10 @@ StyledMenu {
 
     required property var viewModel
     darkTheme: Theme.AppTheme.isDark
-    menuWidth: 380
+    menuWidth: 420
 
     Item {
-        width: parent ? parent.width : 380
+        width: parent ? parent.width : 420
         implicitHeight: notificationsContainer.implicitHeight
 
         Column {
@@ -55,6 +55,7 @@ StyledMenu {
 
                     notificationId: modelData.id
                     title: modelData.title || ""
+                    details: modelData.details || ""
                     kind: modelData.kind || "info"
                     progress: modelData.progress === undefined ? -1 : modelData.progress
                     autoClose: false
