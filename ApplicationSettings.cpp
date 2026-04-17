@@ -7,6 +7,8 @@ static const QString kThemeKey = QStringLiteral("theme");
 static const QString kPreviewEnabledKey = QStringLiteral("previewEnabled");
 static const QString kSearchScopeKey = QStringLiteral("searchScope");
 static const QString kViewModeKey = QStringLiteral("viewMode");
+static const QString kSortFieldKey = QStringLiteral("sortField");
+static const QString kSortDescendingKey = QStringLiteral("sortDescending");
 static const QString kShowHiddenFilesKey = QStringLiteral("showHiddenFiles");
 static const QString kTabsKey = QStringLiteral("tabs");
 static const QString kCurrentTabIndexKey = QStringLiteral("currentTabIndex");
@@ -15,6 +17,8 @@ static const QString kDefaultTheme = QStringLiteral("Light");
 static const bool kDefaultPreviewEnabled = true;
 static const QString kDefaultSearchScope = QStringLiteral("folder");
 static const QString kDefaultViewMode = QStringLiteral("Details");
+static const QString kDefaultSortField = QStringLiteral("name");
+static const bool kDefaultSortDescending = false;
 static const bool kDefaultShowHiddenFiles = false;
 }
 
@@ -38,6 +42,12 @@ void ApplicationSettings::ensureDefaults() const
 
     if (!settings.contains(kViewModeKey))
         settings.setValue(kViewModeKey, kDefaultViewMode);
+
+    if (!settings.contains(kSortFieldKey))
+        settings.setValue(kSortFieldKey, kDefaultSortField);
+
+    if (!settings.contains(kSortDescendingKey))
+        settings.setValue(kSortDescendingKey, kDefaultSortDescending);
 
     if (!settings.contains(kShowHiddenFilesKey))
         settings.setValue(kShowHiddenFilesKey, kDefaultShowHiddenFiles);
@@ -135,6 +145,45 @@ void ApplicationSettings::setViewMode(const QString& viewMode)
 
     QSettings settings;
     settings.setValue(kViewModeKey, normalized);
+    settings.sync();
+}
+
+QString ApplicationSettings::sortField() const
+{
+    QSettings settings;
+    const QString value = settings.value(kSortFieldKey, kDefaultSortField).toString().trimmed();
+    if (value == QStringLiteral("dateModified")
+        || value == QStringLiteral("type")
+        || value == QStringLiteral("size")) {
+        return value;
+    }
+    return QStringLiteral("name");
+}
+
+void ApplicationSettings::setSortField(const QString& field)
+{
+    QString normalized = field.trimmed();
+    if (normalized != QStringLiteral("dateModified")
+        && normalized != QStringLiteral("type")
+        && normalized != QStringLiteral("size")) {
+        normalized = QStringLiteral("name");
+    }
+
+    QSettings settings;
+    settings.setValue(kSortFieldKey, normalized);
+    settings.sync();
+}
+
+bool ApplicationSettings::sortDescending() const
+{
+    QSettings settings;
+    return settings.value(kSortDescendingKey, kDefaultSortDescending).toBool();
+}
+
+void ApplicationSettings::setSortDescending(bool descending)
+{
+    QSettings settings;
+    settings.setValue(kSortDescendingKey, descending);
     settings.sync();
 }
 

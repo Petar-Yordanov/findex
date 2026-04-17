@@ -20,6 +20,7 @@ class PreviewPaneViewModel final : public QObject
     Q_PROPERTY(QString name READ name NOTIFY previewChanged)
     Q_PROPERTY(QString type READ type NOTIFY previewChanged)
     Q_PROPERTY(QString icon READ icon NOTIFY previewChanged)
+    Q_PROPERTY(QString nativeIconSource READ nativeIconSource NOTIFY previewChanged)
     Q_PROPERTY(QString previewType READ previewType NOTIFY previewChanged)
     Q_PROPERTY(QString size READ size NOTIFY previewChanged)
     Q_PROPERTY(QString dateModified READ dateModified NOTIFY previewChanged)
@@ -48,6 +49,7 @@ public:
     QString name() const;
     QString type() const;
     QString icon() const;
+    QString nativeIconSource() const;
     QString previewType() const;
     QString size() const;
     QString dateModified() const;
@@ -72,6 +74,7 @@ private:
         const QString& name,
         const QString& type,
         const QString& icon,
+        const QString& nativeIconSource,
         const QString& previewType,
         const QString& size,
         const QString& dateModified,
@@ -90,6 +93,7 @@ private:
     QString m_name;
     QString m_type;
     QString m_icon = QStringLiteral("insert-drive-file");
+    QString m_nativeIconSource;
     QString m_previewType = QStringLiteral("none");
     QString m_size;
     QString m_dateModified;

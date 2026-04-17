@@ -156,8 +156,9 @@ Item {
         onDropped: function(drop) {
             if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(itemPath))
                 return
-            appWorkspaceViewModel.requestDropToPath(itemPath, itemKind)
-            drop.accept(Qt.MoveAction)
+            const dropAction = drop.proposedAction === Qt.CopyAction ? Qt.CopyAction : Qt.MoveAction
+            appWorkspaceViewModel.requestDropToPath(itemPath, itemKind, dropAction === Qt.CopyAction)
+            drop.accept(dropAction)
         }
     }
 

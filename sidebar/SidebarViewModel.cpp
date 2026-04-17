@@ -3,6 +3,7 @@
 #include <QDir>
 #include <QStorageInfo>
 #include <QtConcurrent>
+#include <algorithm>
 
 #include "WslModel.h"
 #include "DriveListModel.h"

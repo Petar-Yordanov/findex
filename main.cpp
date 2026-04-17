@@ -8,6 +8,7 @@
 #include <QCoreApplication>
 
 #include "ApplicationSettings.h"
+#include "FileIconProvider.h"
 
 #include "sidebar/SidebarViewModel.h"
 #include "navigation/NavigationViewModel.h"
@@ -27,6 +28,7 @@ int main(int argc, char* argv[])
     QSettings::setDefaultFormat(QSettings::IniFormat);
 
     QQmlApplicationEngine engine;
+    engine.addImageProvider(QStringLiteral("fileicons"), new FileIconProvider);
 
     ApplicationSettings appSettings;
 
@@ -177,13 +179,14 @@ int main(int argc, char* argv[])
     QObject::connect(
         &workspaceViewModel,
         &WorkspaceViewModel::fileDropRequested,
-        [&](const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind)
+        [&](const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind, bool copy)
         {
             qDebug() << "fileDropRequested:";
             qDebug() << "  targetPath =" << targetPath;
             qDebug() << "  targetKind =" << targetKind;
+            qDebug() << "  copy =" << copy;
             qDebug() << "  draggedItems =" << draggedItems;
-            workspaceViewModel.performDropOperation(draggedItems, targetPath);
+            workspaceViewModel.performDropOperation(draggedItems, targetPath, copy);
         });
 
     QObject::connect(
@@ -281,6 +284,14 @@ int main(int argc, char* argv[])
         [&](const QString& message)
         {
             notify(message, QStringLiteral("error"));
+        });
+
+    QObject::connect(
+        &workspaceViewModel,
+        &WorkspaceViewModel::contextInfoRequested,
+        [&](const QString& title, const QString& details, const QString& kind)
+        {
+            statusBarViewModel.pushNotification(title, details, kind, -1, false, true);
         });
 
     {

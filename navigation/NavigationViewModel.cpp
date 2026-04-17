@@ -337,6 +337,34 @@ void NavigationViewModel::setBreadcrumbsFromPathText(const QString& text)
         syncPathTextFromBreadcrumbs();
         return;
     }
+
+    const bool isUncPath =
+        working.startsWith(QStringLiteral("//"))
+        && !working.startsWith(QStringLiteral("///"));
+
+    if (isUncPath)
+    {
+        const QStringList parts = working.mid(2).split('/', Qt::SkipEmptyParts);
+        QString cumulativePath = QStringLiteral("//");
+
+        for (int i = 0; i < parts.size(); ++i)
+        {
+            if (i > 0)
+                cumulativePath += QStringLiteral("/");
+
+            cumulativePath += parts.at(i);
+
+            items.push_back({
+                parts.at(i),
+                i == 0 ? QStringLiteral("hard-drive") : QStringLiteral("folder"),
+                cumulativePath
+            });
+        }
+
+        m_breadcrumbModel.setItems(items);
+        syncPathTextFromBreadcrumbs();
+        return;
+    }
 #endif
 
     const QStringList parts = normalized.split('/', Qt::SkipEmptyParts);

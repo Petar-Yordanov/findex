@@ -64,6 +64,31 @@ void DriveListModel::setDrives(const QVector<DriveItem>& items)
     if (m_items == items)
         return;
 
+    const bool sameShape =
+        m_items.size() == items.size()
+        && std::equal(
+            m_items.cbegin(),
+            m_items.cend(),
+            items.cbegin(),
+            [](const DriveItem& current, const DriveItem& next) {
+                return current.path == next.path;
+            });
+
+    if (sameShape) {
+        for (int row = 0; row < m_items.size(); ++row) {
+            if (m_items.at(row) == items.at(row))
+                continue;
+
+            m_items[row] = items.at(row);
+            const QModelIndex modelIndex = index(row, 0);
+            emit dataChanged(
+                modelIndex,
+                modelIndex,
+                { LabelRole, PathRole, IconRole, UsedRole, TotalRole, UsedTextRole });
+        }
+        return;
+    }
+
     beginResetModel();
     m_items = items;
     endResetModel();

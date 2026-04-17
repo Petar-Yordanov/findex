@@ -25,6 +25,8 @@ class WorkspaceViewModel final : public QObject
     Q_PROPERTY(QString itemsText READ itemsText NOTIFY itemsTextChanged)
     Q_PROPERTY(bool dragSelecting READ dragSelecting NOTIFY dragSelectingChanged)
     Q_PROPERTY(int selectionRevision READ selectionRevision NOTIFY selectionStateChanged)
+    Q_PROPERTY(QString sortField READ sortField NOTIFY sortChanged)
+    Q_PROPERTY(bool sortDescending READ sortDescending NOTIFY sortChanged)
 
     Q_PROPERTY(QString currentDirectoryPath READ currentDirectoryPath WRITE setCurrentDirectoryPath NOTIFY currentDirectoryPathChanged)
     Q_PROPERTY(bool draggingItems READ draggingItems NOTIFY draggingItemsChanged)
@@ -57,6 +59,8 @@ public:
     QString itemsText() const;
     bool dragSelecting() const;
     int selectionRevision() const;
+    QString sortField() const;
+    bool sortDescending() const;
 
     QString currentDirectoryPath() const;
     void setCurrentDirectoryPath(const QString& value);
@@ -91,6 +95,8 @@ public:
 
     Q_INVOKABLE QString savedViewMode() const;
     Q_INVOKABLE bool savedShowHiddenFiles() const;
+    Q_INVOKABLE void setSort(const QString& field, bool descending);
+    Q_INVOKABLE void toggleSort(const QString& field);
 
     Q_INVOKABLE void activateRow(int row);
     Q_INVOKABLE void selectOnlyRow(int row);
@@ -112,10 +118,10 @@ public:
     Q_INVOKABLE void cancelFileDrag();
     Q_INVOKABLE bool canDropOnRow(int row) const;
     Q_INVOKABLE bool canDropToPath(const QString& targetPath) const;
-    Q_INVOKABLE void dropOnRow(int row);
-    Q_INVOKABLE void requestDropToPath(const QString& targetPath, const QString& targetKind);
+    Q_INVOKABLE void dropOnRow(int row, bool copy = false);
+    Q_INVOKABLE void requestDropToPath(const QString& targetPath, const QString& targetKind, bool copy = false);
     Q_INVOKABLE bool isOnlyDraggingRow(int row) const;
-    void performDropOperation(const QVariantList& draggedItems, const QString& targetPath);
+    void performDropOperation(const QVariantList& draggedItems, const QString& targetPath, bool copy);
 
     Q_INVOKABLE void beginFileDragPreview(qreal overlayX, qreal overlayY, const QString& text, const QString& icon);
     Q_INVOKABLE void updateFileDragPreview(qreal overlayX, qreal overlayY);
@@ -134,9 +140,13 @@ public:
     Q_INVOKABLE void cutSelectedItems();
     Q_INVOKABLE void copySelectedItems();
     Q_INVOKABLE void pasteItems();
+    Q_INVOKABLE void duplicateSelectedItems();
     Q_INVOKABLE void deleteSelectedItems();
     Q_INVOKABLE void compressSelectedItems();
     Q_INVOKABLE void extractSelectedItems();
+    Q_INVOKABLE void showProperties();
+    Q_INVOKABLE void showItemProperties();
+    Q_INVOKABLE void showCurrentLocationProperties();
 
     Q_INVOKABLE void prepareOpenWithForRow(int row);
     Q_INVOKABLE void prepareOpenWithForSelection();
@@ -151,6 +161,7 @@ signals:
     void itemsTextChanged();
     void selectionStateChanged();
     void dragSelectingChanged();
+    void sortChanged();
 
     void currentDirectoryPathChanged();
     void draggingItemsChanged();
@@ -166,9 +177,10 @@ signals:
     void openFileRequested(const QVariantMap& fileData);
     void openDirectoryRequested(const QVariantMap& directoryData);
 
-    void fileDropRequested(const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind);
+    void fileDropRequested(const QVariantList& draggedItems, const QString& targetPath, const QString& targetKind, bool copy);
     void fileContextActionRequested(const QString& action, const QVariantMap& item);
     void fileDragFinished(bool accepted, const QString& targetPath, const QString& targetKind);
+    void contextInfoRequested(const QString& title, const QString& details, const QString& kind);
 
     void operationCompleted(const QString& message);
     void operationFailed(const QString& message);
@@ -186,7 +198,9 @@ private:
     };
 
     QString normalizeViewMode(const QString& value) const;
+    QString normalizeSortField(const QString& value) const;
     QString iconForViewMode(const QString& mode) const;
+    void applySort(QVector<FileListModel::FileItem>& items) const;
     void emitSelectionSignals(int previousSelected, const QString& previousItemsText, bool selectionChanged);
     int firstSelectedRow() const;
     QVariantMap previewDataForRow(int row) const;
@@ -203,28 +217,43 @@ private:
     void clearInlineEditState();
 
     QString normalizePath(QString value) const;
+    QString parentLocationForPath(const QString& path) const;
+    QString childLocationForName(const QString& directoryPath, const QString& name) const;
+    QString uniqueLocationInDirectory(const QString& directoryPath, const QString& originalName) const;
     void loadLocation(const QString& path, bool pushHistory = true);
     void reloadListing();
-    QVector<FileListModel::FileItem> listDirectoryItems(const QString& path) const;
+    QVector<FileListModel::FileItem> listDirectoryItems(const QString& path);
     QVector<FileListModel::FileItem> searchItems(const QString& basePath,
                                                  const QString& query,
-                                                 const QString& scope) const;
+                                                 const QString& scope);
     void resetSelectionToFirstItem();
+    bool restoreSelectionToPaths(const QStringList& paths, const QString& currentPath);
 
     QVariantList selectedItemsAsMaps() const;
     QStringList selectedPaths() const;
     QString currentSelectedFilePath() const;
     void setOpenWithAppsForPath(const QString& filePath);
+    void selectPathIfVisible(const QString& path);
+    void copySelectedPathTextToClipboard();
+    void openContainingFolderForSelection();
+    void emitPropertiesForItem(const QVariantMap& item);
+    QString buildPropertiesDetails(const QVariantMap& item) const;
 
     bool operationInProgress() const;
-    void startAsyncPasteOperation(ClipboardMode mode, const QStringList& sourcePaths);
-    void startAsyncDeleteOperation(const QStringList& paths);
+    void startAsyncDuplicateOperation(const QStringList& sourcePaths);
+    void startAsyncTransferOperation(const QStringList& sourcePaths,
+                                     const QString& destinationDirectory,
+                                     bool copy,
+                                     const QString& successMessageTemplate,
+                                     const QString& failureMessage);
     void attachWorker(FileOperationWorker* worker, QThread* thread);
 
 private:
     ApplicationSettings m_settings;
     FileListModel m_fileModel;
     QString m_viewMode;
+    QString m_sortField;
+    bool m_sortDescending = false;
     int m_currentIndex = -1;
     int m_selectionAnchorRow = -1;
     QSet<int> m_selectedRows;

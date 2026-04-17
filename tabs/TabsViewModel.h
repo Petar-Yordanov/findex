@@ -30,6 +30,10 @@ public:
 
     Q_INVOKABLE void addTab();
     Q_INVOKABLE void closeTab(int index);
+    Q_INVOKABLE void closeOtherTabs(int index);
+    Q_INVOKABLE void closeTabsToLeft(int index);
+    Q_INVOKABLE void closeTabsToRight(int index);
+    Q_INVOKABLE void duplicateTab(int index);
     Q_INVOKABLE void activateTab(int index);
     Q_INVOKABLE void activateTabForDrop(int index);
     Q_INVOKABLE void beginRenameTab(int index);
@@ -52,6 +56,8 @@ signals:
     void tabMoved(int from, int to);
 
 private:
+    void applyTabsState(const QVector<TabListModel::TabItem>& tabs, int currentIndex);
+    void emitCurrentTabActivated();
     void setCurrentIndexInternal(int index);
     void setEditingIndexInternal(int index);
     QString defaultTitleForPath(const QString& path) const;

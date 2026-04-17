@@ -20,6 +20,12 @@ public:
     QString viewMode() const;
     void setViewMode(const QString& viewMode);
 
+    QString sortField() const;
+    void setSortField(const QString& field);
+
+    bool sortDescending() const;
+    void setSortDescending(bool descending);
+
     bool showHiddenFiles() const;
     void setShowHiddenFiles(bool enabled);
 

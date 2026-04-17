@@ -128,6 +128,11 @@ QString PreviewPaneViewModel::icon() const
     return m_icon;
 }
 
+QString PreviewPaneViewModel::nativeIconSource() const
+{
+    return m_nativeIconSource;
+}
+
 QString PreviewPaneViewModel::previewType() const
 {
     return m_previewType;
@@ -175,6 +180,7 @@ void PreviewPaneViewModel::showPreviewData(const QVariantMap& data)
         data.value(QStringLiteral("name")).toString(),
         data.value(QStringLiteral("type")).toString(),
         data.value(QStringLiteral("icon"), QStringLiteral("insert-drive-file")).toString(),
+        data.value(QStringLiteral("nativeIconSource")).toString(),
         data.value(QStringLiteral("previewType"), QStringLiteral("none")).toString(),
         data.value(QStringLiteral("size")).toString(),
         data.value(QStringLiteral("dateModified")).toString(),
@@ -189,6 +195,7 @@ void PreviewPaneViewModel::clearPreview()
         QString(),
         QString(),
         QStringLiteral("insert-drive-file"),
+        QString(),
         QStringLiteral("none"),
         QString(),
         QString(),
@@ -206,6 +213,7 @@ void PreviewPaneViewModel::setPreviewFields(
     const QString& nameValue,
     const QString& typeValue,
     const QString& iconValue,
+    const QString& nativeIconSourceValue,
     const QString& previewTypeValue,
     const QString& sizeValue,
     const QString& dateModifiedValue,
@@ -217,6 +225,7 @@ void PreviewPaneViewModel::setPreviewFields(
         || m_name != nameValue
         || m_type != typeValue
         || m_icon != iconValue
+        || m_nativeIconSource != nativeIconSourceValue
         || m_previewType != previewTypeValue
         || m_size != sizeValue
         || m_dateModified != dateModifiedValue
@@ -230,6 +239,7 @@ void PreviewPaneViewModel::setPreviewFields(
     m_name = nameValue;
     m_type = typeValue;
     m_icon = iconValue;
+    m_nativeIconSource = nativeIconSourceValue;
     m_previewType = previewTypeValue;
     m_size = sizeValue;
     m_dateModified = dateModifiedValue;

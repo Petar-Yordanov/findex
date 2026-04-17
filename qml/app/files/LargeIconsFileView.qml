@@ -9,6 +9,41 @@ Rectangle {
     required property var fileContextMenu
     required property var dragOverlayHost
     color: "transparent"
+    property real preservedContentY: 0
+    property bool restoreScrollAfterReset: false
+    property bool directoryChangedSinceLastReset: false
+
+    function restoreFileListScrollPosition() {
+        fileList.contentY = Math.max(0, Math.min(preservedContentY, Math.max(0, fileList.contentHeight - fileList.height)))
+    }
+
+    Connections {
+        target: viewModel
+
+        function onCurrentDirectoryPathChanged() {
+            root.directoryChangedSinceLastReset = true
+        }
+    }
+
+    Connections {
+        target: viewModel ? viewModel.fileModel : null
+
+        function onModelAboutToBeReset() {
+            root.restoreScrollAfterReset = !root.directoryChangedSinceLastReset
+            if (!root.restoreScrollAfterReset)
+                return
+            root.preservedContentY = fileList.contentY
+        }
+
+        function onModelReset() {
+            const shouldRestore = root.restoreScrollAfterReset
+            root.restoreScrollAfterReset = false
+            root.directoryChangedSinceLastReset = false
+            if (!shouldRestore)
+                return
+            Qt.callLater(root.restoreFileListScrollPosition)
+        }
+    }
 
     ListView {
         id: fileList
@@ -37,6 +72,7 @@ Rectangle {
             required property string name
             required property string path
             required property string icon
+            required property string nativeIconSource
             required property bool isDir
 
             readonly property bool selectedState: {
@@ -77,7 +113,7 @@ Rectangle {
 
                 Drag.active: mouseArea.fileDragActive
                 Drag.dragType: Drag.Internal
-                Drag.supportedActions: Qt.MoveAction
+                Drag.supportedActions: Qt.CopyAction | Qt.MoveAction
                 Drag.hotSpot.x: 0
                 Drag.hotSpot.y: 0
                 Drag.mimeData: {
@@ -114,6 +150,7 @@ Rectangle {
 
                 AppIcon {
                     name: icon
+                    sourceOverride: nativeIconSource
                     darkTheme: Theme.AppTheme.isDark
                     iconSize: 14
                     anchors.verticalCenter: parent.verticalCenter
@@ -195,8 +232,9 @@ Rectangle {
                 onDropped: function(drop) {
                     if (!viewModel || !viewModel.canDropOnRow(index))
                         return
-                    viewModel.dropOnRow(index)
-                    drop.accept(Qt.MoveAction)
+                    const dropAction = drop.proposedAction === Qt.CopyAction ? Qt.CopyAction : Qt.MoveAction
+                    viewModel.dropOnRow(index, dropAction === Qt.CopyAction)
+                    drop.accept(dropAction)
                 }
             }
 
@@ -244,6 +282,8 @@ Rectangle {
                     }
 
                     if (mouse.button === Qt.RightButton) {
+                        if (viewModel && !viewModel.isRowSelected(index))
+                            viewModel.selectOnlyRow(index)
                         if (fileContextMenu) {
                             fileContextMenu.rowIndex = index
                             var p = mouseArea.mapToItem(fileContextMenu.parent, mouse.x, mouse.y)
@@ -371,6 +411,41 @@ Rectangle {
                 }
             }
         }
+
+    Column {
+        anchors.centerIn: parent
+        width: Math.min(parent.width - 48, 320)
+        spacing: Theme.Metrics.spacingMd
+        visible: fileList.count === 0
+        z: 1
+
+        AppIcon {
+            anchors.horizontalCenter: parent.horizontalCenter
+            name: "folder"
+            darkTheme: Theme.AppTheme.isDark
+            iconSize: Theme.Metrics.icon3xl
+            iconOpacity: 0.5
+        }
+
+        Text {
+            width: parent.width
+            text: "This folder is empty"
+            color: Theme.AppTheme.text
+            font.pixelSize: Theme.Typography.bodyLg
+            font.bold: true
+            wrapMode: Text.Wrap
+            horizontalAlignment: Text.AlignHCenter
+        }
+
+        Text {
+            width: parent.width
+            text: "Create something new or copy files here."
+            color: Theme.AppTheme.muted
+            font.pixelSize: Theme.Typography.body
+            wrapMode: Text.Wrap
+            horizontalAlignment: Text.AlignHCenter
+        }
+    }
 
         MouseArea {
             id: overlay

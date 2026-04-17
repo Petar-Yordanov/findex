@@ -39,6 +39,8 @@ QVariant FileListModel::data(const QModelIndex& index, int role) const
         return item.size;
     case IconRole:
         return item.icon;
+    case NativeIconSourceRole:
+        return item.nativeIconSource;
     case IsDirRole:
         return item.isDir;
     default:
@@ -55,6 +57,7 @@ QHash<int, QByteArray> FileListModel::roleNames() const
         { TypeRole, "type" },
         { SizeRole, "size" },
         { IconRole, "icon" },
+        { NativeIconSourceRole, "nativeIconSource" },
         { IsDirRole, "isDir" }
     };
 }
@@ -105,7 +108,7 @@ bool FileListModel::updateItem(int row, const FileItem& item)
     emit dataChanged(
         modelIndex,
         modelIndex,
-        { NameRole, PathRole, DateModifiedRole, TypeRole, SizeRole, IconRole, IsDirRole });
+        { NameRole, PathRole, DateModifiedRole, TypeRole, SizeRole, IconRole, NativeIconSourceRole, IsDirRole });
 
     return true;
 }
@@ -124,6 +127,7 @@ QVariantMap FileListModel::get(int row) const
     map.insert(QStringLiteral("type"), item.type);
     map.insert(QStringLiteral("size"), item.size);
     map.insert(QStringLiteral("icon"), item.icon);
+    map.insert(QStringLiteral("nativeIconSource"), item.nativeIconSource);
     map.insert(QStringLiteral("isDir"), item.isDir);
     return map;
 }

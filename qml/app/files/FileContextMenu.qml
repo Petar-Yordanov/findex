@@ -149,6 +149,64 @@ StyledMenu {
     StyledMenuSeparator {}
 
     StyledMenuItem {
+        text: "Copy path"
+        darkTheme: Theme.AppTheme.isDark
+        enabled: rowIndex >= 0
+
+        onTriggered: {
+            if (viewModel && rowIndex >= 0)
+                viewModel.requestFileContextAction("Copy path", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
+            menu.close()
+        }
+    }
+
+    StyledMenuItem {
+        text: "Duplicate"
+        darkTheme: Theme.AppTheme.isDark
+        enabled: rowIndex >= 0
+
+        onTriggered: {
+            if (viewModel && rowIndex >= 0)
+                viewModel.requestFileContextAction("Duplicate", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
+            menu.close()
+        }
+    }
+
+    StyledMenuItem {
+        text: "Open containing folder"
+        darkTheme: Theme.AppTheme.isDark
+        enabled: rowIndex >= 0
+
+        onTriggered: {
+            if (viewModel && rowIndex >= 0)
+                viewModel.requestFileContextAction("Open containing folder", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
+            menu.close()
+        }
+    }
+
+    StyledMenuItem {
+        text: "Properties"
+        darkTheme: Theme.AppTheme.isDark
+        enabled: rowIndex >= 0
+
+        onTriggered: {
+            if (viewModel && rowIndex >= 0)
+                viewModel.requestFileContextAction("Properties", rowIndex)
+            openWithHoverTimer.stop()
+            openWithSubmenu.close()
+            menu.close()
+        }
+    }
+
+    StyledMenuSeparator {}
+
+    StyledMenuItem {
         text: "Compress"
         darkTheme: Theme.AppTheme.isDark
         enabled: rowIndex >= 0

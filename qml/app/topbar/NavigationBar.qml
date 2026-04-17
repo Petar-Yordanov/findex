@@ -18,6 +18,29 @@ Rectangle {
     readonly property bool hasVm: viewModel !== null && viewModel !== undefined
     readonly property var crumbsModel: hasVm ? viewModel.breadcrumbModel : null
 
+    TapHandler {
+        parent: navBar.rootWindow ? navBar.rootWindow.contentItem : null
+        enabled: navBar.hasVm && navBar.viewModel.editingPath && !!navBar.rootWindow
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        target: null
+
+        onTapped: function(eventPoint) {
+            if (!navBar.hasVm || !navBar.viewModel.editingPath || !navBar.rootWindow)
+                return
+
+            var pathBarPos = pathBar.mapToItem(navBar.rootWindow.contentItem, 0, 0)
+            var localX = eventPoint.position.x - pathBarPos.x
+            var localY = eventPoint.position.y - pathBarPos.y
+            var clickedInsidePathBar = localX >= 0
+                    && localY >= 0
+                    && localX <= pathBar.width
+                    && localY <= pathBar.height
+
+            if (!clickedInsidePathBar)
+                navBar.viewModel.cancelPathEdit()
+        }
+    }
+
     color: Theme.AppTheme.surface
     border.color: Theme.AppTheme.borderSoft
     border.width: Theme.Metrics.borderWidth
@@ -156,8 +179,9 @@ Rectangle {
                                             onDropped: function(drop) {
                                                 if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(path))
                                                     return
-                                                appWorkspaceViewModel.requestDropToPath(path, "breadcrumb")
-                                                drop.accept(Qt.MoveAction)
+                                                const dropAction = drop.proposedAction === Qt.CopyAction ? Qt.CopyAction : Qt.MoveAction
+                                                appWorkspaceViewModel.requestDropToPath(path, "breadcrumb", dropAction === Qt.CopyAction)
+                                                drop.accept(dropAction)
                                             }
                                         }
 

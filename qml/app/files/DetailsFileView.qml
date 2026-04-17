@@ -31,6 +31,10 @@ Rectangle {
     property int baseDateColumnWidth: 220
     property int baseTypeColumnWidth: 290
     property int baseSizeColumnWidth: 140
+    property real preservedContentX: 0
+    property real preservedContentY: 0
+    property bool restoreScrollAfterReset: false
+    property bool directoryChangedSinceLastReset: false
 
     readonly property int availableViewportWidth: Math.max(
         0,
@@ -96,6 +100,61 @@ Rectangle {
         baseTypeColumnWidth = Math.max(minTypeColumnWidth, baseTypeColumnWidth + delta)
     }
 
+    function headerLabel(label, field) {
+        return label
+    }
+
+    function headerColor(field) {
+        if (viewModel && viewModel.sortField === field)
+            return Theme.AppTheme.accent
+        return Theme.AppTheme.text
+    }
+
+    function sortIconName(field) {
+        if (!viewModel || viewModel.sortField !== field)
+            return ""
+        return viewModel.sortDescending ? "keyboard-arrow-down" : "keyboard-arrow-up"
+    }
+
+    function toggleSort(field) {
+        if (viewModel)
+            viewModel.toggleSort(field)
+    }
+
+    function restoreFileListScrollPosition() {
+        fileList.contentX = Math.max(0, Math.min(preservedContentX, Math.max(0, fileList.contentWidth - fileList.width)))
+        fileList.contentY = Math.max(0, Math.min(preservedContentY, Math.max(0, fileList.contentHeight - fileList.height)))
+    }
+
+    Connections {
+        target: viewModel
+
+        function onCurrentDirectoryPathChanged() {
+            root.directoryChangedSinceLastReset = true
+        }
+    }
+
+    Connections {
+        target: viewModel ? viewModel.fileModel : null
+
+        function onModelAboutToBeReset() {
+            root.restoreScrollAfterReset = !root.directoryChangedSinceLastReset
+            if (!root.restoreScrollAfterReset)
+                return
+            root.preservedContentX = fileList.contentX
+            root.preservedContentY = fileList.contentY
+        }
+
+        function onModelReset() {
+            const shouldRestore = root.restoreScrollAfterReset
+            root.restoreScrollAfterReset = false
+            root.directoryChangedSinceLastReset = false
+            if (!shouldRestore)
+                return
+            Qt.callLater(root.restoreFileListScrollPosition)
+        }
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 0
@@ -124,18 +183,44 @@ Rectangle {
                     width: root.effectiveContentWidth
                     height: headerFlick.height
 
-                    Text {
+                    Item {
                         id: nameHeader
                         x: 0
                         width: root.nameColumnWidth
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Name"
-                        color: Theme.AppTheme.text
-                        font.pixelSize: Theme.Typography.body
-                        font.bold: true
-                        elide: Text.ElideRight
-                        horizontalAlignment: Text.AlignLeft
-                        verticalAlignment: Text.AlignVCenter
+                        height: parent.height
+
+                        Row {
+                            anchors.fill: parent
+                            spacing: 4
+
+                            Text {
+                                width: parent.width - (nameSortIcon.visible ? nameSortIcon.width + parent.spacing : 0)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root.headerLabel("Name", "name")
+                                color: root.headerColor("name")
+                                font.pixelSize: Theme.Typography.body
+                                font.bold: true
+                                elide: Text.ElideRight
+                                horizontalAlignment: Text.AlignLeft
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            AppIcon {
+                                id: nameSortIcon
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: root.sortIconName("name")
+                                darkTheme: Theme.AppTheme.isDark
+                                iconSize: 16
+                                visible: name !== ""
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: nameHeader
+                        acceptedButtons: Qt.LeftButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.toggleSort("name")
                     }
 
                     Rectangle {
@@ -169,18 +254,44 @@ Rectangle {
                         }
                     }
 
-                    Text {
+                    Item {
                         id: dateHeader
                         x: root.nameColumnWidth + root.columnSpacing
                         width: root.dateColumnWidth
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Date modified"
-                        color: Theme.AppTheme.text
-                        font.pixelSize: Theme.Typography.body
-                        font.bold: true
-                        elide: Text.ElideRight
-                        horizontalAlignment: Text.AlignLeft
-                        verticalAlignment: Text.AlignVCenter
+                        height: parent.height
+
+                        Row {
+                            anchors.fill: parent
+                            spacing: 4
+
+                            Text {
+                                width: parent.width - (dateSortIcon.visible ? dateSortIcon.width + parent.spacing : 0)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root.headerLabel("Date modified", "dateModified")
+                                color: root.headerColor("dateModified")
+                                font.pixelSize: Theme.Typography.body
+                                font.bold: true
+                                elide: Text.ElideRight
+                                horizontalAlignment: Text.AlignLeft
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            AppIcon {
+                                id: dateSortIcon
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: root.sortIconName("dateModified")
+                                darkTheme: Theme.AppTheme.isDark
+                                iconSize: 16
+                                visible: name !== ""
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: dateHeader
+                        acceptedButtons: Qt.LeftButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.toggleSort("dateModified")
                     }
 
                     Rectangle {
@@ -214,19 +325,45 @@ Rectangle {
                         }
                     }
 
-                    Text {
+                    Item {
                         id: typeHeader
                         x: root.nameColumnWidth + root.columnSpacing
                            + root.dateColumnWidth + root.columnSpacing
                         width: root.typeColumnWidth
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Type"
-                        color: Theme.AppTheme.text
-                        font.pixelSize: Theme.Typography.body
-                        font.bold: true
-                        elide: Text.ElideRight
-                        horizontalAlignment: Text.AlignLeft
-                        verticalAlignment: Text.AlignVCenter
+                        height: parent.height
+
+                        Row {
+                            anchors.fill: parent
+                            spacing: 4
+
+                            Text {
+                                width: parent.width - (typeSortIcon.visible ? typeSortIcon.width + parent.spacing : 0)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root.headerLabel("Type", "type")
+                                color: root.headerColor("type")
+                                font.pixelSize: Theme.Typography.body
+                                font.bold: true
+                                elide: Text.ElideRight
+                                horizontalAlignment: Text.AlignLeft
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            AppIcon {
+                                id: typeSortIcon
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: root.sortIconName("type")
+                                darkTheme: Theme.AppTheme.isDark
+                                iconSize: 16
+                                visible: name !== ""
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: typeHeader
+                        acceptedButtons: Qt.LeftButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.toggleSort("type")
                     }
 
                     Rectangle {
@@ -260,19 +397,46 @@ Rectangle {
                         }
                     }
 
-                    Text {
+                    Item {
+                        id: sizeHeader
                         x: root.nameColumnWidth + root.columnSpacing
                            + root.dateColumnWidth + root.columnSpacing
                            + root.typeColumnWidth + root.columnSpacing
                         width: root.sizeColumnWidth
-                        anchors.verticalCenter: parent.verticalCenter
-                        text: "Size"
-                        color: Theme.AppTheme.text
-                        font.pixelSize: Theme.Typography.body
-                        font.bold: true
-                        elide: Text.ElideRight
-                        horizontalAlignment: Text.AlignLeft
-                        verticalAlignment: Text.AlignVCenter
+                        height: parent.height
+
+                        Row {
+                            anchors.fill: parent
+                            spacing: 4
+
+                            Text {
+                                width: parent.width - (sizeSortIcon.visible ? sizeSortIcon.width + parent.spacing : 0)
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root.headerLabel("Size", "size")
+                                color: root.headerColor("size")
+                                font.pixelSize: Theme.Typography.body
+                                font.bold: true
+                                elide: Text.ElideRight
+                                horizontalAlignment: Text.AlignLeft
+                                verticalAlignment: Text.AlignVCenter
+                            }
+
+                            AppIcon {
+                                id: sizeSortIcon
+                                anchors.verticalCenter: parent.verticalCenter
+                                name: root.sortIconName("size")
+                                darkTheme: Theme.AppTheme.isDark
+                                iconSize: 16
+                                visible: name !== ""
+                            }
+                        }
+                    }
+
+                    MouseArea {
+                        anchors.fill: sizeHeader
+                        acceptedButtons: Qt.LeftButton
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: root.toggleSort("size")
                     }
                 }
             }
@@ -314,6 +478,7 @@ Rectangle {
                 required property string type
                 required property string size
                 required property string icon
+                required property string nativeIconSource
                 required property bool isDir
 
                 readonly property bool selectedState: {
@@ -354,7 +519,7 @@ Rectangle {
 
                     Drag.active: mouseArea.fileDragActive
                     Drag.dragType: Drag.Internal
-                    Drag.supportedActions: Qt.MoveAction
+                    Drag.supportedActions: Qt.CopyAction | Qt.MoveAction
                     Drag.hotSpot.x: 0
                     Drag.hotSpot.y: 0
                     Drag.mimeData: {
@@ -398,6 +563,7 @@ Rectangle {
                         AppIcon {
                             anchors.verticalCenter: parent.verticalCenter
                             name: icon
+                            sourceOverride: nativeIconSource
                             darkTheme: Theme.AppTheme.isDark
                             iconSize: 16
                         }
@@ -497,7 +663,7 @@ Rectangle {
                     Text {
                         width: root.sizeColumnWidth
                         anchors.verticalCenter: parent.verticalCenter
-                        text: size !== "" ? size : "—"
+                        text: size !== "" ? size : "-"
                         color: Theme.AppTheme.muted
                         font.pixelSize: Theme.Typography.bodyLg
                         elide: Text.ElideRight
@@ -514,8 +680,9 @@ Rectangle {
                     onDropped: function(drop) {
                         if (!viewModel || !viewModel.canDropOnRow(index))
                             return
-                        viewModel.dropOnRow(index)
-                        drop.accept(Qt.MoveAction)
+                        const dropAction = drop.proposedAction === Qt.CopyAction ? Qt.CopyAction : Qt.MoveAction
+                        viewModel.dropOnRow(index, dropAction === Qt.CopyAction)
+                        drop.accept(dropAction)
                     }
                 }
 
@@ -563,6 +730,8 @@ Rectangle {
                         }
 
                         if (mouse.button === Qt.RightButton) {
+                            if (viewModel && !viewModel.isRowSelected(index))
+                                viewModel.selectOnlyRow(index)
                             if (fileContextMenu) {
                                 fileContextMenu.rowIndex = index
                                 var p = mouseArea.mapToItem(fileContextMenu.parent, mouse.x, mouse.y)
@@ -811,6 +980,45 @@ Rectangle {
                     forcedMarquee = false
                     pressedInRealEmptyArea = false
                     anchorIndex = -1
+                }
+            }
+
+            Item {
+                anchors.fill: parent
+                visible: fileList.count === 0
+                z: 1
+
+                Column {
+                    anchors.centerIn: parent
+                    width: Math.min(parent.width - 48, 320)
+                    spacing: Theme.Metrics.spacingMd
+
+                    AppIcon {
+                        anchors.horizontalCenter: parent.horizontalCenter
+                        name: "folder"
+                        darkTheme: Theme.AppTheme.isDark
+                        iconSize: Theme.Metrics.icon3xl
+                        iconOpacity: 0.5
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: "This folder is empty"
+                        color: Theme.AppTheme.text
+                        font.pixelSize: Theme.Typography.bodyLg
+                        font.bold: true
+                        wrapMode: Text.Wrap
+                        horizontalAlignment: Text.AlignHCenter
+                    }
+
+                    Text {
+                        width: parent.width
+                        text: "Create something new or copy files here."
+                        color: Theme.AppTheme.muted
+                        font.pixelSize: Theme.Typography.body
+                        wrapMode: Text.Wrap
+                        horizontalAlignment: Text.AlignHCenter
+                    }
                 }
             }
         }

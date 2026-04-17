@@ -5,7 +5,7 @@ project(Findex VERSION 0.0.1 LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Quick Qml QuickControls2 Concurrent)
+find_package(Qt6 REQUIRED COMPONENTS Quick Qml QuickControls2 Concurrent Widgets)
 
 qt_standard_project_setup(REQUIRES 6.10)
 
@@ -14,6 +14,8 @@ qt_add_executable(Findex
 
     ApplicationSettings.cpp
     ApplicationSettings.h
+    FileIconProvider.cpp
+    FileIconProvider.h
 
     sidebar/DriveListModel.cpp
     sidebar/DriveListModel.h
@@ -272,6 +274,7 @@ target_link_libraries(Findex
         Qt6::Qml
         Qt6::QuickControls2
         Qt6::Concurrent
+        Qt6::Widgets
 )
 
 set_target_properties(Findex PROPERTIES

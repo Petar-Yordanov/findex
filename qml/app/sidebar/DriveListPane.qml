@@ -141,8 +141,9 @@ Rectangle {
                     onDropped: function(drop) {
                         if (!appWorkspaceViewModel || !appWorkspaceViewModel.canDropToPath(path))
                             return
-                        appWorkspaceViewModel.requestDropToPath(path, "drive")
-                        drop.accept(Qt.MoveAction)
+                        const dropAction = drop.proposedAction === Qt.CopyAction ? Qt.CopyAction : Qt.MoveAction
+                        appWorkspaceViewModel.requestDropToPath(path, "drive", dropAction === Qt.CopyAction)
+                        drop.accept(dropAction)
                     }
                 }
 

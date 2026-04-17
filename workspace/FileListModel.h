@@ -2,6 +2,7 @@
 
 #include <QAbstractListModel>
 #include <QFileInfo>
+#include <QDateTime>
 #include <QString>
 #include <QVector>
 
@@ -18,7 +19,10 @@ public:
         QString type;
         QString size;
         QString icon;
+        QString nativeIconSource;
         bool isDir = false;
+        qint64 sizeBytes = 0;
+        QDateTime lastModifiedValue;
     };
 
     enum Roles
@@ -29,6 +33,7 @@ public:
         TypeRole,
         SizeRole,
         IconRole,
+        NativeIconSourceRole,
         IsDirRole
     };
     Q_ENUM(Roles)

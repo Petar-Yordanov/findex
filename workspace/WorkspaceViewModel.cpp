@@ -10,14 +10,17 @@
 #include <QFileInfo>
 #include <QFutureWatcher>
 #include <QGuiApplication>
+#include <QLocale>
 #include <QMetaObject>
 #include <QMimeDatabase>
+#include <QMimeData>
 #include <QMimeType>
 #include <QPointer>
 #include <QProcess>
 #include <QRegularExpression>
 #include <QSet>
 #include <QVariantList>
+#include <QUrl>
 #include <QtConcurrent>
 #include <QElapsedTimer>
 #include <algorithm>
@@ -88,7 +91,7 @@ QString iconForFileInfo(const QFileInfo& info)
     if (suffix == QStringLiteral("png") || suffix == QStringLiteral("jpg")
         || suffix == QStringLiteral("jpeg") || suffix == QStringLiteral("svg")
         || suffix == QStringLiteral("gif") || suffix == QStringLiteral("webp")
-        || suffix == QStringLiteral("bmp") || suffix == QStringLiteral("ico"))
+        || suffix == QStringLiteral("bmp") || suffix == QStringLiteral("ico") || suffix == QStringLiteral("webp"))
         return QStringLiteral("image");
 
     if (suffix == QStringLiteral("mp3") || suffix == QStringLiteral("wav")
@@ -354,6 +357,81 @@ QString typeForFileInfo(const QFileInfo& info)
     return fallback;
 }
 
+bool shouldUseNativeIcon(const QFileInfo& info)
+{
+#ifdef Q_OS_MACOS
+    if (info.isBundle())
+        return true;
+#endif
+
+    if (info.isDir())
+        return false;
+
+    const QString suffix = info.suffix().toLower();
+
+#ifdef Q_OS_WINDOWS
+    if (suffix == QStringLiteral("exe")
+        || suffix == QStringLiteral("msi")
+        || suffix == QStringLiteral("lnk")
+        || suffix == QStringLiteral("url")) {
+        return true;
+    }
+#endif
+
+#ifdef Q_OS_LINUX
+    if (suffix == QStringLiteral("desktop"))
+        return true;
+#endif
+
+#ifdef Q_OS_MACOS
+    if (suffix == QStringLiteral("app"))
+        return true;
+#endif
+
+    return false;
+}
+
+QString nativeIconSourceForFileInfo(const QFileInfo& info)
+{
+    if (!shouldUseNativeIcon(info))
+        return {};
+
+    return QStringLiteral("image://fileicons/%1")
+        .arg(QString::fromLatin1(QUrl::toPercentEncoding(info.absoluteFilePath())));
+}
+
+int compareTextInsensitive(const QString& left, const QString& right)
+{
+    return QString::compare(left, right, Qt::CaseInsensitive);
+}
+
+int compareItemsByField(const FileListModel::FileItem& left,
+                        const FileListModel::FileItem& right,
+                        const QString& field)
+{
+    if (field == QStringLiteral("dateModified")) {
+        if (left.lastModifiedValue < right.lastModifiedValue)
+            return -1;
+        if (left.lastModifiedValue > right.lastModifiedValue)
+            return 1;
+    } else if (field == QStringLiteral("type")) {
+        const int typeCompare = compareTextInsensitive(left.type, right.type);
+        if (typeCompare != 0)
+            return typeCompare;
+    } else if (field == QStringLiteral("size")) {
+        if (left.sizeBytes < right.sizeBytes)
+            return -1;
+        if (left.sizeBytes > right.sizeBytes)
+            return 1;
+    }
+
+    const int nameCompare = compareTextInsensitive(left.name, right.name);
+    if (nameCompare != 0)
+        return nameCompare;
+
+    return compareTextInsensitive(left.path, right.path);
+}
+
 FileListModel::FileItem buildItemFromInfo(const QFileInfo& info)
 {
     FileListModel::FileItem item;
@@ -363,7 +441,10 @@ FileListModel::FileItem buildItemFromInfo(const QFileInfo& info)
     item.type = typeForFileInfo(info);
     item.size = info.isDir() ? QString() : formatBytes(info.size());
     item.icon = iconForFileInfo(info);
+    item.nativeIconSource = nativeIconSourceForFileInfo(info);
     item.isDir = info.isDir();
+    item.sizeBytes = info.isDir() ? 0 : qMax<qint64>(0, info.size());
+    item.lastModifiedValue = info.lastModified();
     return item;
 }
 
@@ -425,6 +506,26 @@ QString quotePs(const QString& value)
     QString v = value;
     v.replace('\'', QStringLiteral("''"));
     return QStringLiteral("'") + v + QStringLiteral("'");
+}
+
+QString permissionsToString(QFileDevice::Permissions permissions)
+{
+    const auto bit = [permissions](QFileDevice::Permission permission, QChar enabled, QChar disabled) {
+        return permissions.testFlag(permission) ? enabled : disabled;
+    };
+
+    QString result;
+    result.reserve(9);
+    result.append(bit(QFileDevice::ReadOwner, QLatin1Char('r'), QLatin1Char('-')));
+    result.append(bit(QFileDevice::WriteOwner, QLatin1Char('w'), QLatin1Char('-')));
+    result.append(bit(QFileDevice::ExeOwner, QLatin1Char('x'), QLatin1Char('-')));
+    result.append(bit(QFileDevice::ReadGroup, QLatin1Char('r'), QLatin1Char('-')));
+    result.append(bit(QFileDevice::WriteGroup, QLatin1Char('w'), QLatin1Char('-')));
+    result.append(bit(QFileDevice::ExeGroup, QLatin1Char('x'), QLatin1Char('-')));
+    result.append(bit(QFileDevice::ReadOther, QLatin1Char('r'), QLatin1Char('-')));
+    result.append(bit(QFileDevice::WriteOther, QLatin1Char('w'), QLatin1Char('-')));
+    result.append(bit(QFileDevice::ExeOther, QLatin1Char('x'), QLatin1Char('-')));
+    return result;
 }
 
 qint64 totalBytesForPath(const QString& path)
@@ -677,6 +778,8 @@ bool deletePathWithProgress(const QString& path,
 WorkspaceViewModel::WorkspaceViewModel(QObject* parent)
     : QObject(parent)
     , m_viewMode(normalizeViewMode(m_settings.viewMode()))
+    , m_sortField(normalizeSortField(m_settings.sortField()))
+    , m_sortDescending(m_settings.sortDescending())
 {
     const QVariantList savedTabs = m_settings.tabs();
     QString initialPath = QStringLiteral("C:/");
@@ -742,6 +845,16 @@ bool WorkspaceViewModel::dragSelecting() const
 int WorkspaceViewModel::selectionRevision() const
 {
     return m_selectionRevision;
+}
+
+QString WorkspaceViewModel::sortField() const
+{
+    return m_sortField;
+}
+
+bool WorkspaceViewModel::sortDescending() const
+{
+    return m_sortDescending;
 }
 
 QString WorkspaceViewModel::currentDirectoryPath() const
@@ -865,10 +978,7 @@ void WorkspaceViewModel::goForward()
 
 void WorkspaceViewModel::goUp()
 {
-    const QFileInfo info(m_currentDirectoryPath);
-    const QDir parentDir = info.dir();
-
-    QString parentPath = QDir::fromNativeSeparators(parentDir.absolutePath());
+    const QString parentPath = parentLocationForPath(m_currentDirectoryPath);
     if (parentPath == normalizePath(m_currentDirectoryPath))
         return;
 
@@ -911,6 +1021,31 @@ QString WorkspaceViewModel::savedViewMode() const
 bool WorkspaceViewModel::savedShowHiddenFiles() const
 {
     return m_settings.showHiddenFiles();
+}
+
+void WorkspaceViewModel::setSort(const QString& field, bool descending)
+{
+    const QString normalizedField = normalizeSortField(field);
+    if (m_sortField == normalizedField && m_sortDescending == descending)
+        return;
+
+    m_sortField = normalizedField;
+    m_sortDescending = descending;
+    m_settings.setSortField(m_sortField);
+    m_settings.setSortDescending(m_sortDescending);
+    emit sortChanged();
+    reloadListing();
+}
+
+void WorkspaceViewModel::toggleSort(const QString& field)
+{
+    const QString normalizedField = normalizeSortField(field);
+    if (m_sortField == normalizedField) {
+        setSort(normalizedField, !m_sortDescending);
+        return;
+    }
+
+    setSort(normalizedField, false);
 }
 
 void WorkspaceViewModel::activateRow(int row)
@@ -1044,12 +1179,14 @@ void WorkspaceViewModel::openRow(int row)
     }
 
     const bool ok = FileAssociationService::openWithDefaultApp(path);
+
     emit openFileRequested(item);
 
     if (ok)
         emit operationCompleted(QStringLiteral("Opened %1").arg(item.value(QStringLiteral("name")).toString()));
     else
-        emit operationFailed(QStringLiteral("Failed to open %1").arg(item.value(QStringLiteral("name")).toString()));
+        emit operationFailed(
+            QStringLiteral("Failed to open %1").arg(item.value(QStringLiteral("name")).toString()));
 }
 
 bool WorkspaceViewModel::isRowSelected(int row) const
@@ -1188,14 +1325,7 @@ void WorkspaceViewModel::startFileDrag(int row, int modifiers)
     if (row == m_inlineEditRow)
         return;
 
-    const Qt::KeyboardModifiers keyboardModifiers =
-        static_cast<Qt::KeyboardModifiers>(modifiers);
-
-    if (keyboardModifiers.testFlag(Qt::ControlModifier)
-        || keyboardModifiers.testFlag(Qt::ShiftModifier)
-        || keyboardModifiers.testFlag(Qt::AltModifier)) {
-        return;
-    }
+    Q_UNUSED(modifiers);
 
     if (!m_selectedRows.contains(row))
         selectOnlyRow(row);
@@ -1294,16 +1424,16 @@ bool WorkspaceViewModel::canDropToPath(const QString& targetPath) const
     return true;
 }
 
-void WorkspaceViewModel::dropOnRow(int row)
+void WorkspaceViewModel::dropOnRow(int row, bool copy)
 {
     if (!canDropOnRow(row))
         return;
 
     const QVariantMap item = fileAt(row);
-    requestDropToPath(item.value(QStringLiteral("path")).toString(), QStringLiteral("folder"));
+    requestDropToPath(item.value(QStringLiteral("path")).toString(), QStringLiteral("folder"), copy);
 }
 
-void WorkspaceViewModel::requestDropToPath(const QString& targetPath, const QString& targetKind)
+void WorkspaceViewModel::requestDropToPath(const QString& targetPath, const QString& targetKind, bool copy)
 {
     if (!canDropToPath(targetPath))
         return;
@@ -1314,10 +1444,11 @@ void WorkspaceViewModel::requestDropToPath(const QString& targetPath, const QStr
     emit fileDropRequested(
         m_draggedItems,
         m_lastDropTargetPath,
-        m_lastDropTargetKind);
+        m_lastDropTargetKind,
+        copy);
 }
 
-void WorkspaceViewModel::performDropOperation(const QVariantList& draggedItems, const QString& targetPath)
+void WorkspaceViewModel::performDropOperation(const QVariantList& draggedItems, const QString& targetPath, bool copy)
 {
     const QString destinationDirectory = normalizePath(targetPath);
     if (destinationDirectory.isEmpty()) {
@@ -1333,7 +1464,6 @@ void WorkspaceViewModel::performDropOperation(const QVariantList& draggedItems, 
 
     QStringList sourcePaths;
     QSet<QString> seenPaths;
-    qint64 totalBytes = 0;
 
     for (const QVariant& entry : draggedItems) {
         const QVariantMap item = entry.toMap();
@@ -1347,73 +1477,20 @@ void WorkspaceViewModel::performDropOperation(const QVariantList& draggedItems, 
 
         seenPaths.insert(sourcePath);
         sourcePaths.push_back(sourcePath);
-        totalBytes += totalBytesForPath(sourcePath);
     }
 
     if (sourcePaths.isEmpty()) {
-        emit operationFailed(QStringLiteral("Nothing to move."));
+        emit operationFailed(copy ? QStringLiteral("Nothing to copy.")
+                                  : QStringLiteral("Nothing to move."));
         return;
     }
 
-    emit operationProgress(
-        QStringLiteral("Moving items"),
-        QStringLiteral("0 B of %1").arg(formatBytes(totalBytes)),
-        0,
-        false);
-
-    auto* watcher = new QFutureWatcher<AsyncOperationResult>(this);
-
-    connect(watcher, &QFutureWatcher<AsyncOperationResult>::finished, this, [this, watcher]() {
-        const AsyncOperationResult result = watcher->result();
-        watcher->deleteLater();
-
-        reloadListing();
-
-        if (result.ok)
-            emit operationCompleted(result.successMessage);
-        else
-            emit operationFailed(result.errorMessage);
-    });
-
-    watcher->setFuture(QtConcurrent::run([target = QPointer<WorkspaceViewModel>(this),
-                                          sourcePaths,
-                                          destinationDirectory,
-                                          totalBytes]() -> AsyncOperationResult {
-        AsyncOperationResult result;
-        ProgressReporter reporter(target, QStringLiteral("Moving items"), totalBytes);
-
-        int movedCount = 0;
-        for (const QString& sourcePath : sourcePaths) {
-            QFileInfo srcInfo(sourcePath);
-            if (!srcInfo.exists())
-                continue;
-
-            const QString destPath = uniquePathInDirectory(destinationDirectory, srcInfo.fileName());
-
-            QString error;
-            if (!movePathSmartChunked(sourcePath, destPath, reporter, &error)) {
-                result.ok = false;
-                result.errorMessage = error.isEmpty()
-                                          ? QStringLiteral("Move failed.")
-                                          : error;
-                return result;
-            }
-
-            ++movedCount;
-        }
-
-        reporter.finish();
-
-        result.ok = movedCount > 0;
-        result.affectedCount = movedCount;
-
-        if (result.ok)
-            result.successMessage = QStringLiteral("Moved %1 item(s)").arg(movedCount);
-        else
-            result.errorMessage = QStringLiteral("Move failed.");
-
-        return result;
-    }));
+    startAsyncTransferOperation(
+        sourcePaths,
+        destinationDirectory,
+        copy,
+        copy ? QStringLiteral("Copied %1 item(s)") : QStringLiteral("Moved %1 item(s)"),
+        copy ? QStringLiteral("Copy failed.") : QStringLiteral("Move failed."));
 }
 
 bool WorkspaceViewModel::isOnlyDraggingRow(int row) const
@@ -1505,6 +1582,21 @@ void WorkspaceViewModel::requestFileContextAction(const QString& action, int row
         return;
     }
 
+    if (trimmedAction.compare(QStringLiteral("Copy path"), Qt::CaseInsensitive) == 0) {
+        copySelectedPathTextToClipboard();
+        return;
+    }
+
+    if (trimmedAction.compare(QStringLiteral("Duplicate"), Qt::CaseInsensitive) == 0) {
+        duplicateSelectedItems();
+        return;
+    }
+
+    if (trimmedAction.compare(QStringLiteral("Open containing folder"), Qt::CaseInsensitive) == 0) {
+        openContainingFolderForSelection();
+        return;
+    }
+
     if (trimmedAction.compare(QStringLiteral("Compress"), Qt::CaseInsensitive) == 0) {
         compressSelectedItems();
         return;
@@ -1513,6 +1605,11 @@ void WorkspaceViewModel::requestFileContextAction(const QString& action, int row
     if (trimmedAction.compare(QStringLiteral("Extract here"), Qt::CaseInsensitive) == 0
         || trimmedAction.compare(QStringLiteral("Extract"), Qt::CaseInsensitive) == 0) {
         extractSelectedItems();
+        return;
+    }
+
+    if (trimmedAction.compare(QStringLiteral("Properties"), Qt::CaseInsensitive) == 0) {
+        showItemProperties();
         return;
     }
 
@@ -1583,12 +1680,14 @@ bool WorkspaceViewModel::commitInlineEdit()
     const QString oldPath = existingMap.value(QStringLiteral("path")).toString();
 
     if (m_inlineEditIsNew) {
-        const QString newPath = QDir(m_currentDirectoryPath).filePath(trimmed);
+        const QString newPath = childLocationForName(m_currentDirectoryPath, trimmed);
 
         bool ok = false;
-        if (isDir)
+        QString operationError;
+
+        if (isDir) {
             ok = QDir().mkpath(newPath);
-        else {
+        } else {
             QFile f(newPath);
             ok = f.open(QIODevice::WriteOnly);
             if (ok)
@@ -1596,15 +1695,25 @@ bool WorkspaceViewModel::commitInlineEdit()
         }
 
         if (!ok) {
-            setInlineEditError(QStringLiteral("Failed to create item on disk."));
+            setInlineEditError(operationError.isEmpty()
+                                   ? QStringLiteral("Failed to create item.")
+                                   : operationError);
             return false;
         }
 
         emit operationCompleted(QStringLiteral("Created %1").arg(trimmed));
     } else if (oldName.compare(trimmed, Qt::CaseInsensitive) != 0) {
-        const QString newPath = QDir(m_currentDirectoryPath).filePath(trimmed);
-        if (!QFile::rename(oldPath, newPath)) {
-            setInlineEditError(QStringLiteral("Failed to rename item on disk."));
+        const QString newPath = childLocationForName(parentLocationForPath(oldPath), trimmed);
+
+        bool ok = false;
+        QString operationError;
+
+        ok = QFile::rename(oldPath, newPath);
+
+        if (!ok) {
+            setInlineEditError(operationError.isEmpty()
+                                   ? QStringLiteral("Failed to rename item.")
+                                   : operationError);
             return false;
         }
 
@@ -1661,8 +1770,16 @@ void WorkspaceViewModel::cutSelectedItems()
     m_clipboardMode = ClipboardMode::Cut;
     m_clipboardPaths = paths;
 
-    if (QGuiApplication::clipboard())
-        QGuiApplication::clipboard()->setText(paths.join(QLatin1Char('\n')));
+    if (QGuiApplication::clipboard()) {
+        auto* mimeData = new QMimeData;
+        QList<QUrl> urls;
+        urls.reserve(paths.size());
+        for (const QString& path : paths)
+            urls.push_back(QUrl::fromLocalFile(path));
+        mimeData->setUrls(urls);
+        mimeData->setText(paths.join(QLatin1Char('\n')));
+        QGuiApplication::clipboard()->setMimeData(mimeData);
+    }
 
     emit operationCompleted(QStringLiteral("Cut %1 item(s)").arg(paths.size()));
 }
@@ -1678,36 +1795,101 @@ void WorkspaceViewModel::copySelectedItems()
     m_clipboardMode = ClipboardMode::Copy;
     m_clipboardPaths = paths;
 
-    if (QGuiApplication::clipboard())
-        QGuiApplication::clipboard()->setText(paths.join(QLatin1Char('\n')));
+    if (QGuiApplication::clipboard()) {
+        auto* mimeData = new QMimeData;
+        QList<QUrl> urls;
+        urls.reserve(paths.size());
+        for (const QString& path : paths)
+            urls.push_back(QUrl::fromLocalFile(path));
+        mimeData->setUrls(urls);
+        mimeData->setText(paths.join(QLatin1Char('\n')));
+        QGuiApplication::clipboard()->setMimeData(mimeData);
+    }
 
     emit operationCompleted(QStringLiteral("Copied %1 item(s)").arg(paths.size()));
 }
 
 void WorkspaceViewModel::pasteItems()
 {
-    if (m_clipboardPaths.isEmpty() || m_clipboardMode == ClipboardMode::None) {
+    QStringList sourcePaths;
+    bool copy = true;
+
+    if (!m_clipboardPaths.isEmpty() && m_clipboardMode != ClipboardMode::None) {
+        sourcePaths = m_clipboardPaths;
+        copy = m_clipboardMode == ClipboardMode::Copy;
+
+        if (m_clipboardMode == ClipboardMode::Cut) {
+            m_clipboardMode = ClipboardMode::None;
+            m_clipboardPaths.clear();
+        }
+    } else if (QGuiApplication::clipboard() && QGuiApplication::clipboard()->mimeData()) {
+        const QMimeData* mimeData = QGuiApplication::clipboard()->mimeData();
+        const QList<QUrl> urls = mimeData->urls();
+        for (const QUrl& url : urls) {
+            if (!url.isLocalFile())
+                continue;
+
+            const QString localPath = normalizePath(url.toLocalFile());
+            if (!localPath.isEmpty())
+                sourcePaths.push_back(localPath);
+        }
+        sourcePaths.removeDuplicates();
+        copy = true;
+    }
+
+    if (sourcePaths.isEmpty()) {
         emit operationFailed(QStringLiteral("Clipboard is empty."));
         return;
     }
 
-    const QStringList sourcePaths = m_clipboardPaths;
-    const QString destinationDirectory = m_currentDirectoryPath;
-    const ClipboardMode clipboardMode = m_clipboardMode;
+    startAsyncTransferOperation(
+        sourcePaths,
+        m_currentDirectoryPath,
+        copy,
+        copy ? QStringLiteral("Pasted %1 item(s)") : QStringLiteral("Moved %1 item(s)"),
+        QStringLiteral("Paste failed."));
+}
 
-    if (clipboardMode == ClipboardMode::Cut) {
-        m_clipboardMode = ClipboardMode::None;
-        m_clipboardPaths.clear();
+void WorkspaceViewModel::duplicateSelectedItems()
+{
+    const QStringList sourcePaths = selectedPaths();
+    if (sourcePaths.isEmpty()) {
+        emit operationFailed(QStringLiteral("Nothing to duplicate."));
+        return;
+    }
+
+    startAsyncDuplicateOperation(sourcePaths);
+}
+
+void WorkspaceViewModel::startAsyncTransferOperation(const QStringList& sourcePaths,
+                                                     const QString& destinationDirectory,
+                                                     bool copy,
+                                                     const QString& successMessageTemplate,
+                                                     const QString& failureMessage)
+{
+    const QString normalizedDestination = normalizePath(destinationDirectory);
+    if (normalizedDestination.isEmpty()) {
+        emit operationFailed(QStringLiteral("Destination is invalid."));
+        return;
+    }
+
+    QFileInfo destinationInfo(normalizedDestination);
+    if (!destinationInfo.exists() || !destinationInfo.isDir()) {
+        emit operationFailed(QStringLiteral("Destination is unavailable."));
+        return;
+    }
+
+    if (sourcePaths.isEmpty()) {
+        emit operationFailed(failureMessage);
+        return;
     }
 
     qint64 totalBytes = 0;
     for (const QString& path : sourcePaths)
         totalBytes += totalBytesForPath(path);
 
-    const QString progressTitle =
-        clipboardMode == ClipboardMode::Copy
-            ? QStringLiteral("Copying items")
-            : QStringLiteral("Moving items");
+    const QString progressTitle = copy ? QStringLiteral("Copying items")
+                                       : QStringLiteral("Moving items");
 
     emit operationProgress(
         progressTitle,
@@ -1731,10 +1913,12 @@ void WorkspaceViewModel::pasteItems()
 
     watcher->setFuture(QtConcurrent::run([target = QPointer<WorkspaceViewModel>(this),
                                           sourcePaths,
-                                          destinationDirectory,
-                                          clipboardMode,
+                                          normalizedDestination,
+                                          copy,
                                           totalBytes,
-                                          progressTitle]() -> AsyncOperationResult {
+                                          progressTitle,
+                                          successMessageTemplate,
+                                          failureMessage]() -> AsyncOperationResult {
         AsyncOperationResult result;
         ProgressReporter reporter(target, progressTitle, totalBytes);
 
@@ -1745,20 +1929,122 @@ void WorkspaceViewModel::pasteItems()
             if (!srcInfo.exists())
                 continue;
 
-            const QString destPath = uniquePathInDirectory(destinationDirectory, srcInfo.fileName());
+            const QString destPath = uniquePathInDirectory(normalizedDestination, srcInfo.fileName());
 
             QString error;
             bool ok = false;
 
-            if (clipboardMode == ClipboardMode::Copy)
+            if (copy)
                 ok = copyRecursivelyChunked(sourcePath, destPath, reporter, &error);
             else
                 ok = movePathSmartChunked(sourcePath, destPath, reporter, &error);
 
             if (!ok) {
                 result.ok = false;
+                result.errorMessage = error.isEmpty() ? failureMessage : error;
+                return result;
+            }
+
+            ++successCount;
+        }
+
+        reporter.finish();
+
+        result.ok = successCount > 0;
+        result.affectedCount = successCount;
+
+        if (result.ok)
+            result.successMessage = successMessageTemplate.arg(successCount);
+        else
+            result.errorMessage = failureMessage;
+
+        return result;
+    }));
+}
+
+void WorkspaceViewModel::showProperties()
+{
+    showItemProperties();
+}
+
+void WorkspaceViewModel::showItemProperties()
+{
+    const int row = firstSelectedRow();
+    if (row < 0 || !isValidRow(row)) {
+        emit operationFailed(QStringLiteral("No item selected."));
+        return;
+    }
+
+    emitPropertiesForItem(fileAt(row));
+}
+
+void WorkspaceViewModel::showCurrentLocationProperties()
+{
+    QVariantMap item;
+    {
+        QFileInfo info(m_currentDirectoryPath);
+        item.insert(QStringLiteral("name"), info.fileName().isEmpty() ? m_currentDirectoryPath : info.fileName());
+        item.insert(QStringLiteral("type"), QStringLiteral("Folder"));
+        item.insert(QStringLiteral("icon"), QStringLiteral("folder"));
+        item.insert(QStringLiteral("isDir"), true);
+    }
+    item.insert(QStringLiteral("path"), m_currentDirectoryPath);
+    item.insert(QStringLiteral("size"), QString());
+    emitPropertiesForItem(item);
+}
+
+void WorkspaceViewModel::startAsyncDuplicateOperation(const QStringList& sourcePaths)
+{
+    if (sourcePaths.isEmpty()) {
+        emit operationFailed(QStringLiteral("Nothing to duplicate."));
+        return;
+    }
+
+    qint64 totalBytes = 0;
+    for (const QString& path : sourcePaths)
+        totalBytes += totalBytesForPath(path);
+
+    emit operationProgress(
+        QStringLiteral("Duplicating items"),
+        QStringLiteral("0 B of %1").arg(formatBytes(totalBytes)),
+        0,
+        false);
+
+    auto* watcher = new QFutureWatcher<AsyncOperationResult>(this);
+
+    connect(watcher, &QFutureWatcher<AsyncOperationResult>::finished, this, [this, watcher]() {
+        const AsyncOperationResult result = watcher->result();
+        watcher->deleteLater();
+
+        reloadListing();
+
+        if (result.ok)
+            emit operationCompleted(result.successMessage);
+        else
+            emit operationFailed(result.errorMessage);
+    });
+
+    watcher->setFuture(QtConcurrent::run([target = QPointer<WorkspaceViewModel>(this),
+                                          sourcePaths,
+                                          totalBytes]() -> AsyncOperationResult {
+        AsyncOperationResult result;
+        ProgressReporter reporter(target, QStringLiteral("Duplicating items"), totalBytes);
+
+        int successCount = 0;
+
+        for (const QString& sourcePath : sourcePaths) {
+            QFileInfo srcInfo(sourcePath);
+            if (!srcInfo.exists())
+                continue;
+
+            const QString destinationDirectory = srcInfo.dir().absolutePath();
+            const QString destPath = uniquePathInDirectory(destinationDirectory, srcInfo.fileName());
+
+            QString error;
+            if (!copyRecursivelyChunked(sourcePath, destPath, reporter, &error)) {
+                result.ok = false;
                 result.errorMessage = error.isEmpty()
-                                          ? QStringLiteral("Paste failed.")
+                                          ? QStringLiteral("Duplicate failed.")
                                           : error;
                 return result;
             }
@@ -1771,14 +2057,10 @@ void WorkspaceViewModel::pasteItems()
         result.ok = successCount > 0;
         result.affectedCount = successCount;
 
-        if (result.ok) {
-            result.successMessage =
-                clipboardMode == ClipboardMode::Copy
-                    ? QStringLiteral("Pasted %1 item(s)").arg(successCount)
-                    : QStringLiteral("Moved %1 item(s)").arg(successCount);
-        } else {
-            result.errorMessage = QStringLiteral("Paste failed.");
-        }
+        if (result.ok)
+            result.successMessage = QStringLiteral("Duplicated %1 item(s)").arg(successCount);
+        else
+            result.errorMessage = QStringLiteral("Duplicate failed.");
 
         return result;
     }));
@@ -1975,6 +2257,7 @@ bool WorkspaceViewModel::openRowWithApp(int row, const QString& appIdOrExecutabl
         return false;
 
     const QString path = item.value(QStringLiteral("path")).toString();
+
     const bool ok = FileAssociationService::openWithAppId(path, appIdOrExecutable);
 
     if (ok)
@@ -2070,27 +2353,40 @@ QVariantMap WorkspaceViewModel::previewDataForRow(int row) const
     const QString size = item.value(QStringLiteral("size")).toString();
     const QString dateModified = item.value(QStringLiteral("dateModified")).toString();
     const QString icon = item.value(QStringLiteral("icon")).toString();
+    const QString nativeIconSource = item.value(QStringLiteral("nativeIconSource")).toString();
     const bool isDir = item.value(QStringLiteral("isDir")).toBool();
+    const QString path = item.value(QStringLiteral("path")).toString();
+    const QString previewType = isDir
+                                    ? QStringLiteral("folder")
+                                    : (icon == QStringLiteral("image")
+                                           ? QStringLiteral("image")
+                                           : QStringLiteral("text"));
 
     QVariantList lines;
-    lines.push_back(QStringLiteral("Name: %1").arg(name));
-    lines.push_back(QStringLiteral("Path: %1").arg(item.value(QStringLiteral("path")).toString()));
-    lines.push_back(QStringLiteral("Type: %1").arg(type));
-    lines.push_back(QStringLiteral("Modified: %1").arg(dateModified));
-    if (!size.isEmpty())
-        lines.push_back(QStringLiteral("Size: %1").arg(size));
+    QString summary = isDir ? QStringLiteral("Folder selected.")
+                            : (previewType == QStringLiteral("image")
+                                   ? QStringLiteral("Image selected.")
+                                   : QStringLiteral("File selected."));
+
+    if (lines.isEmpty()) {
+        lines.push_back(QStringLiteral("Name: %1").arg(name));
+        lines.push_back(QStringLiteral("Path: %1").arg(path));
+        lines.push_back(QStringLiteral("Type: %1").arg(type));
+        lines.push_back(QStringLiteral("Modified: %1").arg(dateModified));
+        if (!size.isEmpty())
+            lines.push_back(QStringLiteral("Size: %1").arg(size));
+    }
 
     QVariantMap data;
     data.insert(QStringLiteral("visible"), true);
     data.insert(QStringLiteral("name"), name);
     data.insert(QStringLiteral("type"), type);
     data.insert(QStringLiteral("icon"), icon.isEmpty() ? QStringLiteral("insert-drive-file") : icon);
-    data.insert(QStringLiteral("previewType"), isDir ? QStringLiteral("folder") : QStringLiteral("text"));
+    data.insert(QStringLiteral("nativeIconSource"), nativeIconSource);
+    data.insert(QStringLiteral("previewType"), previewType);
     data.insert(QStringLiteral("size"), size);
     data.insert(QStringLiteral("dateModified"), dateModified);
-    data.insert(
-        QStringLiteral("summary"),
-        isDir ? QStringLiteral("Folder selected.") : QStringLiteral("File selected."));
+    data.insert(QStringLiteral("summary"), summary);
     data.insert(QStringLiteral("lines"), lines);
     return data;
 }
@@ -2251,18 +2547,23 @@ FileListModel::FileItem WorkspaceViewModel::buildItemFromName(const QString& nam
     item.path = normalizedPath + QStringLiteral("/") + item.name;
     item.dateModified = QDateTime::currentDateTime().toString(QStringLiteral("dd/MM/yyyy HH:mm"));
     item.isDir = isDir;
+    item.lastModifiedValue = QDateTime::currentDateTime();
 
     if (isDir) {
         item.type = QStringLiteral("File folder");
         item.size.clear();
         item.icon = QStringLiteral("folder");
+        item.nativeIconSource.clear();
+        item.sizeBytes = 0;
         return item;
     }
 
-    QFileInfo info(name);
+    QFileInfo info(item.path);
     item.type = fallbackTypeFromSuffix(info);
     item.icon = iconForFileInfo(info);
+    item.nativeIconSource = nativeIconSourceForFileInfo(info);
     item.size.clear();
+    item.sizeBytes = 0;
     return item;
 }
 
@@ -2320,6 +2621,9 @@ QString WorkspaceViewModel::normalizePath(QString value) const
 
     value.replace('\\', '/');
 
+    if (value.startsWith(QStringLiteral("container://")))
+        return {};
+
 #ifdef Q_OS_WINDOWS
     const bool isUncPath =
         value.startsWith(QStringLiteral("//"))
@@ -2349,6 +2653,48 @@ QString WorkspaceViewModel::normalizePath(QString value) const
         value.replace(QStringLiteral("//"), QStringLiteral("/"));
 
     return QDir::fromNativeSeparators(QFileInfo(value).absoluteFilePath());
+}
+
+QString WorkspaceViewModel::parentLocationForPath(const QString& path) const
+{
+    const QFileInfo info(normalizePath(path));
+    return normalizePath(info.dir().absolutePath());
+}
+
+QString WorkspaceViewModel::childLocationForName(const QString& directoryPath, const QString& name) const
+{
+    return normalizePath(QDir(normalizePath(directoryPath)).filePath(name));
+}
+
+QString WorkspaceViewModel::uniqueLocationInDirectory(const QString& directoryPath,
+                                                      const QString& originalName) const
+{
+    return uniquePathInDirectory(normalizePath(directoryPath), originalName);
+}
+
+QString WorkspaceViewModel::normalizeSortField(const QString& value) const
+{
+    const QString trimmed = value.trimmed();
+    if (trimmed == QStringLiteral("dateModified")
+        || trimmed == QStringLiteral("type")
+        || trimmed == QStringLiteral("size")) {
+        return trimmed;
+    }
+    return QStringLiteral("name");
+}
+
+void WorkspaceViewModel::applySort(QVector<FileListModel::FileItem>& items) const
+{
+    std::sort(items.begin(), items.end(), [this](const auto& left, const auto& right) {
+        if (left.isDir != right.isDir)
+            return left.isDir && !right.isDir;
+
+        const int comparison = compareItemsByField(left, right, m_sortField);
+        if (comparison == 0)
+            return false;
+
+        return m_sortDescending ? (comparison > 0) : (comparison < 0);
+    });
 }
 
 void WorkspaceViewModel::loadLocation(const QString& path, bool pushHistory)
@@ -2383,6 +2729,12 @@ void WorkspaceViewModel::loadLocation(const QString& path, bool pushHistory)
 
 void WorkspaceViewModel::reloadListing()
 {
+    const QStringList previousPaths = selectedPaths();
+    const QString previousCurrentPath =
+        isValidRow(m_currentIndex)
+            ? fileAt(m_currentIndex).value(QStringLiteral("path")).toString()
+            : QString();
+
     QVector<FileListModel::FileItem> items;
 
     if (m_activeSearch.isEmpty())
@@ -2393,10 +2745,11 @@ void WorkspaceViewModel::reloadListing()
     m_fileModel.setItems(items);
 
     emit totalItemsChanged();
-    resetSelectionToFirstItem();
+    if (!restoreSelectionToPaths(previousPaths, previousCurrentPath))
+        resetSelectionToFirstItem();
 }
 
-QVector<FileListModel::FileItem> WorkspaceViewModel::listDirectoryItems(const QString& path) const
+QVector<FileListModel::FileItem> WorkspaceViewModel::listDirectoryItems(const QString& path)
 {
     QVector<FileListModel::FileItem> result;
 
@@ -2410,7 +2763,7 @@ QVector<FileListModel::FileItem> WorkspaceViewModel::listDirectoryItems(const QS
 
     const QFileInfoList entries = dir.entryInfoList(
         filters,
-        QDir::DirsFirst | QDir::IgnoreCase | QDir::Name);
+        QDir::NoSort);
 
     result.reserve(entries.size());
     for (const QFileInfo& info : entries) {
@@ -2420,12 +2773,13 @@ QVector<FileListModel::FileItem> WorkspaceViewModel::listDirectoryItems(const QS
         result.push_back(buildItemFromInfo(info));
     }
 
+    applySort(result);
     return result;
 }
 
 QVector<FileListModel::FileItem> WorkspaceViewModel::searchItems(const QString& basePath,
                                                                  const QString& query,
-                                                                 const QString& scope) const
+                                                                 const QString& scope)
 {
     QVector<FileListModel::FileItem> result;
     const QString trimmedQuery = query.trimmed();
@@ -2461,12 +2815,7 @@ QVector<FileListModel::FileItem> WorkspaceViewModel::searchItems(const QString& 
         }
     }
 
-    std::sort(result.begin(), result.end(), [](const auto& a, const auto& b) {
-        if (a.isDir != b.isDir)
-            return a.isDir && !b.isDir;
-        return a.name.toLower() < b.name.toLower();
-    });
-
+    applySort(result);
     return result;
 }
 
@@ -2492,6 +2841,55 @@ void WorkspaceViewModel::resetSelectionToFirstItem()
         emit currentIndexChanged();
 
     emitSelectionSignals(previousSelected, previousItemsText, previousRows != m_selectedRows);
+}
+
+bool WorkspaceViewModel::restoreSelectionToPaths(const QStringList& paths, const QString& currentPath)
+{
+    if (paths.isEmpty())
+        return false;
+
+    QSet<QString> remainingPaths;
+    for (const QString& path : paths)
+        remainingPaths.insert(normalizePath(path));
+
+    if (remainingPaths.isEmpty())
+        return false;
+
+    const int previousSelected = selectedItems();
+    const QString previousItemsText = itemsText();
+    const QSet<int> previousRows = m_selectedRows;
+    const int previousCurrentIndex = m_currentIndex;
+
+    QList<int> matchedRows;
+    int nextCurrentIndex = -1;
+    const QString normalizedCurrentPath = normalizePath(currentPath);
+
+    for (int row = 0; row < m_fileModel.rowCount(); ++row) {
+        const QString rowPath = normalizePath(fileAt(row).value(QStringLiteral("path")).toString());
+        if (!remainingPaths.contains(rowPath))
+            continue;
+
+        matchedRows.push_back(row);
+        if (!normalizedCurrentPath.isEmpty()
+            && rowPath.compare(normalizedCurrentPath, Qt::CaseInsensitive) == 0) {
+            nextCurrentIndex = row;
+        }
+    }
+
+    if (matchedRows.isEmpty())
+        return false;
+
+    m_selectedRows.clear();
+    for (int row : matchedRows)
+        m_selectedRows.insert(row);
+    m_selectionAnchorRow = matchedRows.first();
+    m_currentIndex = nextCurrentIndex >= 0 ? nextCurrentIndex : matchedRows.first();
+
+    if (previousCurrentIndex != m_currentIndex)
+        emit currentIndexChanged();
+
+    emitSelectionSignals(previousSelected, previousItemsText, previousRows != m_selectedRows);
+    return true;
 }
 
 QVariantList WorkspaceViewModel::selectedItemsAsMaps() const
@@ -2547,4 +2945,119 @@ void WorkspaceViewModel::setOpenWithAppsForPath(const QString& filePath)
 
     m_openWithApps = out;
     emit openWithAppsChanged();
+}
+
+void WorkspaceViewModel::selectPathIfVisible(const QString& path)
+{
+    const QString normalizedTarget = normalizePath(path);
+    if (normalizedTarget.isEmpty())
+        return;
+
+    for (int row = 0; row < m_fileModel.rowCount(); ++row) {
+        const QString rowPath = normalizePath(fileAt(row).value(QStringLiteral("path")).toString());
+        if (rowPath.compare(normalizedTarget, Qt::CaseInsensitive) == 0) {
+            selectOnlyRow(row);
+            return;
+        }
+    }
+}
+
+void WorkspaceViewModel::copySelectedPathTextToClipboard()
+{
+    const QStringList paths = selectedPaths();
+    if (paths.isEmpty()) {
+        emit operationFailed(QStringLiteral("Nothing selected."));
+        return;
+    }
+
+    if (QGuiApplication::clipboard())
+        QGuiApplication::clipboard()->setText(paths.join(QLatin1Char('\n')));
+
+    emit operationCompleted(
+        paths.size() == 1
+            ? QStringLiteral("Copied path")
+            : QStringLiteral("Copied %1 paths").arg(paths.size()));
+}
+
+void WorkspaceViewModel::openContainingFolderForSelection()
+{
+    const int row = firstSelectedRow();
+    if (row < 0 || !isValidRow(row)) {
+        emit operationFailed(QStringLiteral("No item selected."));
+        return;
+    }
+
+    const QVariantMap item = fileAt(row);
+    const QString itemPath = item.value(QStringLiteral("path")).toString();
+    const QString parentPath = parentLocationForPath(itemPath);
+    if (parentPath.isEmpty()) {
+        emit operationFailed(QStringLiteral("Containing folder is unavailable."));
+        return;
+    }
+
+    loadLocation(parentPath, true);
+    selectPathIfVisible(itemPath);
+    emit operationCompleted(
+        QStringLiteral("Opened containing folder for %1").arg(item.value(QStringLiteral("name")).toString()));
+}
+
+void WorkspaceViewModel::emitPropertiesForItem(const QVariantMap& item)
+{
+    const QString name = item.value(QStringLiteral("name")).toString().trimmed();
+    emit contextInfoRequested(
+        QStringLiteral("Properties: %1").arg(name.isEmpty() ? QStringLiteral("Item") : name),
+        buildPropertiesDetails(item),
+        QStringLiteral("info"));
+}
+
+QString WorkspaceViewModel::buildPropertiesDetails(const QVariantMap& item) const
+{
+    const QString path = item.value(QStringLiteral("path")).toString();
+
+    QFileInfo info(path);
+
+    QStringList lines;
+    lines.push_back(QStringLiteral("Path: %1").arg(QDir::toNativeSeparators(path)));
+    lines.push_back(QStringLiteral("Type: %1").arg(item.value(QStringLiteral("type")).toString()));
+
+    if (info.exists()) {
+        if (info.isDir()) {
+            const QDir dir(path);
+            const QFileInfoList entries = dir.entryInfoList(
+                QDir::Files | QDir::Dirs | QDir::NoDotAndDotDot | QDir::Hidden | QDir::System);
+            lines.push_back(QStringLiteral("Items: %1").arg(entries.size()));
+            lines.push_back(QStringLiteral("Size: %1").arg(formatBytes(totalBytesForPath(path))));
+        } else {
+            lines.push_back(QStringLiteral("Size: %1").arg(formatBytes(info.size())));
+        }
+
+        const QDateTime created = info.birthTime();
+        if (created.isValid())
+            lines.push_back(QStringLiteral("Created: %1").arg(QLocale().toString(created, QLocale::ShortFormat)));
+
+        const QDateTime modified = info.lastModified();
+        if (modified.isValid())
+            lines.push_back(QStringLiteral("Modified: %1").arg(QLocale().toString(modified, QLocale::ShortFormat)));
+
+        const QDateTime accessed = info.lastRead();
+        if (accessed.isValid())
+            lines.push_back(QStringLiteral("Accessed: %1").arg(QLocale().toString(accessed, QLocale::ShortFormat)));
+
+        const QString owner = info.owner();
+        if (!owner.isEmpty())
+            lines.push_back(QStringLiteral("Owner: %1").arg(owner));
+
+        const QString group = info.group();
+        if (!group.isEmpty())
+            lines.push_back(QStringLiteral("Group: %1").arg(group));
+
+        lines.push_back(QStringLiteral("Permissions: %1").arg(permissionsToString(info.permissions())));
+
+        if (info.isSymLink())
+            lines.push_back(QStringLiteral("Target: %1").arg(QDir::toNativeSeparators(info.symLinkTarget())));
+    } else {
+        lines.push_back(QStringLiteral("Status: Item is no longer available on disk."));
+    }
+
+    return lines.join(QLatin1Char('\n'));
 }

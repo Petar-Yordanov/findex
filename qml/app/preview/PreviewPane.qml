@@ -13,11 +13,22 @@ Rectangle {
     readonly property string previewName: hasVm && viewModel.name ? viewModel.name : ""
     readonly property string previewFileType: hasVm && viewModel.type ? viewModel.type : ""
     readonly property string previewIcon: hasVm && viewModel.icon ? viewModel.icon : "insert-drive-file"
+    readonly property string previewNativeIconSource: hasVm && viewModel.nativeIconSource ? viewModel.nativeIconSource : ""
     readonly property string previewKind: hasVm && viewModel.previewType ? viewModel.previewType : "none"
     readonly property string previewSize: hasVm && viewModel.size ? viewModel.size : ""
     readonly property string previewDateModified: hasVm && viewModel.dateModified ? viewModel.dateModified : ""
     readonly property string previewSummary: hasVm && viewModel.summary ? viewModel.summary : ""
     readonly property var previewLines: hasVm && viewModel.lines ? viewModel.lines : []
+    readonly property string previewCardTitle: previewVisible ? previewName : ""
+    readonly property string previewCardSubtitle: {
+        if (!previewVisible)
+            return ""
+        if (previewKind === "multi" && previewSummary !== "")
+            return previewSummary
+        if (previewFileType !== "")
+            return previewFileType
+        return previewSummary
+    }
 
     color: Theme.AppTheme.isDark ? "#141920" : "#fbfcfd"
     border.color: Theme.AppTheme.borderSoft
@@ -92,21 +103,14 @@ Rectangle {
                     AppIcon {
                         anchors.horizontalCenter: parent.horizontalCenter
                         name: root.previewIcon
+                        sourceOverride: root.previewNativeIconSource
                         darkTheme: Theme.AppTheme.isDark
                         iconSize: Theme.Metrics.icon4xl
                     }
 
                     Text {
                         width: parent.width
-                        text: root.previewKind === "multi" ? "Multiple items"
-                              : root.previewKind === "image" ? "Mock image preview"
-                              : root.previewKind === "text" ? "Mock text preview"
-                              : root.previewKind === "document" ? "Mock document preview"
-                              : root.previewKind === "audio" ? "Mock audio preview"
-                              : root.previewKind === "video" ? "Mock video preview"
-                              : root.previewKind === "archive" ? "Mock archive preview"
-                              : root.previewKind === "folder" ? "Mock folder preview"
-                              : "Mock file preview"
+                        text: root.previewCardTitle
                         color: Theme.AppTheme.text
                         font.pixelSize: Theme.Typography.bodyLg
                         font.bold: true
@@ -116,7 +120,8 @@ Rectangle {
 
                     Text {
                         width: parent.width
-                        text: "Backend/viewmodel-driven placeholder"
+                        visible: text !== ""
+                        text: root.previewCardSubtitle
                         color: Theme.AppTheme.muted
                         font.pixelSize: Theme.Typography.caption
                         wrapMode: Text.Wrap
@@ -127,25 +132,8 @@ Rectangle {
 
             Text {
                 visible: root.previewVisible
-                width: parent.width
-                text: root.previewName
-                color: Theme.AppTheme.text
-                font.pixelSize: Theme.Typography.subtitle
-                font.bold: true
-                wrapMode: Text.Wrap
-            }
-
-            Text {
-                visible: root.previewVisible
-                width: parent.width
-                text: root.previewFileType
-                color: Theme.AppTheme.muted
-                font.pixelSize: Theme.Typography.body
-                wrapMode: Text.Wrap
-            }
-
-            Text {
-                visible: root.previewVisible && root.previewSummary !== ""
+                         && root.previewSummary !== ""
+                         && root.previewSummary !== root.previewCardSubtitle
                 width: parent.width
                 text: root.previewSummary
                 color: Theme.AppTheme.text
@@ -185,7 +173,7 @@ Rectangle {
 
                     Text {
                         width: Math.max(0, parent.width - x)
-                        text: root.previewDateModified !== "" ? root.previewDateModified : "—"
+                        text: root.previewDateModified !== "" ? root.previewDateModified : "-"
                         color: Theme.AppTheme.text
                         font.pixelSize: Theme.Typography.caption
                         wrapMode: Text.Wrap
@@ -205,7 +193,7 @@ Rectangle {
 
                     Text {
                         width: Math.max(0, parent.width - x)
-                        text: root.previewSize !== "" ? root.previewSize : "—"
+                        text: root.previewSize !== "" ? root.previewSize : "-"
                         color: Theme.AppTheme.text
                         font.pixelSize: Theme.Typography.caption
                         wrapMode: Text.Wrap
@@ -219,7 +207,7 @@ Rectangle {
                 spacing: Theme.Metrics.spacingSm
 
                 Text {
-                    text: "Mock content"
+                    text: "Content"
                     color: Theme.AppTheme.text
                     font.pixelSize: Theme.Typography.body
                     font.bold: true

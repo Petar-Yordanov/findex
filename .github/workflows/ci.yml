@@ -6,10 +6,53 @@ on:
   pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
+  read-version:
+    name: Read version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read Version.json
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ ! -f Version.json ]; then
+            echo "Version.json not found"
+            exit 1
+          fi
+
+          major=$(jq -r '.major' Version.json)
+          minor=$(jq -r '.minor' Version.json)
+          patch=$(jq -r '.patch' Version.json)
+
+          if [ "$major" = "null" ] || [ "$minor" = "null" ] || [ "$patch" = "null" ]; then
+            echo "Version.json must contain major, minor, patch"
+            exit 1
+          fi
+
+          version="${major}.${minor}.${patch}"
+          tag="v${version}"
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+          echo "Resolved version: $version"
+          echo "Resolved tag: $tag"
+
   build:
     name: Build (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
+    needs: read-version
 
     strategy:
       fail-fast: false
@@ -22,6 +65,7 @@ jobs:
             artifact_name: app-linux
             build_dir: build
             package_dir: dist
+            archive_ext: tar.gz
 
           - os: windows-latest
             qt_host: windows
@@ -30,6 +74,7 @@ jobs:
             artifact_name: app-windows
             build_dir: build
             package_dir: dist
+            archive_ext: zip
 
           - os: macos-latest
             qt_host: mac
@@ -38,10 +83,13 @@ jobs:
             artifact_name: app-macos
             build_dir: build
             package_dir: dist
+            archive_ext: zip
 
     env:
       QT_VERSION: 6.10.2
       BUILD_TYPE: Release
+      APP_VERSION: ${{ needs.read-version.outputs.version }}
+      APP_TAG: ${{ needs.read-version.outputs.tag }}
 
     steps:
       - name: Checkout
@@ -86,7 +134,8 @@ jobs:
             libfontconfig1 \
             libfreetype6 \
             libegl1 \
-            libopengl0
+            libopengl0 \
+            jq
 
       - name: Install Qt
         uses: jurplel/install-qt-action@v4
@@ -103,6 +152,8 @@ jobs:
         shell: bash
         run: |
           echo "QT_ROOT_DIR=$QT_ROOT_DIR"
+          echo "APP_VERSION=$APP_VERSION"
+          echo "APP_TAG=$APP_TAG"
           find "$QT_ROOT_DIR" -maxdepth 4 -type d \( -name Qt6 -o -name cmake \) | head -50 || true
 
       - name: Configure (Windows)
@@ -400,48 +451,91 @@ jobs:
 
           Stop-Process -Id $proc.Id -Force
 
-      - name: Zip app (Linux)
+      - name: Archive app (Linux)
         if: runner.os == 'Linux'
         shell: bash
         run: |
           set -euo pipefail
-          cd "${{ matrix.package_dir }}"
-          tar -czf "../${{ matrix.artifact_name }}.tar.gz" .
+          tar -C "${{ matrix.package_dir }}" -czf "Findex-${APP_VERSION}-linux.tar.gz" .
 
-      - name: Zip app (Windows)
+      - name: Archive app (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          Compress-Archive -Path "${{ matrix.package_dir }}\*" -DestinationPath "${{ matrix.artifact_name }}.zip" -Force
+          Compress-Archive -Path "${{ matrix.package_dir }}\*" -DestinationPath "Findex-${env:APP_VERSION}-windows.zip" -Force
 
-      - name: Zip app (macOS)
+      - name: Archive app (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euo pipefail
           cd "${{ matrix.package_dir }}"
-          ditto -c -k --sequesterRsrc --keepParent "Findex.app" "app-macos.zip"
-
-      - name: Upload artifact (Windows)
-        if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_name }}.zip
-          if-no-files-found: error
+          ditto -c -k --sequesterRsrc --keepParent "Findex.app" "../Findex-${APP_VERSION}-macos.zip"
 
       - name: Upload artifact (Linux)
         if: runner.os == 'Linux'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.artifact_name }}.tar.gz
+          name: release-linux
+          path: Findex-${{ env.APP_VERSION }}-linux.tar.gz
+          if-no-files-found: error
+
+      - name: Upload artifact (Windows)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-windows
+          path: Findex-${{ env.APP_VERSION }}-windows.zip
           if-no-files-found: error
 
       - name: Upload artifact (macOS)
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: ${{ matrix.package_dir }}/app-macos.zip
+          name: release-macos
+          path: Findex-${{ env.APP_VERSION }}-macos.zip
           if-no-files-found: error
+
+  release:
+    name: Create GitHub release
+    runs-on: ubuntu-latest
+    needs: [read-version, build]
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Download Linux artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-linux
+          path: release-assets
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-windows
+          path: release-assets
+
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: release-macos
+          path: release-assets
+
+      - name: Show downloaded assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          find release-assets -maxdepth 3 -type f -print
+
+      - name: Create or update GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.read-version.outputs.tag }}
+          name: Findex ${{ needs.read-version.outputs.version }}
+          generate_release_notes: true
+          draft: false
+          prerelease: false
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/**/*.zip
+            release-assets/**/*.tar.gz

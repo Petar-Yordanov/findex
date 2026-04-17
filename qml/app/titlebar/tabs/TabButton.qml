@@ -88,8 +88,9 @@ Rectangle {
             if (viewModel)
                 viewModel.activateTabForDrop(tabIndex)
 
-            appWorkspaceViewModel.requestDropToPath(tabPath, "tab")
-            drop.accept(Qt.MoveAction)
+            const dropAction = drop.proposedAction === Qt.CopyAction ? Qt.CopyAction : Qt.MoveAction
+            appWorkspaceViewModel.requestDropToPath(tabPath, "tab", dropAction === Qt.CopyAction)
+            drop.accept(dropAction)
         }
     }
 

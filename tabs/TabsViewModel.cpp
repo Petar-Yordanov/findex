@@ -119,26 +119,108 @@ void TabsViewModel::addTab()
 
 void TabsViewModel::closeTab(int index)
 {
-    if (m_tabsModel.rowCount() <= 1)
+    const auto currentTabs = m_tabsModel.tabs();
+    if (index < 0 || index >= currentTabs.size() || currentTabs.size() <= 1)
         return;
 
-    const QString title =
-        m_tabsModel.data(m_tabsModel.index(index, 0), TabListModel::TitleRole).toString();
+    cancelRenameTab();
 
-    m_tabsModel.closeTab(index);
+    QVector<TabListModel::TabItem> tabs = currentTabs;
+    const QString title = tabs.at(index).title;
+    const bool currentTabWillChange = (index == m_currentIndex);
 
-    if (m_currentIndex >= m_tabsModel.rowCount())
-        setCurrentIndexInternal(m_tabsModel.rowCount() - 1);
-    else
-        m_tabsModel.activateTab(m_currentIndex);
+    int nextCurrentIndex = m_currentIndex;
+    if (index < m_currentIndex)
+        --nextCurrentIndex;
+    else if (index == m_currentIndex)
+        nextCurrentIndex = qMin(index, tabs.size() - 2);
 
-    if (m_editingIndex == index)
-        cancelRenameTab();
-    else if (m_editingIndex > index)
-        setEditingIndexInternal(m_editingIndex - 1);
+    tabs.removeAt(index);
+    applyTabsState(tabs, nextCurrentIndex);
 
     emit tabsStateChanged();
     emit tabClosed(index, title);
+
+    if (currentTabWillChange)
+        emitCurrentTabActivated();
+}
+
+void TabsViewModel::closeOtherTabs(int index)
+{
+    const auto currentTabs = m_tabsModel.tabs();
+    if (index < 0 || index >= currentTabs.size() || currentTabs.size() <= 1)
+        return;
+
+    cancelRenameTab();
+
+    const bool currentTabWillChange = (m_currentIndex != index);
+    QVector<TabListModel::TabItem> tabs;
+    tabs.push_back(currentTabs.at(index));
+    applyTabsState(tabs, 0);
+    emit tabsStateChanged();
+
+    if (currentTabWillChange)
+        emitCurrentTabActivated();
+}
+
+void TabsViewModel::closeTabsToLeft(int index)
+{
+    const auto currentTabs = m_tabsModel.tabs();
+    if (index <= 0 || index >= currentTabs.size())
+        return;
+
+    cancelRenameTab();
+
+    QVector<TabListModel::TabItem> tabs;
+    tabs.reserve(currentTabs.size() - index);
+    for (int i = index; i < currentTabs.size(); ++i)
+        tabs.push_back(currentTabs.at(i));
+
+    const bool currentTabWillChange = (m_currentIndex < index);
+    const int nextCurrentIndex = currentTabWillChange ? 0 : (m_currentIndex - index);
+    applyTabsState(tabs, nextCurrentIndex);
+    emit tabsStateChanged();
+
+    if (currentTabWillChange)
+        emitCurrentTabActivated();
+}
+
+void TabsViewModel::closeTabsToRight(int index)
+{
+    const auto currentTabs = m_tabsModel.tabs();
+    if (index < 0 || index >= currentTabs.size() - 1)
+        return;
+
+    cancelRenameTab();
+
+    QVector<TabListModel::TabItem> tabs;
+    tabs.reserve(index + 1);
+    for (int i = 0; i <= index; ++i)
+        tabs.push_back(currentTabs.at(i));
+
+    const bool currentTabWillChange = (m_currentIndex > index);
+    const int nextCurrentIndex = currentTabWillChange ? index : m_currentIndex;
+    applyTabsState(tabs, nextCurrentIndex);
+    emit tabsStateChanged();
+
+    if (currentTabWillChange)
+        emitCurrentTabActivated();
+}
+
+void TabsViewModel::duplicateTab(int index)
+{
+    const auto currentTabs = m_tabsModel.tabs();
+    if (index < 0 || index >= currentTabs.size())
+        return;
+
+    cancelRenameTab();
+
+    QVector<TabListModel::TabItem> tabs = currentTabs;
+    tabs.insert(index + 1, currentTabs.at(index));
+    applyTabsState(tabs, index + 1);
+    emit tabsStateChanged();
+    emit tabAdded(index + 1, tabs.at(index + 1).title, tabs.at(index + 1).path);
+    emitCurrentTabActivated();
 }
 
 void TabsViewModel::activateTab(int index)
@@ -254,6 +336,32 @@ void TabsViewModel::syncCurrentTabToPath(const QString& path)
         m_tabsModel.setTabTitle(m_currentIndex, defaultTitleForPath(path), false);
 
     emit tabsStateChanged();
+}
+
+void TabsViewModel::applyTabsState(const QVector<TabListModel::TabItem>& tabs, int currentIndex)
+{
+    QVector<TabListModel::TabItem> nextTabs = tabs;
+    if (nextTabs.isEmpty())
+        nextTabs.push_back({ QStringLiteral("Home"), QStringLiteral("home"), QStringLiteral("C:/Users/Petar"), true, false });
+
+    const int safeIndex = qBound(0, currentIndex, nextTabs.size() - 1);
+    for (int i = 0; i < nextTabs.size(); ++i)
+        nextTabs[i].active = (i == safeIndex);
+
+    m_tabsModel.setTabs(nextTabs);
+    setCurrentIndexInternal(safeIndex);
+}
+
+void TabsViewModel::emitCurrentTabActivated()
+{
+    if (m_currentIndex < 0 || m_currentIndex >= m_tabsModel.rowCount())
+        return;
+
+    const auto dataIndex = m_tabsModel.index(m_currentIndex, 0);
+    emit tabActivated(
+        m_currentIndex,
+        m_tabsModel.data(dataIndex, TabListModel::TitleRole).toString(),
+        m_tabsModel.data(dataIndex, TabListModel::PathRole).toString());
 }
 
 void TabsViewModel::setCurrentIndexInternal(int index)
