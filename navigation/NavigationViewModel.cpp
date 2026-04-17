@@ -104,6 +104,7 @@ void NavigationViewModel::setCurrentSearch(const QString& value)
 
     m_currentSearch = value;
     emit currentSearchChanged();
+    invokeBackendSearch();
 }
 
 QString NavigationViewModel::searchScope() const
@@ -122,6 +123,7 @@ void NavigationViewModel::setSearchScope(const QString& value)
 
     m_searchScope = resolved;
     emit searchScopeChanged();
+    invokeBackendSearch();
 }
 
 bool NavigationViewModel::canGoBack() const

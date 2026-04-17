@@ -10,6 +10,7 @@ Rectangle {
     required property var viewModel
     required property var sidebarContextMenu
 
+    visible: Qt.platform.os === "windows"
     Layout.fillWidth: true
     Layout.fillHeight: true
     radius: Theme.Metrics.radiusLg
